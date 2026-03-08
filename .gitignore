@@ -1,13 +1,33 @@
-# Node
+# -----------------------
+# Node / React
+# -----------------------
 node_modules/
 dist/
+build/
+.vite/
 
-# Java
+# -----------------------
+# Java / Spring Boot
+# -----------------------
 target/
+*.class
 *.log
 
-# OS
-.DS_Store
+# -----------------------
+# IDE Files
+# -----------------------
+.idea/
+*.iml
+.vscode/
 
-# Environment
+# -----------------------
+# Environment Variables
+# -----------------------
 .env
+.env.local
+
+# -----------------------
+# OS Files
+# -----------------------
+.DS_Store
+Thumbs.db
