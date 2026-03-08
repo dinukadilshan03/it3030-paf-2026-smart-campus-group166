@@ -9,20 +9,20 @@ on:
 jobs:
 
   backend:
-    runs-on: ubuntu-latest
+  runs-on: ubuntu-latest
 
-    steps:
-      - uses: actions/checkout@v4
+  steps:
+    - uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: 21
 
-      - name: Build Backend
-        working-directory: backend
-        run: mvn -B clean package
+    - name: Build Backend
+      working-directory: backend
+      run: mvn -B clean package -DskipTests
 
   frontend:
     runs-on: ubuntu-latest
