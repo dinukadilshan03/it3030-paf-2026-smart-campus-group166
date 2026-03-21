@@ -1,81 +1,319 @@
-# Database Schema - SmartCampus
+# PAF System – Database Design
 
 ## Overview
-- Database Engine: PostgreSQL
-- ORM Layer: Spring Data JPA + Hibernate
-- Naming Convention: Java fields use camelCase; database naming follows Spring/Hibernate defaults.
-- Migration Strategy: No migration tool configured yet; schema is currently managed by Hibernate auto update.
-- Hibernate DDL Mode: `spring.jpa.hibernate.ddl-auto=update`
 
-## Entity List
-- `User` (`users` table)
-- `Role` enum (`USER`, `ADMIN`, `TECHNICIAN`)
-- `AuthProvider` enum (`LOCAL`, `GOOGLE`)
+This document defines the relational database schema for the PAF system.
+It is designed for compatibility with **Spring Boot + JPA + PostgreSQL/MySQL**.
 
-## Table Definitions
+---
 
-### Table: `users`
-Purpose: Stores application user accounts, credentials, and auth provider details.
+## Entities
 
-Columns (from `User` entity):
-- `id`: bigint, primary key, auto-generated identity
-- `name`: varchar, not null
-- `email`: varchar, unique, not null
-- `password`: varchar, not null
-- `role`: varchar (enum as string), nullable unless enforced at service level
-- `auth_provider`: varchar (enum as string), nullable unless enforced at service level
-- `provider_id`: varchar, nullable
-- `active`: boolean, defaults to true in `@PrePersist` when null
-- `created_at`: timestamp, set in `@PrePersist`
+* User
+* Role
+* Resource
+* ResourceType
+* Booking
+* Ticket
+* TicketAssignment
+* Comment
+* Notification
+* Attachment
 
-Indexes and constraints:
-- Unique constraint/index on `email`
-- Primary key on `id`
+---
 
-Relationships:
-- No foreign-key relationships are defined yet.
+## 1. Role Table
 
-## Relationship Summary
-- Current schema has one standalone table: `users`
-- No one-to-many, many-to-many, or one-to-one relationships are implemented yet.
+Defines system roles.
 
-## ER Diagram
-Current state:
-- users
-
-## Sample SQL Snippets
-
-Create table (representative):
 ```sql
-CREATE TABLE users (
-  id BIGSERIAL PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  email VARCHAR(255) NOT NULL UNIQUE,
-  password VARCHAR(255) NOT NULL,
-  role VARCHAR(50),
-  auth_provider VARCHAR(50),
-  provider_id VARCHAR(255),
-  active BOOLEAN,
-  created_at TIMESTAMP
-);
+Table: roles
+
+role_id      BIGINT (PK)
+role_name    VARCHAR(50) UNIQUE
+description  TEXT
+created_at   TIMESTAMP
 ```
 
-Unique index (representative):
+**Example Roles**
+
+* ADMIN
+* USER
+* TECHNICIAN
+
+---
+
+## 2. User Table
+
+Stores system users.
+
 ```sql
-CREATE UNIQUE INDEX uk_users_email ON users(email);
+Table: users
+
+user_id        BIGINT (PK)
+name           VARCHAR(120)
+email          VARCHAR(120) UNIQUE
+role_id        BIGINT (FK → roles.role_id)
+department     VARCHAR(120)
+phone          VARCHAR(30)
+oauth_provider VARCHAR(50)
+oauth_id       VARCHAR(120)
+status         VARCHAR(20)
+created_at     TIMESTAMP
+updated_at     TIMESTAMP
 ```
 
-## Data Integrity Rules
-- Every user must have `name`, `email`, and `password`.
-- `email` must be unique.
-- `active` defaults to true when user is first persisted and value is null.
+**Relationship**
 
-## Seed Data
-- Seed mechanism is not implemented yet.
-- Expected initial enum values:
-  - Roles: `USER`, `ADMIN`, `TECHNICIAN`
-  - Auth providers: `LOCAL`, `GOOGLE`
+```
+users.role_id → roles.role_id
+```
 
-## Notes
-- Add migration tooling (Flyway or Liquibase) before production.
-- Add explicit nullable constraints for enum fields if required by business rules.
+---
+
+## 3. ResourceType Table
+
+Defines categories of resources.
+
+```sql
+Table: resource_types
+
+type_id     BIGINT (PK)
+type_name   VARCHAR(100)
+category    VARCHAR(100)
+description TEXT
+```
+
+**Examples**
+
+* LECTURE_HALL (FACILITY)
+* LAB (FACILITY)
+* PROJECTOR (EQUIPMENT)
+* CAMERA (EQUIPMENT)
+
+---
+
+## 4. Resource Table
+
+Represents actual resources.
+
+```sql
+Table: resources
+
+resource_id  BIGINT (PK)
+name         VARCHAR(150)
+type_id      BIGINT (FK → resource_types.type_id)
+location     VARCHAR(200)
+capacity     INT
+status       VARCHAR(30)
+description  TEXT
+created_at   TIMESTAMP
+updated_at   TIMESTAMP
+```
+
+**Relationship**
+
+```
+resources.type_id → resource_types.type_id
+```
+
+---
+
+## 5. Booking Table
+
+Handles reservations.
+
+```sql
+Table: bookings
+
+booking_id          BIGINT (PK)
+resource_id         BIGINT (FK → resources.resource_id)
+user_id             BIGINT (FK → users.user_id)
+start_time          TIMESTAMP
+end_time            TIMESTAMP
+purpose             TEXT
+expected_attendees  INT
+status              VARCHAR(30)
+approval_reason     TEXT
+created_at          TIMESTAMP
+updated_at          TIMESTAMP
+```
+
+**Statuses**
+
+* PENDING
+* APPROVED
+* REJECTED
+* CANCELLED
+
+**Relationships**
+
+```
+bookings.resource_id → resources.resource_id
+bookings.user_id → users.user_id
+```
+
+---
+
+## 6. Ticket Table
+
+Maintenance/incident tracking.
+
+```sql
+Table: tickets
+
+ticket_id         BIGINT (PK)
+resource_id       BIGINT (FK → resources.resource_id)
+reported_by       BIGINT (FK → users.user_id)
+category          VARCHAR(100)
+priority          VARCHAR(20)
+description       TEXT
+status            VARCHAR(30)
+preferred_contact VARCHAR(120)
+created_at        TIMESTAMP
+updated_at        TIMESTAMP
+```
+
+**Statuses**
+
+* OPEN
+* IN_PROGRESS
+* RESOLVED
+* CLOSED
+* REJECTED
+
+---
+
+## 7. TicketAssignment Table
+
+Tracks technician assignments.
+
+```sql
+Table: ticket_assignments
+
+assignment_id  BIGINT (PK)
+ticket_id      BIGINT (FK → tickets.ticket_id)
+technician_id  BIGINT (FK → users.user_id)
+assigned_by    BIGINT (FK → users.user_id)
+assigned_at    TIMESTAMP
+```
+
+---
+
+## 8. Comment Table
+
+Stores ticket discussions.
+
+```sql
+Table: comments
+
+comment_id  BIGINT (PK)
+ticket_id   BIGINT (FK → tickets.ticket_id)
+user_id     BIGINT (FK → users.user_id)
+content     TEXT
+created_at  TIMESTAMP
+updated_at  TIMESTAMP
+```
+
+---
+
+## 9. Notification Table
+
+Stores system notifications.
+
+```sql
+Table: notifications
+
+notification_id BIGINT (PK)
+user_id         BIGINT (FK → users.user_id)
+type            VARCHAR(50)
+message         TEXT
+reference_id    BIGINT
+is_read         BOOLEAN
+created_at      TIMESTAMP
+```
+
+**Examples**
+
+* BOOKING_APPROVED
+* BOOKING_REJECTED
+* TICKET_STATUS_UPDATE
+* NEW_COMMENT
+
+---
+
+## 10. Attachment Table
+
+Stores files for tickets.
+
+```sql
+Table: attachments
+
+attachment_id BIGINT (PK)
+ticket_id     BIGINT (FK → tickets.ticket_id)
+file_name     VARCHAR(200)
+file_url      VARCHAR(300)
+file_type     VARCHAR(50)
+file_size     BIGINT
+uploaded_at   TIMESTAMP
+```
+
+---
+
+# System Relationships (High-Level)
+
+```
+Role
+ └── User
+      ├── Booking
+      ├── Ticket
+      │    ├── Comment
+      │    ├── Attachment
+      │    └── TicketAssignment
+      └── Notification
+
+ResourceType
+ └── Resource
+      ├── Booking
+      └── Ticket
+```
+
+---
+
+# Module Ownership (Team Split)
+
+## Member 1 – Facilities & Assets
+
+* Resource
+* ResourceType
+
+## Member 2 – Booking Management
+
+* Booking
+
+## Member 3 – Maintenance & Ticketing
+
+* Ticket
+* TicketAssignment
+* Comment
+* Attachment
+
+## Member 4 – Auth & Notifications
+
+* User
+* Role
+* Notification
+
+---
+
+# Notes for Implementation
+
+* Use **JPA relationships** (`@ManyToOne`, `@OneToMany`) to map foreign keys
+* Enforce **unique constraints** (email, role_name)
+* Add **indexes** on:
+
+  * `resource_id`
+  * `user_id`
+  * `ticket_id`
+* Consider using **ENUMs** for status fields in code layer
+
