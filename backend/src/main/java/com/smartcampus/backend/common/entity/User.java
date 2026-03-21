@@ -1,48 +1,64 @@
 package com.smartcampus.backend.common.entity;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
 @Entity
+@Table(name = "users")
 @Getter
 @Setter
-@Table(name = "users")
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(name = "user_id")
+    private Long userId;
 
-    @Column(nullable = false)
+    @Column(name = "name", length = 120, nullable = false)
     private String name;
 
-    @Column(unique = true, nullable = false)
+    @Column(name = "email", length = 120, unique = true, nullable = false)
     private String email;
 
-    @Column(nullable = false)
-    private String password;
-
-    @Enumerated(EnumType.STRING)
+    // FK → roles.role_id
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "role_id", nullable = false)
     private Role role;
 
-    @Enumerated(EnumType.STRING)
-    private AuthProvider authProvider;
+    @Column(name = "department", length = 120)
+    private String department;
 
-    private String providerId;
+    @Column(name = "phone", length = 30)
+    private String phone;
 
-    private Boolean active;
+    @Column(name = "oauth_provider", length = 50)
+    private String oauthProvider;
 
+    @Column(name = "oauth_id", length = 120)
+    private String oauthId;
+
+    @Column(name = "status", length = 20)
+    private String status;
+
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    // Auto timestamps
     @PrePersist
-    public void prePersist() {
-        createdAt = LocalDateTime.now();
-        if (active == null) {
-            active = true;
-        }
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
     }
 
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 }
