@@ -1,4 +1,4 @@
-package com.smartcampus.backend.common.entity;
+package com.smartcampus.backend.modules.booking.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
