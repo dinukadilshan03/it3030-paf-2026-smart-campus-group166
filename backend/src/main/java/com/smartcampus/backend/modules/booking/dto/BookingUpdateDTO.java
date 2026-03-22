@@ -1,3 +1,4 @@
+//update existing bookings
 package com.smartcampus.backend.modules.booking.dto;
 
 import java.time.LocalDateTime;

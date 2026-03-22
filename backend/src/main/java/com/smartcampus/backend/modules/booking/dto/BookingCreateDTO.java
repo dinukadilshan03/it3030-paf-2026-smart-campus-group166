@@ -1,3 +1,4 @@
+//Used for creating new bookings.
 package com.smartcampus.backend.modules.booking.dto;
 
 import java.time.LocalDateTime;

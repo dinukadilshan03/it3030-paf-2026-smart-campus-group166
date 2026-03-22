@@ -1,3 +1,4 @@
+//handles the business logic for managing bookings.
 package com.smartcampus.backend.modules.booking.service;
 
 import java.time.LocalDateTime;

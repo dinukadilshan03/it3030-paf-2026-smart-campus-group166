@@ -1,3 +1,4 @@
+//classes
 package com.smartcampus.backend.modules.booking.entity;
 
 import jakarta.persistence.*;

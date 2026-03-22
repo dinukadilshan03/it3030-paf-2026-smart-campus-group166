@@ -1,3 +1,4 @@
+//responsible for handling HTTP requests related to bookings. 
 package com.smartcampus.backend.modules.booking.controller;
 
 import java.util.HashMap;

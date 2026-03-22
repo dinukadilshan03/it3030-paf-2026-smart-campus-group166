@@ -1,3 +1,4 @@
+//A Spring Data JPA repository for managing Booking entities. 
 package com.smartcampus.backend.modules.booking.repository;
 
 import java.time.LocalDateTime;
