@@ -1,4 +1,4 @@
-package com.smartcampus.backend.common.Controller;
+package com.smartcampus.backend.modules.booking.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -11,8 +11,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.smartcampus.backend.common.Service.BookingService;
-import com.smartcampus.backend.common.entity.Booking;
+import com.smartcampus.backend.modules.booking.entity.Booking;
+import com.smartcampus.backend.modules.booking.service.BookingService;
 
 @RestController
 @RequestMapping("/api/bookings")

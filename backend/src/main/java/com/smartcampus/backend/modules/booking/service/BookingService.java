@@ -1,12 +1,12 @@
-package com.smartcampus.backend.common.Service;
+package com.smartcampus.backend.modules.booking.service;
 
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.smartcampus.backend.common.entity.Booking;
-import com.smartcampus.backend.common.repository.BookingRepository;
+import com.smartcampus.backend.modules.booking.entity.Booking;
+import com.smartcampus.backend.modules.booking.repository.BookingRepository;
 
 @Service
 public class BookingService {
