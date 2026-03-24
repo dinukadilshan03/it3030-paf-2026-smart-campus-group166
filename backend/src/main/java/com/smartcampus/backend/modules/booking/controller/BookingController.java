@@ -1,6 +1,8 @@
 //responsible for handling HTTP requests related to bookings. 
 package com.smartcampus.backend.modules.booking.controller;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,8 +22,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.smartcampus.backend.modules.booking.dto.BookingCreateDTO;
 import com.smartcampus.backend.modules.booking.dto.BookingUpdateDTO;
+import com.smartcampus.backend.modules.booking.dto.PopularResourceDTO;
 import com.smartcampus.backend.modules.booking.entity.Booking;
 import com.smartcampus.backend.modules.booking.service.BookingService;
+import com.smartcampus.backend.modules.booking.service.RecommendationService;
 
 @RestController
 @RequestMapping("/api/bookings")
@@ -29,6 +33,9 @@ public class BookingController {
     
     @Autowired
     private BookingService bookingService;
+
+    @Autowired
+    private RecommendationService recommendationService;
     
     /**
      * Add/Create a new booking
@@ -161,6 +168,57 @@ public class BookingController {
             response.put("success", true);
             response.put("data", bookings);
             response.put("count", bookings.size());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Get popular resources (by booking count).
+     * Optional `since` param (ISO_LOCAL_DATE_TIME) and `limit`.
+     */
+    @GetMapping("/popular")
+    public ResponseEntity<?> getPopularResources(@RequestParam(required = false) String since,
+                                                 @RequestParam(required = false, defaultValue = "10") int limit) {
+        try {
+            LocalDateTime sinceDt = null;
+            if (since != null && !since.isBlank()) {
+                try {
+                    sinceDt = LocalDateTime.parse(since);
+                } catch (DateTimeParseException ex) {
+                    throw new RuntimeException("Invalid since datetime format. Use ISO_LOCAL_DATE_TIME");
+                }
+            }
+            List<PopularResourceDTO> popular = recommendationService.getPopularResources(sinceDt, limit);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("data", popular);
+            response.put("count", popular.size());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+    }
+
+    /**
+     * Recommend resources for a user. Optional `userId` and `limit`.
+     */
+    @GetMapping("/recommendations")
+    public ResponseEntity<?> getRecommendations(@RequestParam(required = false) Long userId,
+                                                @RequestParam(required = false, defaultValue = "5") int limit) {
+        try {
+            List<PopularResourceDTO> recs = recommendationService.getRecommendations(userId, limit);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("data", recs);
+            response.put("count", recs.size());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> response = new HashMap<>();

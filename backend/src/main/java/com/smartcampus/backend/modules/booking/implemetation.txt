@@ -1,0 +1,39 @@
+Here’s a concise explanation of options A, B and C so you can pick what to implement next.
+
+**A — Availability filtering + unit tests**
+- What: Ensure recommendations exclude resources already booked for the requested time and add automated tests.
+- Key steps:
+  - Add availability check in `RecommendationService` and/or `BookingService` using `BookingRepository.findByResourceIdAndStatusAndTimeRange`.
+  - Accept time/date filters in recommendation API (`/api/bookings/recommendations`) and apply availability + capacity rules.
+  - Add unit tests for conflict cases and integration tests for the controller (`src/test/java/...`).
+- Complexity / ETA: Low → Moderate (1–2 days).
+- Pros: Better UX (no recommending unavailable resources); quick win; easy to test.
+- Cons: Needs careful timezone handling and concurrent booking edge-cases.
+
+**B — Scheduled aggregation + cache**
+- What: Precompute top-N popular resources and cache results for fast reads.
+- Key steps:
+  - Create scheduled task (e.g., `@Scheduled(cron = ...)`) to run aggregation query and store results in memory or Redis.
+  - Replace on-the-fly `findTopResources` calls with cached data in `RecommendationService`.
+  - Add cache invalidation or incremental updates on new approved bookings.
+- Complexity / ETA: Moderate (1–3 days).
+- Pros: Scalability and lower DB load; stable latency for frontend.
+- Cons: Slight staleness of results; needs cache infra (Redis) for multi-node setups.
+
+**C — Embedding-based AI agent flow**
+- What: Use semantic embeddings to match user natural-language requests to resource profiles (name, description, tags), combine with popularity and availability for ranked recommendations.
+- Two practical approaches:
+  - Quick/managed: use external embeddings API (OpenAI, Cohere) — compute and store resource vectors, embed user query, nearest-neighbor search (vector similarity).
+  - Full/advanced: build vector index (Milvus/Weaviate/FAISS) or a Python microservice for similarity + business-rule fusion.
+- Key steps:
+  - Create resource text profiles and compute & store embeddings (one-time + update on resource change).
+  - Add `RecommendationService` logic: embed query → nearest neighbors → filter by availability → blend with usage score.
+  - Expose API `POST /api/bookings/recommendations` that accepts natural-language intent and optional constraints.
+  - Add rate-limits, caching, and privacy checks.
+- Complexity / ETA: Medium → High (1–3+ weeks depending on infra).
+- Pros: Much better relevance for complex user intents; supports richer UX (“I need a quiet room for 10 people near library”).
+- Cons: Requires embedding/LLM costs or new infra; slightly more complex to test and secure.
+
+rules and regulations section 
+
+announcement section
