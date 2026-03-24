@@ -147,21 +147,21 @@ public class BookingService {
      * Get bookings by user
      */
     public List<Booking> getBookingsByUser(Long userId) {
-        return bookingRepository.findByUserId(userId);
+        return bookingRepository.findByUser_UserId(userId);
     }
     
     /**
      * Get bookings by resource
      */
     public List<Booking> getBookingsByResource(Long resourceId) {
-        return bookingRepository.findByResourceId(resourceId);
+        return bookingRepository.findByResource_Id(resourceId);
     }
     
     /**
      * Get pending bookings for a resource
      */
     public List<Booking> getPendingBookingsByResource(Long resourceId) {
-        return bookingRepository.findByResourceIdAndStatus(resourceId, "PENDING");
+        return bookingRepository.findByResource_IdAndStatus(resourceId, "PENDING");
     }
     
     /**

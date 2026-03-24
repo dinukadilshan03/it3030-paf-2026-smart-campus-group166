@@ -15,11 +15,11 @@ import com.smartcampus.backend.modules.booking.entity.Booking;
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
     
-    List<Booking> findByUserId(Long userId);
+    List<Booking> findByUser_UserId(Long userId);
     
-    List<Booking> findByResourceId(Long resourceId);
+    List<Booking> findByResource_Id(Long resourceId);
     
-    List<Booking> findByResourceIdAndStatus(Long resourceId, String status);
+    List<Booking> findByResource_IdAndStatus(Long resourceId, String status);
     
     /**
      * Find bookings that conflict with a given time range for a specific resource
