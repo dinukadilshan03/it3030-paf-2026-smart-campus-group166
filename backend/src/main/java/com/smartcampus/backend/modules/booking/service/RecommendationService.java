@@ -46,7 +46,7 @@ public class RecommendationService {
             return popular.subList(0, Math.min(limit, popular.size()));
         }
 
-        List<Booking> userBookings = bookingRepository.findByUserId(userId);
+        List<Booking> userBookings = bookingRepository.findByUser_UserId(userId);
         Set<Long> userResourceIds = new HashSet<>();
         for (Booking b : userBookings) {
             if (b.getResource() != null && b.getResource().getId() != null) {
