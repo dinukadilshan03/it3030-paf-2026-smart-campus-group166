@@ -5,6 +5,9 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
+import com.smartcampus.backend.common.enums.OAuthProvider;
+import com.smartcampus.backend.common.enums.UserStatus;
+
 @Entity
 @Table(name = "users")
 @Getter
@@ -25,8 +28,9 @@ public class User {
     @Column(name = "email", length = 120, unique = true, nullable = false)
     private String email;
 
-    // FK → roles.role_id
-    @ManyToOne(fetch = FetchType.EAGER)
+    // FK -> roles.role_id
+    // Lazy loading avoids unnecessary joins when listing users.
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
 
@@ -36,14 +40,17 @@ public class User {
     @Column(name = "phone", length = 30)
     private String phone;
 
-    @Column(name = "oauth_provider", length = 50)
-    private String oauthProvider;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "oauth_provider")
+    private OAuthProvider oauthProvider;
 
     @Column(name = "oauth_id", length = 120)
     private String oauthId;
 
-    @Column(name = "status", length = 20)
-    private String status;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status")
+    // Enum-backed status keeps lifecycle values type-safe.
+    private UserStatus status;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

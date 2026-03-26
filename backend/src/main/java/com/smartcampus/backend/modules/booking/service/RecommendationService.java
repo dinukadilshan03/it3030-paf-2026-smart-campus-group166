@@ -55,7 +55,7 @@ public class RecommendationService {
                                                        java.time.LocalDateTime endTime, int limit) {
         List<PopularResourceDTO> popular = getPopularResources(null, Math.max(10, limit));
 
-        // Determine user's previous resource ids
+        List<Booking> userBookings = bookingRepository.findByUser_UserId(userId);
         Set<Long> userResourceIds = new HashSet<>();
         if (userId != null) {
             List<Booking> userBookings = bookingRepository.findByUserId(userId);

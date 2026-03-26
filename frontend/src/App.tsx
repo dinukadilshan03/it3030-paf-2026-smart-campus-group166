@@ -1,35 +1,106 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useEffect, useState } from 'react';
+import './FacilitiesCatalogue.css';
+import ResourceForm from './components/ResourceForm';
+import ResourceList from './components/ResourceList';
+import {
+  createResource,
+  deleteResource,
+  getAllResources,
+  searchResources,
+  updateResource,
+  type Resource,
+} from './services/resourceService';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [editingResource, setEditingResource] = useState<Resource | null>(null);
+  const [searchText, setSearchText] = useState('');
+
+  const loadResources = async () => {
+    try {
+      const data = await getAllResources();
+      setResources(data);
+    } catch (error) {
+      console.error('Error loading resources:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadResources();
+  }, []);
+
+  const handleSubmit = async (resource: Resource) => {
+    try {
+      if (editingResource?.id) {
+        await updateResource(editingResource.id, resource);
+        setEditingResource(null);
+      } else {
+        await createResource(resource);
+      }
+      await loadResources();
+    } catch (error) {
+      console.error('Error saving resource:', error);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteResource(id);
+      await loadResources();
+    } catch (error) {
+      console.error('Error deleting resource:', error);
+    }
+  };
+
+  const handleEdit = (resource: Resource) => {
+    setEditingResource(resource);
+  };
+
+  const handleSearch = async () => {
+    try {
+      if (!searchText.trim()) {
+        await loadResources();
+        return;
+      }
+      const data = await searchResources(searchText);
+      setResources(data);
+    } catch (error) {
+      console.error('Error searching resources:', error);
+    }
+  };
+
+  const clearEdit = () => {
+    setEditingResource(null);
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <div className="app-container">
+      <h1>Facilities & Assets Catalogue</h1>
+
+      <div className="search-bar">
+        <input
+          type="text"
+          placeholder="Search by type"
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+        />
+        <button onClick={handleSearch}>Search</button>
+        <button onClick={loadResources}>Reset</button>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+
+      <ResourceForm
+        onSubmit={handleSubmit}
+        editingResource={editingResource}
+        clearEdit={clearEdit}
+      />
+
+      <ResourceList
+        resources={resources}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+      />
+    </div>
+  );
 }
 
-export default App
+export default App;
