@@ -212,9 +212,28 @@ public class BookingController {
      */
     @GetMapping("/recommendations")
     public ResponseEntity<?> getRecommendations(@RequestParam(required = false) Long userId,
+                                                @RequestParam(required = false) String start,
+                                                @RequestParam(required = false) String end,
                                                 @RequestParam(required = false, defaultValue = "5") int limit) {
         try {
-            List<PopularResourceDTO> recs = recommendationService.getRecommendations(userId, limit);
+            java.time.LocalDateTime startDt = null;
+            java.time.LocalDateTime endDt = null;
+            if (start != null && !start.isBlank()) {
+                try {
+                    startDt = java.time.LocalDateTime.parse(start);
+                } catch (DateTimeParseException ex) {
+                    throw new RuntimeException("Invalid start datetime format. Use ISO_LOCAL_DATE_TIME");
+                }
+            }
+            if (end != null && !end.isBlank()) {
+                try {
+                    endDt = java.time.LocalDateTime.parse(end);
+                } catch (DateTimeParseException ex) {
+                    throw new RuntimeException("Invalid end datetime format. Use ISO_LOCAL_DATE_TIME");
+                }
+            }
+
+            List<PopularResourceDTO> recs = recommendationService.getRecommendations(userId, startDt, endDt, limit);
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("data", recs);

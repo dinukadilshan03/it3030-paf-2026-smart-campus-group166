@@ -17,8 +17,11 @@ import com.smartcampus.backend.modules.booking.repository.BookingRepository;
 @Service
 public class RecommendationService {
 
-    @Autowired
-    private BookingRepository bookingRepository;
+    private final BookingRepository bookingRepository;
+
+    public RecommendationService(BookingRepository bookingRepository) {
+        this.bookingRepository = bookingRepository;
+    }
 
     /**
      * Return top popular resources since an optional date.
@@ -40,32 +43,54 @@ public class RecommendationService {
      * falling back to popularity ranking.
      */
     public List<PopularResourceDTO> getRecommendations(Long userId, int limit) {
-        List<PopularResourceDTO> popular = getPopularResources(null, Math.max(10, limit));
+        return getRecommendations(userId, null, null, limit);
+    }
 
-        if (userId == null) {
-            return popular.subList(0, Math.min(limit, popular.size()));
-        }
+    /**
+     * Recommend resources with optional time window availability filtering.
+     * If startTime and endTime are provided, resources that have APPROVED
+     * bookings overlapping that range are excluded.
+     */
+    public List<PopularResourceDTO> getRecommendations(Long userId, java.time.LocalDateTime startTime,
+                                                       java.time.LocalDateTime endTime, int limit) {
+        List<PopularResourceDTO> popular = getPopularResources(null, Math.max(10, limit));
 
         List<Booking> userBookings = bookingRepository.findByUser_UserId(userId);
         Set<Long> userResourceIds = new HashSet<>();
-        for (Booking b : userBookings) {
-            if (b.getResource() != null && b.getResource().getId() != null) {
-                userResourceIds.add(b.getResource().getId());
+        if (userId != null) {
+            List<Booking> userBookings = bookingRepository.findByUserId(userId);
+            for (Booking b : userBookings) {
+                if (b.getResource() != null && b.getResource().getId() != null) {
+                    userResourceIds.add(b.getResource().getId());
+                }
             }
         }
 
-        List<PopularResourceDTO> prioritized = new ArrayList<>();
-        // first add user's resources if present in popular list
+        List<PopularResourceDTO> filtered = new ArrayList<>();
+
         for (PopularResourceDTO p : popular) {
-            if (userResourceIds.contains(p.getResourceId())) {
-                prioritized.add(p);
+            Long resId = p.getResourceId();
+
+            // If time window provided, check for conflicting APPROVED bookings
+            boolean available = true;
+            if (startTime != null && endTime != null && resId != null) {
+                List<Booking> conflicts = bookingRepository.findByResourceIdAndStatusAndTimeRange(resId,
+                        "APPROVED", startTime, endTime);
+                if (conflicts != null && !conflicts.isEmpty()) {
+                    available = false;
+                }
             }
+
+            if (available) filtered.add(p);
         }
-        // then add remaining popular
-        for (PopularResourceDTO p : popular) {
-            if (!userResourceIds.contains(p.getResourceId())) {
-                prioritized.add(p);
-            }
+
+        // Prioritize user's previous resources
+        List<PopularResourceDTO> prioritized = new ArrayList<>();
+        for (PopularResourceDTO p : filtered) {
+            if (userResourceIds.contains(p.getResourceId())) prioritized.add(p);
+        }
+        for (PopularResourceDTO p : filtered) {
+            if (!userResourceIds.contains(p.getResourceId())) prioritized.add(p);
         }
 
         return prioritized.subList(0, Math.min(limit, prioritized.size()));
