@@ -37,3 +37,12 @@ Here’s a concise explanation of options A, B and C so you can pick what to imp
 rules and regulations section 
 
 announcement section
+
+caching 
+- Performance: Returns GET /api/bookings/popular results much faster (ms vs DB aggregation time).
+- Reduced DB load: Avoids repeated GROUP BY/joins on bookings for every request; lowers CPU and I/O.
+- Scalability: Supports many frontend users or calendar refreshes without multiplying DB queries.
+- Predictable latency: Stable response times improve UX (important for UI widgets and mobile apps).
+- Cost: Less DB usage reduces infra costs for cloud DBs and avoids costly autoscaling.
+- Rate-limiting expensive work: Lets you decouple heavy ops (embeddings, vector searches) from synchronous requests.
+- Resilience: Cache can serve slightly stale data if DB is unreachable (graceful degradation).
