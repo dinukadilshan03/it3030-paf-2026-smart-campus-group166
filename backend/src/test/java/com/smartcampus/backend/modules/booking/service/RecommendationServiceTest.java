@@ -20,7 +20,6 @@ import org.springframework.data.domain.PageRequest;
 
 import com.smartcampus.backend.modules.booking.dto.PopularResourceDTO;
 import com.smartcampus.backend.modules.booking.entity.Booking;
-import com.smartcampus.backend.modules.booking.entity.Booking;
 import com.smartcampus.backend.modules.booking.repository.BookingRepository;
 
 @ExtendWith(MockitoExtension.class)

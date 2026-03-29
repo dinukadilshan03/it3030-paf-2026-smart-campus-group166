@@ -16,4 +16,6 @@ public class UserResponseDTO {
     private String department;
     private String phone;
     private String status;
+    private String oauthProvider;
+    private boolean localAccount;
 }
