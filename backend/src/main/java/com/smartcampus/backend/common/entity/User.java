@@ -28,6 +28,9 @@ public class User {
     @Column(name = "email", length = 120, unique = true, nullable = false)
     private String email;
 
+    @Column(name = "password_hash")
+    private String passwordHash;
+
     // FK -> roles.role_id
     // Lazy loading avoids unnecessary joins when listing users.
     @ManyToOne(fetch = FetchType.LAZY)
@@ -62,6 +65,7 @@ public class User {
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
     }
 
     @PreUpdate

@@ -19,6 +19,8 @@ public class UserMapper {
                 .department(user.getDepartment())
                 .phone(user.getPhone())
                 .status(user.getStatus() != null ? user.getStatus().name() : null)
+                .oauthProvider(user.getOauthProvider() != null ? user.getOauthProvider().name() : null)
+                .localAccount(user.getPasswordHash() != null && !user.getPasswordHash().isBlank())
                 .build();
     }
 }
