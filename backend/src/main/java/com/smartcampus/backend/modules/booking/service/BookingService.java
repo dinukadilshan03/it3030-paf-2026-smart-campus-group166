@@ -24,6 +24,9 @@ public class BookingService {
     
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private QRCodeService qrCodeService;
     
     /**
      * Create a new booking
@@ -56,7 +59,20 @@ public class BookingService {
             booking.setUser(user);
         }
         
-        return bookingRepository.save(booking);
+        // Save booking first to get the ID
+        booking = bookingRepository.save(booking);
+        
+        // Generate QR code after saving to get the booking ID
+        try {
+            String qrCodeBase64 = qrCodeService.generateQRCodeBase64(String.valueOf(booking.getId()));
+            booking.setQrCodeBase64(qrCodeBase64);
+            booking = bookingRepository.save(booking);
+        } catch (Exception e) {
+            // Log the error but don't fail the booking creation
+            System.err.println("Failed to generate QR code for booking " + booking.getId() + ": " + e.getMessage());
+        }
+        
+        return booking;
     }
     
     /**
@@ -172,6 +188,29 @@ public class BookingService {
             throw new RuntimeException("Booking not found with id: " + id);
         }
         bookingRepository.deleteById(id);
+    }
+    
+    /**
+     * Check in a booking via QR code
+     * Marks the booking as checked in and records the check-in time
+     */
+    public Booking checkInBooking(Long id) {
+        Optional<Booking> existingBooking = bookingRepository.findById(id);
+        
+        if (!existingBooking.isPresent()) {
+            throw new RuntimeException("Booking not found with id: " + id);
+        }
+        
+        Booking booking = existingBooking.get();
+        
+        if (booking.isCheckedIn()) {
+            throw new RuntimeException("Booking is already checked in");
+        }
+        
+        booking.setCheckedIn(true);
+        booking.setCheckInTime(LocalDateTime.now());
+        
+        return bookingRepository.save(booking);
     }
     
     // ============ Helper Methods ============
