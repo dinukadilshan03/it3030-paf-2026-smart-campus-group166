@@ -1,212 +1,202 @@
-# 🧱 Smart Campus Project – Setup Guide
+# Smart Campus Project - Setup Guide
 
 This guide explains how to set up the project locally for both backend and frontend.
 
----
-
-# 1. Prerequisites
+## 1. Prerequisites
 
 Install the following before starting:
 
-* Java 21 (JDK)
-* Node.js (LTS ≥ 20)
-* PostgreSQL (≥ 14)
-* Git
+- Java 21 (JDK)
+- Node.js (LTS >= 20)
+- PostgreSQL (>= 14)
+- Git
 
-### Recommended IDEs
+Recommended IDEs:
 
-* Backend: IntelliJ IDEA
-* Frontend: VS Code
+- Backend: IntelliJ IDEA
+- Frontend: VS Code
 
----
+## 2. Backend Setup
 
-# 2. Backend Setup (Spring Boot)
-
-## Step 1 – Clone Repository
+### Step 1 - Clone Repository
 
 ```bash
 git clone <your-repo-url>
-cd backend
+cd SmartCampus
 ```
 
-## Step 2 – Environment Variables
+### Step 2 - Create Root .env File
 
-Create a `.env` file in the backend root:
+Create a `.env` file in the project root:
 
 ```env
 DB_URL=jdbc:postgresql://localhost:5432/smartcampus
-DB_USERNAME=postgres
+DB_USER=postgres
 DB_PASSWORD=yourpassword
-
-OAUTH_GOOGLE_CLIENT_ID=your_client_id
-OAUTH_GOOGLE_CLIENT_SECRET=your_secret
+FRONTEND_URL=http://localhost:5173
+BOOTSTRAP_ADMIN_EMAIL=admin@smartcampus.local
+BOOTSTRAP_ADMIN_PASSWORD=Admin@12345
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
 ```
 
-## Step 3 – application.properties
-
-```properties
-spring.datasource.url=${DB_URL}
-spring.datasource.username=${DB_USERNAME}
-spring.datasource.password=${DB_PASSWORD}
-
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=true
-
-spring.profiles.active=dev
-```
-
-## Step 4 – Create Database
+### Step 3 - Create Database
 
 ```sql
 CREATE DATABASE smartcampus;
 ```
 
-## Step 5 – Run Backend
+### Step 4 - Run Backend
+
+Windows:
+
+```powershell
+cd backend
+.\mvnw.cmd spring-boot:run
+```
+
+macOS/Linux:
 
 ```bash
+cd backend
 ./mvnw spring-boot:run
 ```
 
-Or run the main class in IntelliJ.
+### Step 5 - Verify Backend
 
-## Step 6 – Verify
+- API base: `http://localhost:8080`
+- Actuator: `http://localhost:8080/actuator`
 
-* API: [http://localhost:8080](http://localhost:8080)
-* Actuator: [http://localhost:8080/actuator](http://localhost:8080/actuator)
+## 3. Frontend Setup
 
----
-
-# 3. Frontend Setup (React + Vite)
-
-## Step 1 – Navigate to Frontend
+### Step 1 - Navigate to Frontend
 
 ```bash
 cd frontend
 ```
 
-## Step 2 – Install Dependencies
+### Step 2 - Install Dependencies
 
 ```bash
 npm install
 ```
 
-## Step 3 – Environment Variables
+### Step 3 - Frontend Environment
 
-Create `.env` file:
+Create `frontend/.env` if needed:
 
 ```env
-VITE_API_BASE_URL=http://localhost:8080/api
+VITE_API_BASE_URL=http://localhost:8080
 ```
 
-## Step 4 – Run Frontend
+### Step 4 - Run Frontend
 
 ```bash
 npm run dev
 ```
 
-## Step 5 – Verify
+### Step 5 - Verify Frontend
 
-* App: [http://localhost:5173](http://localhost:5173)
+- App: `http://localhost:5173`
 
----
+## 4. Google OAuth Setup
 
-# 4. Testing
+The app already contains the Google OAuth flow in code. You only need to create a Google OAuth client and copy the credentials into `.env`.
 
-## Backend Tests
+### Google Cloud Steps
 
-```bash
-./mvnw test
+1. Open the Google Cloud Console.
+2. Create or select a project.
+3. Configure the OAuth consent screen / branding details.
+4. Go to `APIs & Services -> Credentials`.
+5. Create an `OAuth client ID`.
+6. Choose application type `Web application`.
+
+Use these values for local development:
+
+Authorized JavaScript origin:
+
+```text
+http://localhost:5173
 ```
 
-## Frontend Lint
+Authorized redirect URI:
 
-```bash
-npm run lint
-```
-
----
-
-# 5. OAuth (Google) Setup
-
-1. Go to Google Cloud Console
-2. Create OAuth Client
-3. Add redirect URI:
-
-```
+```text
 http://localhost:8080/login/oauth2/code/google
 ```
 
----
+Then copy the generated values into the root `.env` file:
 
-# 6. Project Structure
-
+```env
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
 ```
+
+Important notes:
+
+- The redirect URI must match exactly.
+- If you get `redirect_uri_mismatch`, re-check the exact redirect URI above.
+- After updating `.env`, restart the backend.
+- OAuth success will return to the frontend through `/auth/callback`.
+
+## 5. Testing
+
+Backend tests:
+
+```bash
+cd backend
+./mvnw test
+```
+
+Frontend build:
+
+```bash
+cd frontend
+npm run build
+```
+
+## 6. Project Structure
+
+```text
 backend/
-  ├── common/
-  ├── auth/
-  ├── booking/
-  ├── resource/
-  ├── ticket/
-  ├── notification/
-
 frontend/
-  ├── src/
-  ├── components/
-  ├── pages/
-  ├── services/
+docs/
 ```
 
----
+Useful frontend auth files:
 
-# 7. Git Workflow
+- `frontend/src/App.tsx`
+- `frontend/src/auth/AuthContext.tsx`
+- `frontend/src/components/ProtectedRoute.tsx`
+- `frontend/src/pages/LoginPage.tsx`
+- `frontend/src/pages/AuthCallbackPage.tsx`
 
-## Branching Strategy
+Useful backend auth files:
 
-```
-main → stable
-dev → integration
-feature/<name> → development
-```
+- `backend/src/main/resources/application.properties`
+- `backend/src/main/java/com/smartcampus/backend/config/SecurityConfig.java`
+- `backend/src/main/java/com/smartcampus/backend/config/GoogleOAuth2UserService.java`
+- `backend/src/main/java/com/smartcampus/backend/config/OAuth2LoginSuccessHandler.java`
 
-## Example
+## 7. Common Issues
 
-```bash
-git checkout -b feature/booking-api
-```
+Google login shows an OAuth error:
 
-## Rules
+- Check `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+- Check that the redirect URI in Google Cloud exactly matches `http://localhost:8080/login/oauth2/code/google`
+- Restart the backend after changing `.env`
 
-* Do NOT commit directly to main
-* Always use pull requests
-* Write meaningful commit messages
+Frontend cannot talk to backend:
 
----
+- Make sure `FRONTEND_URL=http://localhost:5173` in root `.env`
+- Make sure `VITE_API_BASE_URL=http://localhost:8080` in `frontend/.env`
 
-# 8. Common Issues
+Database connection fails:
 
-## Port already in use
+- Make sure PostgreSQL is running
+- Check `DB_URL`, `DB_USER`, and `DB_PASSWORD`
 
-```bash
-kill -9 <port>
-```
+## 8. Done
 
-## Database connection failed
-
-* Ensure PostgreSQL is running
-* Check `.env` values
-
-## Node modules issues
-
-```bash
-rm -rf node_modules package-lock.json
-npm install
-```
-
-## Lombok not working
-
-* Enable annotation processing in IntelliJ
-
-
-# ✅ Done
-
-You are now ready to run and contribute to the project.
+You are ready to run the app with local login and Google OAuth.

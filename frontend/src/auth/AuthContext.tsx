@@ -1,17 +1,18 @@
 import {
   createContext,
   useContext,
+  useCallback,
   useEffect,
   useState,
   type PropsWithChildren,
 } from 'react';
 import { getCurrentUser, login as loginRequest, logout as logoutRequest } from '../services/authService';
-import type { LoginRequest, User } from '../types/auth';
+import type { CurrentUserResponse, LoginRequest, User } from '../types/auth';
 
 interface AuthContextValue {
   user: User | null;
   isLoading: boolean;
-  refreshSession: () => Promise<void>;
+  refreshSession: () => Promise<CurrentUserResponse>;
   login: (request: LoginRequest) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -22,26 +23,27 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const refreshSession = async () => {
+  const refreshSession = useCallback(async () => {
     const response = await getCurrentUser();
     setUser(response.authenticated ? response.user : null);
-  };
+    return response;
+  }, []);
 
   useEffect(() => {
     refreshSession()
       .catch(() => setUser(null))
       .finally(() => setIsLoading(false));
-  }, []);
+  }, [refreshSession]);
 
-  const login = async (request: LoginRequest) => {
+  const login = useCallback(async (request: LoginRequest) => {
     const response = await loginRequest(request);
     setUser(response.user);
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     await logoutRequest();
     setUser(null);
-  };
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, isLoading, refreshSession, login, logout }}>
