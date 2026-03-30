@@ -97,6 +97,27 @@ public class BookingController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
     }
+
+    /**
+     * Check in a booking via QR code
+     * Marks the booking as checked in and records the check-in time
+     */
+    @PostMapping("/{id}/checkin")
+    public ResponseEntity<?> checkInBooking(@PathVariable Long id) {
+        try {
+            Booking checkedInBooking = bookingService.checkInBooking(id);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Checked in successfully");
+            response.put("data", checkedInBooking);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+    }
     
     /**
      * Get all bookings
