@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import {
   createUser,
@@ -139,13 +140,16 @@ export function AdminUsersPage() {
       <div className="app-shell">
         <header className="topbar panel">
           <div>
-            <span className="eyebrow">Admin Control</span>
-            <h1>Identity and access management</h1>
+            <span className="eyebrow">Administration</span>
+            <h1>User access</h1>
             <p>
               Signed in as {user?.name} ({user?.role})
             </p>
           </div>
           <div className="button-row">
+            <Link className="secondary-button" to="/app">
+              User Home
+            </Link>
             <button className="secondary-button" onClick={() => loadUsers()}>
               Refresh
             </button>
@@ -170,15 +174,19 @@ export function AdminUsersPage() {
             <p className="stat-label">Admins</p>
             <p className="stat-value">{stats.admins}</p>
           </div>
+          <div className="stat-card">
+            <p className="stat-label">Protected surface</p>
+            <p className="stat-value">ADMIN</p>
+          </div>
         </section>
 
         <div className="layout-grid">
           <aside className="panel">
-            <span className="eyebrow">Create User</span>
-            <h2 className="section-title">Bootstrap your campus team</h2>
+            <span className="eyebrow">Create user</span>
+            <h2 className="section-title">Add an account</h2>
             <p className="helper-text">
-              Create local accounts first. Google-linked users can attach later when they sign in
-              with the same email.
+              Create a local account now. Google users will link automatically when they sign in
+              with the same email later.
             </p>
 
             <form className="stack" onSubmit={handleCreateUser}>
@@ -281,7 +289,7 @@ export function AdminUsersPage() {
 
           <section className="table-panel">
             <span className="eyebrow">Directory</span>
-            <h2 className="section-title">Campus accounts</h2>
+            <h2 className="section-title">Accounts</h2>
 
             <form className="toolbar" onSubmit={handleSearchSubmit}>
               <div className="filter">

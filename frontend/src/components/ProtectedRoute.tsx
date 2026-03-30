@@ -1,12 +1,13 @@
 import type { PropsWithChildren } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import type { RoleType } from '../types/auth';
 
 interface ProtectedRouteProps extends PropsWithChildren {
-  requireAdmin?: boolean;
+  allowedRoles?: RoleType[];
 }
 
-export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
   const location = useLocation();
 
@@ -15,11 +16,23 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
   }
 
   if (!user) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: `${location.pathname}${location.search}`, reason: 'auth-required' }}
+      />
+    );
   }
 
-  if (requireAdmin && user.role !== 'ADMIN') {
-    return <Navigate to="/login" replace />;
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return (
+      <Navigate
+        to="/access-denied"
+        replace
+        state={{ from: `${location.pathname}${location.search}` }}
+      />
+    );
   }
 
   return <>{children}</>;

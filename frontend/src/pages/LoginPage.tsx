@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { getApiBaseUrl } from '../services/api';
+import { getDefaultRouteForUser } from '../auth/authRouting';
+import { ApiError, getApiBaseUrl } from '../services/api';
 
 export function LoginPage() {
   const { user, login } = useAuth();
@@ -12,11 +13,21 @@ export function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (user) {
-    return <Navigate to="/admin/users" replace />;
+    return <Navigate to={getDefaultRouteForUser(user)} replace />;
   }
 
   const searchParams = new URLSearchParams(location.search);
   const oauthError = searchParams.get('error') === 'oauth';
+  const state = location.state as { from?: string; reason?: string } | null;
+
+  const authMessage =
+    state?.reason === 'auth-required'
+      ? 'Sign in to continue to the protected Smart Campus area.'
+      : state?.reason === 'session-expired'
+        ? 'Your session expired. Sign in again to continue.'
+        : state?.reason === 'oauth-session-failed'
+          ? 'Google sign-in completed, but the app could not restore your session.'
+          : '';
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -27,8 +38,10 @@ export function LoginPage() {
       await login({ email, password });
     } catch (submissionError) {
       setError(
-        submissionError instanceof Error
-          ? submissionError.message
+        submissionError instanceof ApiError && submissionError.status === 401
+          ? 'Invalid email or password. Please try again.'
+          : submissionError instanceof Error
+            ? submissionError.message
           : 'Login failed. Please check your credentials.'
       );
     } finally {
@@ -39,17 +52,18 @@ export function LoginPage() {
   return (
     <div className="auth-layout">
       <div className="auth-card">
-        <span className="eyebrow">Smart Campus IAM</span>
-        <h1 className="hero-title">Control access before business modules grow.</h1>
+        <span className="eyebrow">Smart Campus</span>
+        <h1 className="hero-title">Sign in</h1>
         <p className="hero-copy">
-          Sign in with the bootstrap admin or connect Google OAuth once your client credentials are
-          configured.
+          Use your campus account to access the operations workspace.
         </p>
 
         <form className="stack" onSubmit={handleSubmit}>
+          {authMessage ? <div className="status-banner info">{authMessage}</div> : null}
+
           {oauthError ? (
             <div className="status-banner error">
-              Google sign-in is not available yet. Check your backend OAuth client settings.
+              Google sign-in is currently unavailable. Check the backend OAuth configuration.
             </div>
           ) : null}
 
@@ -92,8 +106,7 @@ export function LoginPage() {
             Continue with Google
           </a>
           <p className="helper-text">
-            Default bootstrap account: <strong>admin@smartcampus.local</strong> /{' '}
-            <strong>Admin@12345</strong>
+            Bootstrap admin: <strong>admin@smartcampus.local</strong> / <strong>Admin@12345</strong>
           </p>
         </div>
       </div>

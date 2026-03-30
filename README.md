@@ -3,6 +3,9 @@
 ## Overview
 This project is a comprehensive web platform developed to manage day-to-day university operations. It centralizes facility and asset bookings, alongside maintenance and incident handling. The system enforces clear workflows, role-based access control (RBAC), and strict auditability to modernize campus management.
 
+## Quick Project Memory
+For fast orientation in future sessions, read [docs/CURRENT_STATE_README.md](docs/CURRENT_STATE_README.md) first. It tracks what is actually implemented right now so you do not need to inspect the whole repo before making changes.
+
 ## Tech Stack
 **Frontend:**
 * Framework: React 19
