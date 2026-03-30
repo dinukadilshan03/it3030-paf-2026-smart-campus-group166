@@ -22,6 +22,10 @@ public class CreateUserRequestDTO {
     @Size(max = 120, message = "Email must be at most 120 characters")
     private String email;
 
+    @NotBlank(message = "Password is required")
+    @Size(min = 8, max = 100, message = "Password must be between 8 and 100 characters")
+    private String password;
+
     @NotNull(message = "Role is required")
     // Enum input blocks invalid free-form role strings at the API boundary.
     private RoleType role;
