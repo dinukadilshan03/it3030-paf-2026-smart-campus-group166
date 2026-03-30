@@ -45,6 +45,7 @@ Implemented pages and flows:
 - `/app`
   - Authenticated home page for signed-in users
   - Main non-admin landing page
+  - Minimal session/status overview rather than a showcase dashboard
 - `/admin/users`
   - Admin-only user management page
   - Create users
@@ -52,6 +53,7 @@ Implemented pages and flows:
   - Edit user profile fields
   - Change role
   - Change status
+  - Cleaned up into a flatter minimal-admin management screen
 - `/access-denied`
   - Shown when a signed-in user reaches a route they do not have permission to open
 
@@ -69,6 +71,13 @@ Frontend auth behavior:
   - `ADMIN` -> `/admin/users`
   - Other authenticated users -> `/app`
 - Role-aware redirect logic is centralized in `frontend/src/auth/authRouting.ts`
+- `AuthContext` remains the single source of truth for session restore, current user, login, and logout
+
+Frontend UI direction:
+
+- Module E screens now use a restrained minimal-admin style
+- Heavy gradients, glossy hero sections, and decorative dashboard styling were reduced
+- Auth and admin pages now prioritize clarity, neutral surfaces, and compact spacing
 
 ### Backend
 
@@ -79,6 +88,7 @@ Implemented backend areas:
   - Session lookup via `/api/auth/me`
   - Logout via `/api/auth/logout`
   - Google OAuth integration
+  - Fallback provisioning of Google-authenticated users when the restored session is valid but the local user record is missing
 - User management
   - Admin-only CRUD-style user administration endpoints
 - Resource module
@@ -112,7 +122,14 @@ Security response behavior:
 - Forbidden API access returns `403` with JSON message
 - OAuth success redirects to frontend `/auth/callback`
 - OAuth failure redirects to frontend `/login?error=oauth`
-- Auth and user management now use concrete services in `modules/auth/service` without a separate `impl` layer
+- Auth and user management now use concrete services directly in `modules/auth/service` without a separate `impl` layer
+
+Backend auth structure:
+
+- `modules/auth/service/AuthService.java` is now a concrete service class
+- `modules/auth/service/UserService.java` is now a concrete service class
+- The old `modules/auth/service/impl` layer has been removed
+- Empty placeholder folders under `modules/auth` were cleaned up
 
 ## Module E Status
 
@@ -123,12 +140,14 @@ Implemented Module E capabilities:
 - Local login for bootstrap/admin usage
 - Google OAuth login integration
 - Session restore on page load
+- Reliable current-user resolution for restored Google OIDC sessions
 - Role-aware frontend redirects
 - Protected frontend routes
 - Admin-only frontend route guard
 - Clear access-denied page
 - Admin user management UI
 - Backend route protection for admin user endpoints
+- Cleaner minimal-admin UI for auth and user-role screens
 
 Supported roles in code:
 
@@ -170,13 +189,15 @@ If someone needs deeper context after this file, start here:
 
 - Frontend app routing: `frontend/src/App.tsx`
 - Frontend auth state: `frontend/src/auth/AuthContext.tsx`
+- Frontend auth redirects: `frontend/src/auth/authRouting.ts`
 - Frontend route guard: `frontend/src/components/ProtectedRoute.tsx`
 - Frontend login page: `frontend/src/pages/LoginPage.tsx`
 - Frontend admin users page: `frontend/src/pages/AdminUsersPage.tsx`
 - Backend security config: `backend/src/main/java/com/smartcampus/backend/config/SecurityConfig.java`
 - Backend OAuth redirect handler: `backend/src/main/java/com/smartcampus/backend/config/OAuth2LoginSuccessHandler.java`
 - Backend auth controller: `backend/src/main/java/com/smartcampus/backend/modules/auth/controller/AuthController.java`
-- Backend user controller: `backend/src/main/java/com/smartcampus/backend/modules/auth/controller/UserController.java`
+- Backend auth service: `backend/src/main/java/com/smartcampus/backend/modules/auth/service/AuthService.java`
+- Backend user service: `backend/src/main/java/com/smartcampus/backend/modules/auth/service/UserService.java`
 
 ## Known Gaps
 
@@ -185,6 +206,7 @@ If someone needs deeper context after this file, start here:
 - Notifications do not yet have a visible frontend experience
 - There is no fully built shared campus dashboard yet beyond the authenticated home placeholder
 - API response shapes are not fully standardized across all modules
+- Some placeholder `.gitkeep` files still remain in genuinely empty areas such as `notification` and `backend/security`
 
 ## Suggested Session Workflow
 
