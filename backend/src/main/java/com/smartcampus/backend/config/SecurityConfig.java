@@ -48,6 +48,7 @@ public class SecurityConfig {
                         .requireExplicitSave(false)
                 )
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/login", "/oauth2/**", "/login/**", "/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/me").permitAll()
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
@@ -103,7 +104,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of(frontendBaseUrl));
+        configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

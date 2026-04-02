@@ -8,12 +8,14 @@ import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { HomeRedirectPage } from './pages/HomeRedirectPage';
 import { LoginPage } from './pages/LoginPage';
 import { UserHomePage } from './pages/UserHomePage';
+import ResourcePage from "./pages/ResourcePage";
 
 function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
+
       <Route
         path="/app"
         element={
@@ -22,6 +24,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/access-denied"
         element={
@@ -30,6 +33,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/admin/users"
         element={
@@ -38,6 +42,17 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
+      {/* ✅ ADD THIS */}
+      <Route
+        path="/resources"
+        element={
+          <ProtectedRoute>
+            <ResourcePage />
+          </ProtectedRoute>
+        }
+      />
+
       <Route path="/" element={<HomeRedirectPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
