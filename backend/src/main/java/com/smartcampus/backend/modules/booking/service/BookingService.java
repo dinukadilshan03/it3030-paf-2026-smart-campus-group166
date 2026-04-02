@@ -7,6 +7,7 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.smartcampus.backend.modules.booking.dto.BookingCreateDTO;
 import com.smartcampus.backend.modules.booking.dto.BookingUpdateDTO;
@@ -73,6 +74,59 @@ public class BookingService {
         }
         
         return booking;
+    }
+
+    /**
+     * Approve a pending booking. Ensures no approved conflicts exist.
+     */
+    @Transactional
+    public Booking approveBooking(Long id, String approvalReason) {
+        Optional<Booking> existingBooking = bookingRepository.findById(id);
+
+        if (!existingBooking.isPresent()) {
+            throw new RuntimeException("Booking not found with id: " + id);
+        }
+
+        Booking booking = existingBooking.get();
+
+        if (!"PENDING".equals(booking.getStatus())) {
+            throw new RuntimeException("Only pending bookings can be approved");
+        }
+
+        if (booking.getResource() == null || booking.getResource().getId() == null) {
+            throw new RuntimeException("Booking has no associated resource");
+        }
+
+        // Ensure resource is still available for this time range (exclude this booking)
+        validateResourceAvailability(booking.getResource().getId(), booking.getStartTime(), booking.getEndTime(), id);
+
+        booking.setStatus("APPROVED");
+        booking.setApprovalReason(approvalReason);
+
+        return bookingRepository.save(booking);
+    }
+
+    /**
+     * Reject a pending booking.
+     */
+    @Transactional
+    public Booking rejectBooking(Long id, String reason) {
+        Optional<Booking> existingBooking = bookingRepository.findById(id);
+
+        if (!existingBooking.isPresent()) {
+            throw new RuntimeException("Booking not found with id: " + id);
+        }
+
+        Booking booking = existingBooking.get();
+
+        if (!"PENDING".equals(booking.getStatus())) {
+            throw new RuntimeException("Only pending bookings can be rejected");
+        }
+
+        booking.setStatus("REJECTED");
+        booking.setApprovalReason(reason);
+
+        return bookingRepository.save(booking);
     }
     
     /**
