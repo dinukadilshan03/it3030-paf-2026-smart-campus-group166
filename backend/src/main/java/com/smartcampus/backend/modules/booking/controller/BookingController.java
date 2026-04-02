@@ -99,6 +99,48 @@ public class BookingController {
     }
 
     /**
+     * Approve a pending booking (admin action)
+     */
+    @PostMapping("/{id}/approve")
+    public ResponseEntity<?> approveBooking(@PathVariable Long id,
+                                            @RequestParam(required = false) String reason) {
+        try {
+            Booking approvedBooking = bookingService.approveBooking(id, reason);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Booking approved successfully");
+            response.put("data", approvedBooking);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+    }
+
+    /**
+     * Reject a pending booking (admin action)
+     */
+    @PostMapping("/{id}/reject")
+    public ResponseEntity<?> rejectBooking(@PathVariable Long id,
+                                           @RequestParam(required = false) String reason) {
+        try {
+            Booking rejectedBooking = bookingService.rejectBooking(id, reason);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Booking rejected successfully");
+            response.put("data", rejectedBooking);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+    }
+
+    /**
      * Check in a booking via QR code
      * Marks the booking as checked in and records the check-in time
      */
