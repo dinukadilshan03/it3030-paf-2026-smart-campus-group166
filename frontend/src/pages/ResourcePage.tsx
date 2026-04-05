@@ -3,6 +3,7 @@ import ResourceForm from "../components/ResourceForm";
 import ResourceList from "../components/ResourceList";
 import { getAllResources, createResource, deleteResource } from "../services/resourceService";
 import type { Resource } from "../services/resourceService";
+import "../FacilitiesCatalogue.css";
 
 function ResourcePage() {
   const [resources, setResources] = useState<Resource[]>([]);

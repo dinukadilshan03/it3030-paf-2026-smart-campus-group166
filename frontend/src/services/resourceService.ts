@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:8081/api/resources';
+const BASE_URL = 'http://localhost:8080/api/resources'; 
 
 export interface Resource {
   id?: number;
@@ -11,10 +11,14 @@ export interface Resource {
 }
 
 export const getAllResources = async (): Promise<Resource[]> => {
-  const response = await fetch(BASE_URL);
+  const response = await fetch(BASE_URL, {
+    credentials: "include", 
+  });
+
   if (!response.ok) {
     throw new Error('Failed to fetch resources');
   }
+
   return response.json();
 };
 
@@ -24,6 +28,7 @@ export const createResource = async (resource: Resource): Promise<Resource> => {
     headers: {
       'Content-Type': 'application/json',
     },
+    credentials: "include", // ✅ IMPORTANT
     body: JSON.stringify(resource),
   });
 
@@ -40,6 +45,7 @@ export const updateResource = async (id: number, resource: Resource): Promise<Re
     headers: {
       'Content-Type': 'application/json',
     },
+    credentials: "include",
     body: JSON.stringify(resource),
   });
 
@@ -53,6 +59,7 @@ export const updateResource = async (id: number, resource: Resource): Promise<Re
 export const deleteResource = async (id: number): Promise<void> => {
   const response = await fetch(`${BASE_URL}/${id}`, {
     method: 'DELETE',
+    credentials: "include", 
   });
 
   if (!response.ok) {
@@ -61,9 +68,13 @@ export const deleteResource = async (id: number): Promise<void> => {
 };
 
 export const searchResources = async (query: string): Promise<Resource[]> => {
-  const response = await fetch(`${BASE_URL}/search?type=${encodeURIComponent(query)}`);
+  const response = await fetch(`${BASE_URL}/search?type=${encodeURIComponent(query)}`, {
+    credentials: "include", 
+  });
+
   if (!response.ok) {
     throw new Error('Failed to search resources');
   }
+
   return response.json();
 };

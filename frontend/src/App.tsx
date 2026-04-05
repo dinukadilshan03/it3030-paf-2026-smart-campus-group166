@@ -43,7 +43,7 @@ function AppRoutes() {
         }
       />
 
-      {/* ✅ ADD THIS */}
+      
       <Route
         path="/resources"
         element={
