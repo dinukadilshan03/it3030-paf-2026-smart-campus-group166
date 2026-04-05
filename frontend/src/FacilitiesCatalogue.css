@@ -1,33 +1,32 @@
-.resource-page,
-.resource-page * {
+* {
   box-sizing: border-box;
 }
 
-.resource-page {
-  min-height: 100vh;
-  padding: 30px 20px;
+body {
+  margin: 0;
   font-family: Arial, sans-serif;
   background: #f4f7fb;
   color: #222;
 }
 
-.resource-page {
+.app-container {
   max-width: 1200px;
   margin: 0 auto;
+  padding: 30px 20px;
 }
 
-.resource-page h1 {
+h1 {
   text-align: center;
   margin-bottom: 30px;
   color: #1f3c88;
 }
 
-.resource-page h2 {
+h2 {
   margin-bottom: 16px;
   color: #1f3c88;
 }
 
-.resource-page .search-bar {
+.search-bar {
   display: flex;
   gap: 10px;
   margin-bottom: 24px;
@@ -35,16 +34,16 @@
   flex-wrap: wrap;
 }
 
-.resource-page .search-bar input {
+.search-bar input {
   padding: 10px;
   width: 260px;
   border: 1px solid #ccc;
   border-radius: 8px;
 }
 
-.resource-page .search-bar button,
-.resource-page .resource-form button,
-.resource-page .resource-table button {
+.search-bar button,
+.resource-form button,
+.resource-table button {
   padding: 10px 14px;
   border: none;
   border-radius: 8px;
@@ -53,8 +52,8 @@
   color: white;
 }
 
-.resource-page .form-card,
-.resource-page .list-card {
+.form-card,
+.list-card {
   background: white;
   padding: 20px;
   border-radius: 14px;
@@ -62,48 +61,48 @@
   margin-bottom: 24px;
 }
 
-.resource-page .resource-form {
+.resource-form {
   display: grid;
   gap: 12px;
 }
 
-.resource-page .resource-form input,
-.resource-page .resource-form textarea {
+.resource-form input,
+.resource-form textarea {
   padding: 10px;
   border: 1px solid #ccc;
   border-radius: 8px;
   width: 100%;
 }
 
-.resource-page .resource-form textarea {
+.resource-form textarea {
   min-height: 100px;
   resize: vertical;
 }
 
-.resource-page .form-buttons {
+.form-buttons {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-.resource-page .resource-table {
+.resource-table {
   width: 100%;
   border-collapse: collapse;
   overflow-x: auto;
 }
 
-.resource-page .resource-table th,
-.resource-page .resource-table td {
+.resource-table th,
+.resource-table td {
   border: 1px solid #ddd;
   padding: 12px;
   text-align: left;
   vertical-align: top;
 }
 
-.resource-page .resource-table th {
+.resource-table th {
   background: #eaf0ff;
 }
 
-.resource-page .resource-table tr:nth-child(even) {
+.resource-table tr:nth-child(even) {
   background: #f9fbff;
 }
