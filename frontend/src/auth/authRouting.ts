@@ -5,5 +5,5 @@ export function getDefaultRouteForUser(user: Pick<User, 'role'> | null) {
     return '/login';
   }
 
-  return user.role === 'ADMIN' ? '/admin/users' : '/app';
+  return '/app';
 }

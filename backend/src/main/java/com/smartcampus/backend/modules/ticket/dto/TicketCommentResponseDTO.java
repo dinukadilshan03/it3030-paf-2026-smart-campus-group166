@@ -9,6 +9,7 @@ public class TicketCommentResponseDTO {
     private Long ticketId;
     private Long userId;
     private String userName;
+    private String userEmail;
     private String content;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -16,12 +17,21 @@ public class TicketCommentResponseDTO {
     // Constructors
     public TicketCommentResponseDTO() {}
 
-    public TicketCommentResponseDTO(Long id, Long ticketId, Long userId, String userName,
-                                    String content, LocalDateTime createdAt, LocalDateTime updatedAt) {
+    public TicketCommentResponseDTO(
+            Long id,
+            Long ticketId,
+            Long userId,
+            String userName,
+            String userEmail,
+            String content,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt
+    ) {
         this.id = id;
         this.ticketId = ticketId;
         this.userId = userId;
         this.userName = userName;
+        this.userEmail = userEmail;
         this.content = content;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -58,6 +68,14 @@ public class TicketCommentResponseDTO {
 
     public void setUserName(String userName) {
         this.userName = userName;
+    }
+
+    public String getUserEmail() {
+        return userEmail;
+    }
+
+    public void setUserEmail(String userEmail) {
+        this.userEmail = userEmail;
     }
 
     public String getContent() {

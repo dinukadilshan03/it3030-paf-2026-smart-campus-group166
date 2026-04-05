@@ -1,13 +1,28 @@
 //Used for creating new maintenance tickets.
 package com.smartcampus.backend.modules.ticket.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
 public class TicketCreateDTO {
 
+    @NotNull(message = "Resource ID is required")
     private Long resourceId;
+
+    @NotNull(message = "Reported by user ID is required")
     private Long reportedById;
+
+    @NotBlank(message = "Category is required")
     private String category;
+
+    @NotBlank(message = "Priority is required")
     private String priority;
+
+    @NotBlank(message = "Description is required")
     private String description;
+
+    @Size(max = 120, message = "Preferred contact must be at most 120 characters")
     private String preferredContact;
 
     // Constructors
