@@ -73,6 +73,7 @@
   font-size: clamp(1.8rem, 3vw, 2.45rem);
   line-height: 1.02;
   letter-spacing: -0.05em;
+  text-align: left;
   color: #f7fff8;
 }
 
@@ -381,6 +382,8 @@
   font-size: clamp(1.55rem, 2vw, 2rem);
   line-height: 1.08;
   letter-spacing: -0.04em;
+  color: #122119;
+  text-align: left;
 }
 
 .admin-panel-copy {

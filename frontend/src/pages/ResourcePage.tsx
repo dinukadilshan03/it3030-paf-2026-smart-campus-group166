@@ -57,7 +57,7 @@ function ResourcePage() {
   };
 
   return (
-    <div className="container">
+    <div className="resource-page">
       <h1>Resources</h1>
 
       {/* FORM */}
