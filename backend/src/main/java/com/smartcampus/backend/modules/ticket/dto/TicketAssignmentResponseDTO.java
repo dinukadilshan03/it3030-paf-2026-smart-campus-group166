@@ -9,6 +9,7 @@ public class TicketAssignmentResponseDTO {
     private Long ticketId;
     private Long technicianId;
     private String technicianName;
+    private String technicianEmail;
     private Long assignedById;
     private String assignedByName;
     private LocalDateTime assignedAt;
@@ -16,12 +17,21 @@ public class TicketAssignmentResponseDTO {
     // Constructors
     public TicketAssignmentResponseDTO() {}
 
-    public TicketAssignmentResponseDTO(Long id, Long ticketId, Long technicianId, String technicianName,
-                                       Long assignedById, String assignedByName, LocalDateTime assignedAt) {
+    public TicketAssignmentResponseDTO(
+            Long id,
+            Long ticketId,
+            Long technicianId,
+            String technicianName,
+            String technicianEmail,
+            Long assignedById,
+            String assignedByName,
+            LocalDateTime assignedAt
+    ) {
         this.id = id;
         this.ticketId = ticketId;
         this.technicianId = technicianId;
         this.technicianName = technicianName;
+        this.technicianEmail = technicianEmail;
         this.assignedById = assignedById;
         this.assignedByName = assignedByName;
         this.assignedAt = assignedAt;
@@ -58,6 +68,14 @@ public class TicketAssignmentResponseDTO {
 
     public void setTechnicianName(String technicianName) {
         this.technicianName = technicianName;
+    }
+
+    public String getTechnicianEmail() {
+        return technicianEmail;
+    }
+
+    public void setTechnicianEmail(String technicianEmail) {
+        this.technicianEmail = technicianEmail;
     }
 
     public Long getAssignedById() {

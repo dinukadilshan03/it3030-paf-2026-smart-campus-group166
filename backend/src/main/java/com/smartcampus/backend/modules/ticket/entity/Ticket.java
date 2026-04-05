@@ -3,8 +3,12 @@ package com.smartcampus.backend.modules.ticket.entity;
 
 import com.smartcampus.backend.common.entity.Resource;
 import com.smartcampus.backend.common.entity.User;
+import com.smartcampus.backend.modules.ticket.enums.TicketPriority;
+import com.smartcampus.backend.modules.ticket.enums.TicketStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -35,17 +39,25 @@ public class Ticket {
     @Column(name = "category", length = 100, nullable = false)
     private String category;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "priority", length = 20, nullable = false)
-    private String priority;
+    private TicketPriority priority;
 
     @Column(name = "description", columnDefinition = "TEXT", nullable = false)
     private String description;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 30, nullable = false)
-    private String status;
+    private TicketStatus status;
 
     @Column(name = "preferred_contact", length = 120)
     private String preferredContact;
+
+    @Column(name = "resolution_notes", columnDefinition = "TEXT")
+    private String resolutionNotes;
+
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -98,11 +110,11 @@ public class Ticket {
         this.category = category;
     }
 
-    public String getPriority() {
+    public TicketPriority getPriority() {
         return priority;
     }
 
-    public void setPriority(String priority) {
+    public void setPriority(TicketPriority priority) {
         this.priority = priority;
     }
 
@@ -114,11 +126,11 @@ public class Ticket {
         this.description = description;
     }
 
-    public String getStatus() {
+    public TicketStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(TicketStatus status) {
         this.status = status;
     }
 
@@ -128,6 +140,22 @@ public class Ticket {
 
     public void setPreferredContact(String preferredContact) {
         this.preferredContact = preferredContact;
+    }
+
+    public String getResolutionNotes() {
+        return resolutionNotes;
+    }
+
+    public void setResolutionNotes(String resolutionNotes) {
+        this.resolutionNotes = resolutionNotes;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
     }
 
     public LocalDateTime getCreatedAt() {

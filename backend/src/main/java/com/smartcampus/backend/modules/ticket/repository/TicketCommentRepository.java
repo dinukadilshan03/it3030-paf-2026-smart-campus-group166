@@ -13,5 +13,5 @@ import java.util.List;
 public interface TicketCommentRepository extends JpaRepository<TicketComment, Long> {
 
     @Query("SELECT tc FROM TicketComment tc WHERE tc.ticket.id = :ticketId ORDER BY tc.createdAt ASC")
-    List<TicketComment> findByTicketId(@Param("ticketId") Long ticketId);
+    List<TicketComment> findByTicketIdOrderByCreatedAtAsc(@Param("ticketId") Long ticketId);
 }

@@ -1,95 +1,91 @@
-//Handles the business logic for ticket comments.
 package com.smartcampus.backend.modules.ticket.service;
 
 import com.smartcampus.backend.common.entity.User;
+import com.smartcampus.backend.common.exception.ResourceNotFoundException;
+import com.smartcampus.backend.modules.auth.service.CurrentUserService;
 import com.smartcampus.backend.modules.ticket.dto.TicketCommentCreateDTO;
+import com.smartcampus.backend.modules.ticket.dto.TicketCommentResponseDTO;
 import com.smartcampus.backend.modules.ticket.dto.TicketCommentUpdateDTO;
 import com.smartcampus.backend.modules.ticket.entity.Ticket;
 import com.smartcampus.backend.modules.ticket.entity.TicketComment;
+import com.smartcampus.backend.modules.ticket.mapper.TicketMapper;
 import com.smartcampus.backend.modules.ticket.repository.TicketCommentRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class TicketCommentService {
 
-    @Autowired
-    private TicketCommentRepository ticketCommentRepository;
+    private final TicketCommentRepository ticketCommentRepository;
+    private final TicketService ticketService;
+    private final CurrentUserService currentUserService;
 
-    @Autowired
-    private TicketService ticketService;
+    public TicketCommentService(
+            TicketCommentRepository ticketCommentRepository,
+            TicketService ticketService,
+            CurrentUserService currentUserService
+    ) {
+        this.ticketCommentRepository = ticketCommentRepository;
+        this.ticketService = ticketService;
+        this.currentUserService = currentUserService;
+    }
 
-    /**
-     * Add a comment to a ticket
-     */
-    public TicketComment addComment(TicketCommentCreateDTO commentDTO) {
-        validateCommentCreateRequest(commentDTO);
+    @Transactional
+    public TicketCommentResponseDTO addComment(Long ticketId, TicketCommentCreateDTO commentDTO) {
+        Ticket ticket = ticketService.getTicketEntity(ticketId);
+        User user = currentUserService.getCurrentUser();
 
         TicketComment comment = new TicketComment();
-
-        Ticket ticket = ticketService.getTicketById(commentDTO.getTicketId());
         comment.setTicket(ticket);
-
-        User user = new User();
-        user.setUserId(commentDTO.getUserId());
         comment.setUser(user);
+        comment.setContent(commentDTO.getContent().trim());
 
-        comment.setContent(commentDTO.getContent());
-
-        return ticketCommentRepository.save(comment);
+        return TicketMapper.toCommentResponse(ticketCommentRepository.save(comment));
     }
 
-    /**
-     * Update an existing comment
-     */
-    public TicketComment updateComment(Long id, TicketCommentUpdateDTO updateDTO) {
-        Optional<TicketComment> existingComment = ticketCommentRepository.findById(id);
-
-        if (existingComment.isEmpty()) {
-            throw new RuntimeException("Ticket comment not found with id: " + id);
-        }
-
-        TicketComment comment = existingComment.get();
-
-        if (updateDTO.getContent() != null && !updateDTO.getContent().isBlank()) {
-            comment.setContent(updateDTO.getContent());
-        }
-
-        return ticketCommentRepository.save(comment);
+    @Transactional
+    public TicketCommentResponseDTO updateComment(Long ticketId, Long commentId, TicketCommentUpdateDTO updateDTO) {
+        TicketComment comment = getComment(ticketId, commentId);
+        validateCommentOwnership(comment);
+        comment.setContent(updateDTO.getContent().trim());
+        return TicketMapper.toCommentResponse(ticketCommentRepository.save(comment));
     }
 
-    /**
-     * Get comments for a ticket
-     */
-    public List<TicketComment> getCommentsByTicket(Long ticketId) {
-        return ticketCommentRepository.findByTicketId(ticketId);
+    @Transactional(readOnly = true)
+    public List<TicketCommentResponseDTO> getCommentsByTicket(Long ticketId) {
+        ticketService.getTicketEntity(ticketId);
+        return ticketCommentRepository.findByTicketIdOrderByCreatedAtAsc(ticketId)
+                .stream()
+                .map(TicketMapper::toCommentResponse)
+                .toList();
     }
 
-    /**
-     * Delete a comment
-     */
-    public void deleteComment(Long id) {
-        if (!ticketCommentRepository.existsById(id)) {
-            throw new RuntimeException("Ticket comment not found with id: " + id);
-        }
-
-        ticketCommentRepository.deleteById(id);
+    @Transactional
+    public void deleteComment(Long ticketId, Long commentId) {
+        TicketComment comment = getComment(ticketId, commentId);
+        validateCommentOwnership(comment);
+        ticketCommentRepository.delete(comment);
     }
 
-    private void validateCommentCreateRequest(TicketCommentCreateDTO commentDTO) {
-        if (commentDTO.getTicketId() == null) {
-            throw new RuntimeException("Ticket ID is required");
+    private TicketComment getComment(Long ticketId, Long commentId) {
+        TicketComment comment = ticketCommentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket comment not found with id: " + commentId));
+        if (!comment.getTicket().getId().equals(ticketId)) {
+            throw new IllegalArgumentException("Comment does not belong to the selected ticket");
         }
 
-        if (commentDTO.getUserId() == null) {
-            throw new RuntimeException("User ID is required");
-        }
+        return comment;
+    }
 
-        if (commentDTO.getContent() == null || commentDTO.getContent().isBlank()) {
-            throw new RuntimeException("Comment content is required");
+    private void validateCommentOwnership(TicketComment comment) {
+        User currentUser = currentUserService.getCurrentUser();
+        boolean ownsComment = comment.getUser().getUserId().equals(currentUser.getUserId());
+
+        if (!ownsComment && !currentUserService.isAdmin(currentUser)) {
+            throw new AccessDeniedException("You do not have permission to manage this comment");
         }
     }
 }

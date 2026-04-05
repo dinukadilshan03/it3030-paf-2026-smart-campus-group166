@@ -1,23 +1,24 @@
 //Used for updating existing maintenance tickets.
 package com.smartcampus.backend.modules.ticket.dto;
 
+import jakarta.validation.constraints.Size;
+
 public class TicketUpdateDTO {
 
     private String category;
     private String priority;
     private String description;
-    private String status;
+
+    @Size(max = 120, message = "Preferred contact must be at most 120 characters")
     private String preferredContact;
 
     // Constructors
     public TicketUpdateDTO() {}
 
-    public TicketUpdateDTO(String category, String priority, String description,
-                           String status, String preferredContact) {
+    public TicketUpdateDTO(String category, String priority, String description, String preferredContact) {
         this.category = category;
         this.priority = priority;
         this.description = description;
-        this.status = status;
         this.preferredContact = preferredContact;
     }
 
@@ -44,14 +45,6 @@ public class TicketUpdateDTO {
 
     public void setDescription(String description) {
         this.description = description;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
     }
 
     public String getPreferredContact() {

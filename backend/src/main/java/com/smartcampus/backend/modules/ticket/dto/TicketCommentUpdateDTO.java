@@ -1,8 +1,11 @@
 //Used for updating existing ticket comments.
 package com.smartcampus.backend.modules.ticket.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
 public class TicketCommentUpdateDTO {
 
+    @NotBlank(message = "Comment content is required")
     private String content;
 
     // Constructors
