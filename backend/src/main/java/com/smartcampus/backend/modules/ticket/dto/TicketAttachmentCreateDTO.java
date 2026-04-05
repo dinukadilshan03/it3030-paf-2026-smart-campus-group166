@@ -1,20 +1,25 @@
 //Used for adding attachments to maintenance tickets.
 package com.smartcampus.backend.modules.ticket.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
+
 public class TicketAttachmentCreateDTO {
 
-    private Long ticketId;
+    @NotBlank(message = "File name is required")
     private String fileName;
+
+    @NotBlank(message = "File URL is required")
     private String fileUrl;
     private String fileType;
+
+    @Positive(message = "File size must be greater than zero")
     private Long fileSize;
 
     // Constructors
     public TicketAttachmentCreateDTO() {}
 
-    public TicketAttachmentCreateDTO(Long ticketId, String fileName, String fileUrl,
-                                     String fileType, Long fileSize) {
-        this.ticketId = ticketId;
+    public TicketAttachmentCreateDTO(String fileName, String fileUrl, String fileType, Long fileSize) {
         this.fileName = fileName;
         this.fileUrl = fileUrl;
         this.fileType = fileType;
@@ -22,14 +27,6 @@ public class TicketAttachmentCreateDTO {
     }
 
     // Getters and Setters
-    public Long getTicketId() {
-        return ticketId;
-    }
-
-    public void setTicketId(Long ticketId) {
-        this.ticketId = ticketId;
-    }
-
     public String getFileName() {
         return fileName;
     }

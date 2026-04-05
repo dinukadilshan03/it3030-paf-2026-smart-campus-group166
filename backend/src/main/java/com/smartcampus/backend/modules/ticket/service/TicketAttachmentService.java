@@ -1,71 +1,69 @@
-//Handles the business logic for ticket attachments.
 package com.smartcampus.backend.modules.ticket.service;
 
+import com.smartcampus.backend.common.exception.ResourceNotFoundException;
 import com.smartcampus.backend.modules.ticket.dto.TicketAttachmentCreateDTO;
+import com.smartcampus.backend.modules.ticket.dto.TicketAttachmentResponseDTO;
 import com.smartcampus.backend.modules.ticket.entity.Ticket;
 import com.smartcampus.backend.modules.ticket.entity.TicketAttachment;
+import com.smartcampus.backend.modules.ticket.mapper.TicketMapper;
 import com.smartcampus.backend.modules.ticket.repository.TicketAttachmentRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
 public class TicketAttachmentService {
 
-    @Autowired
-    private TicketAttachmentRepository ticketAttachmentRepository;
+    private final TicketAttachmentRepository ticketAttachmentRepository;
+    private final TicketService ticketService;
 
-    @Autowired
-    private TicketService ticketService;
+    public TicketAttachmentService(TicketAttachmentRepository ticketAttachmentRepository, TicketService ticketService) {
+        this.ticketAttachmentRepository = ticketAttachmentRepository;
+        this.ticketService = ticketService;
+    }
 
-    /**
-     * Add an attachment to a ticket
-     */
-    public TicketAttachment addAttachment(TicketAttachmentCreateDTO attachmentDTO) {
-        validateAttachmentCreateRequest(attachmentDTO);
+    @Transactional
+    public TicketAttachmentResponseDTO addAttachment(Long ticketId, TicketAttachmentCreateDTO attachmentDTO) {
+        if (ticketAttachmentRepository.countByTicketId(ticketId) >= 3) {
+            throw new IllegalArgumentException("A ticket can have at most 3 attachments");
+        }
+
+        if (attachmentDTO.getFileType() != null
+                && !attachmentDTO.getFileType().isBlank()
+                && !attachmentDTO.getFileType().toLowerCase().startsWith("image/")) {
+            throw new IllegalArgumentException("Only image attachments are supported");
+        }
+
+        Ticket ticket = ticketService.getTicketEntity(ticketId);
 
         TicketAttachment attachment = new TicketAttachment();
-
-        Ticket ticket = ticketService.getTicketById(attachmentDTO.getTicketId());
         attachment.setTicket(ticket);
-        attachment.setFileName(attachmentDTO.getFileName());
-        attachment.setFileUrl(attachmentDTO.getFileUrl());
+        attachment.setFileName(attachmentDTO.getFileName().trim());
+        attachment.setFileUrl(attachmentDTO.getFileUrl().trim());
         attachment.setFileType(attachmentDTO.getFileType());
         attachment.setFileSize(attachmentDTO.getFileSize());
 
-        return ticketAttachmentRepository.save(attachment);
+        return TicketMapper.toAttachmentResponse(ticketAttachmentRepository.save(attachment));
     }
 
-    /**
-     * Get attachments for a ticket
-     */
-    public List<TicketAttachment> getAttachmentsByTicket(Long ticketId) {
-        return ticketAttachmentRepository.findByTicketId(ticketId);
+    @Transactional(readOnly = true)
+    public List<TicketAttachmentResponseDTO> getAttachmentsByTicket(Long ticketId) {
+        ticketService.getTicketEntity(ticketId);
+        return ticketAttachmentRepository.findByTicketIdOrderByUploadedAtAsc(ticketId)
+                .stream()
+                .map(TicketMapper::toAttachmentResponse)
+                .toList();
     }
 
-    /**
-     * Delete an attachment
-     */
-    public void deleteAttachment(Long id) {
-        if (!ticketAttachmentRepository.existsById(id)) {
-            throw new RuntimeException("Ticket attachment not found with id: " + id);
+    @Transactional
+    public void deleteAttachment(Long ticketId, Long attachmentId) {
+        TicketAttachment attachment = ticketAttachmentRepository.findById(attachmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket attachment not found with id: " + attachmentId));
+        if (!attachment.getTicket().getId().equals(ticketId)) {
+            throw new IllegalArgumentException("Attachment does not belong to the selected ticket");
         }
 
-        ticketAttachmentRepository.deleteById(id);
-    }
-
-    private void validateAttachmentCreateRequest(TicketAttachmentCreateDTO attachmentDTO) {
-        if (attachmentDTO.getTicketId() == null) {
-            throw new RuntimeException("Ticket ID is required");
-        }
-
-        if (attachmentDTO.getFileName() == null || attachmentDTO.getFileName().isBlank()) {
-            throw new RuntimeException("File name is required");
-        }
-
-        if (attachmentDTO.getFileUrl() == null || attachmentDTO.getFileUrl().isBlank()) {
-            throw new RuntimeException("File URL is required");
-        }
+        ticketAttachmentRepository.delete(attachment);
     }
 }

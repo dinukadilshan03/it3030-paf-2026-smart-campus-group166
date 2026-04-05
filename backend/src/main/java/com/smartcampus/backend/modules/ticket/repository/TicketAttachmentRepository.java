@@ -12,6 +12,8 @@ import java.util.List;
 @Repository
 public interface TicketAttachmentRepository extends JpaRepository<TicketAttachment, Long> {
 
-    @Query("SELECT ta FROM TicketAttachment ta WHERE ta.ticket.id = :ticketId")
-    List<TicketAttachment> findByTicketId(@Param("ticketId") Long ticketId);
+    @Query("SELECT ta FROM TicketAttachment ta WHERE ta.ticket.id = :ticketId ORDER BY ta.uploadedAt ASC")
+    List<TicketAttachment> findByTicketIdOrderByUploadedAtAsc(@Param("ticketId") Long ticketId);
+
+    long countByTicketId(Long ticketId);
 }
