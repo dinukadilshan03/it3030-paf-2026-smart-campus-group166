@@ -9,6 +9,7 @@ import { HomeRedirectPage } from './pages/HomeRedirectPage';
 import { LoginPage } from './pages/LoginPage';
 import { UserHomePage } from './pages/UserHomePage';
 import ResourcePage from "./pages/ResourcePage";
+import ResourcesCatalogPage from './pages/ResourcesCatalogPage.tsx';
 
 function AppRoutes() {
   return (
@@ -49,6 +50,15 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ResourcePage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/resources/catalog"
+        element={
+          <ProtectedRoute>
+            <ResourcesCatalogPage />
           </ProtectedRoute>
         }
       />

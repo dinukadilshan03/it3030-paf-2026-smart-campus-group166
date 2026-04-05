@@ -23,6 +23,8 @@ export function UserHomePage() {
             <Link className="secondary-button" to="/resources">
               Resources
             </Link>
+            
+            
 
           
 
