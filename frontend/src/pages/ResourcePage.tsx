@@ -5,13 +5,13 @@ import {
   getAllResources,
   createResource,
   updateResource,
-  deleteResource,
+  
 } from "../services/resourceService";
 import type { Resource } from "../services/resourceService";
 import "../FacilitiesCatalogue.css";
 
 function ResourcePage() {
-  const [resources, setResources] = useState<any[]>([]);
+  const [_resources, setResources] = useState<any[]>([]);
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
 
   // 🔄 Load resources
@@ -52,17 +52,7 @@ function ResourcePage() {
     }
   };
 
-  // ❌ DELETE
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this resource?")) return;
-
-    try {
-      await deleteResource(id);
-      await loadResources();
-    } catch (error) {
-      console.error("Error deleting resource:", error);
-    }
-  };
+  // delete handled in catalog; no-op here
 
   
 
@@ -87,7 +77,7 @@ function ResourcePage() {
           clearEdit={() => setEditingResource(null)}
         />
       </div>
-
+    </div>
     </div>
   );
 }
