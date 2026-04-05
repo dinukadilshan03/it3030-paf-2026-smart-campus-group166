@@ -76,6 +76,8 @@ function ResourcePage() {
       </div>
 
       
+    <div className="resource-page">
+      <h1>Resources</h1>
 
       {/* 🧾 FORM */}
       <div className="card">
