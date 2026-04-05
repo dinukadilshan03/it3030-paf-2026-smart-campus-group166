@@ -167,15 +167,29 @@ export function UserHomePage() {
               Signed in as {user?.name} with the <strong>{user?.role}</strong> role.
             </p>
           </div>
+
+          {/* ✅ BUTTON SECTION */}
           <div className="button-row">
+
+            {/* 🆕 RESOURCES */}
+            <Link className="secondary-button" to="/resources">
+              Resources
+            </Link>
+
+          
+
+            {/* EXISTING ADMIN BUTTON */}
             {user?.role === 'ADMIN' ? (
               <Link className="secondary-button" to="/admin/users">
                 Manage users
               </Link>
             ) : null}
+
+            {/* LOGOUT */}
             <button className="ghost-button" onClick={() => logout()}>
               Sign Out
             </button>
+
           </div>
         </header>
 
