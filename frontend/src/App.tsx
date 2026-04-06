@@ -3,6 +3,7 @@ import './App.css';
 import { AuthProvider } from './auth/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AccessDeniedPage } from './pages/AccessDeniedPage';
+import { AdminBookingsPage } from './pages/AdminBookingsPage';
 import { AdminTicketsPage } from './pages/AdminTicketsPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
@@ -42,6 +43,15 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['ADMIN']}>
             <AdminUsersPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/bookings"
+        element={
+          <ProtectedRoute allowedRoles={['ADMIN']}>
+            <AdminBookingsPage />
           </ProtectedRoute>
         }
       />

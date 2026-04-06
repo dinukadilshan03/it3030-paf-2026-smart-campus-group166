@@ -17,7 +17,8 @@ const adminFeatures = [
   {
     title: 'Booking management',
     description: 'Handle booking requests, approvals, rejections, and scheduling conflicts.',
-    state: 'Planned',
+    state: 'Live',
+    href: '/admin/bookings',
   },
   {
     title: 'Maintenance tickets',

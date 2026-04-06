@@ -1199,6 +1199,25 @@
   border-color: #ecc6bf;
 }
 
+.badge.booking-status-PENDING {
+  color: #705f25;
+  background: var(--warning-soft);
+  border-color: #eadfb3;
+}
+
+.badge.booking-status-APPROVED {
+  color: #29563b;
+  background: var(--success-soft);
+  border-color: #cfe4d7;
+}
+
+.badge.booking-status-REJECTED,
+.badge.booking-status-CANCELLED {
+  color: #7a3028;
+  background: var(--danger-soft);
+  border-color: #ecc6bf;
+}
+
 .loading-state {
   min-height: 100vh;
   display: grid;
