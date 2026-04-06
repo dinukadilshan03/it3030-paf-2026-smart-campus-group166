@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from 'react-router-dom';
 import ResourceList from "../components/ResourceList";
 import ResourceForm from "../components/ResourceForm";
 import {
@@ -92,7 +93,7 @@ function ResourcesCatalogPage() {
     <div className="container">
       <h1 className="page-title">Resources Catalog</h1>
 
-      <div style={{ marginBottom: "20px" }}>
+      <div style={{ marginBottom: "20px", display: 'flex', gap: '12px', alignItems: 'center' }}>
         <input
           type="text"
           placeholder="Search resources (any word)..."
@@ -100,6 +101,9 @@ function ResourcesCatalogPage() {
           onChange={(e) => setSearch(e.target.value)}
           style={{ padding: "10px", width: "360px", borderRadius: "8px", border: "1px solid #ccc" }}
         />
+        <Link to="/resources" className="secondary-button">
+          Add Resource
+        </Link>
       </div>
 
       {/* Edit form appears only when editing a resource; no direct "Add" in catalog */}
@@ -121,6 +125,7 @@ function ResourcesCatalogPage() {
             resources={resources}
             onEdit={(r) => setEditingResource(r)}
             onDelete={handleDelete}
+            showActions={true}
           />
         )}
       </div>
