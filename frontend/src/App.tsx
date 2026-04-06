@@ -9,6 +9,7 @@ import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { HomeRedirectPage } from './pages/HomeRedirectPage';
 import { LoginPage } from './pages/LoginPage';
+import { StudentDashboardPage } from './pages/StudentDashboardPage';
 import { UserHomePage } from './pages/UserHomePage';
 import ResourcePage from "./pages/ResourcePage";
 import ResourcesCatalogPage from './pages/ResourcesCatalogPage.tsx';
@@ -25,6 +26,15 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <UserHomePage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/student/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={['USER', 'TECHNICIAN']}>
+            <StudentDashboardPage />
           </ProtectedRoute>
         }
       />
