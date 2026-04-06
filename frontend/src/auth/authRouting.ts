@@ -5,5 +5,13 @@ export function getDefaultRouteForUser(user: Pick<User, 'role'> | null) {
     return '/login';
   }
 
+  if (user.role === 'ADMIN') {
+    return '/app';
+  }
+
+  if (user.role === 'USER' || user.role === 'TECHNICIAN') {
+    return '/student/dashboard';
+  }
+
   return '/app';
 }
