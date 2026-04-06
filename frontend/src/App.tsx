@@ -54,11 +54,10 @@ function AppRoutes() {
         }
       />
 
-      {/* ✅ ADD THIS */}
       <Route
         path="/resources"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <ResourcePage />
           </ProtectedRoute>
         }
@@ -67,7 +66,7 @@ function AppRoutes() {
       <Route
         path="/resources/catalog"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <ResourcesCatalogPage />
           </ProtectedRoute>
         }
