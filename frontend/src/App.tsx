@@ -11,6 +11,7 @@ import { LoginPage } from './pages/LoginPage';
 import { UserHomePage } from './pages/UserHomePage';
 import ResourcePage from "./pages/ResourcePage";
 import ResourcesCatalogPage from './pages/ResourcesCatalogPage.tsx';
+import ResourceListOnlyPage from './pages/ResourceListOnlyPage';
 
 function AppRoutes() {
   return (
@@ -54,11 +55,10 @@ function AppRoutes() {
         }
       />
 
-      {/* ✅ ADD THIS */}
       <Route
         path="/resources"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <ResourcePage />
           </ProtectedRoute>
         }
@@ -67,8 +67,17 @@ function AppRoutes() {
       <Route
         path="/resources/catalog"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <ResourcesCatalogPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/resources/list"
+        element={
+          <ProtectedRoute>
+            <ResourceListOnlyPage />
           </ProtectedRoute>
         }
       />

@@ -8,11 +8,11 @@ const adminFeatures = [
     state: 'Live',
     href: '/admin/users',
   },
-  {
+    {
     title: 'Resource catalogue',
     description: 'View and manage rooms, labs, equipment, and their current availability details.',
     state: 'Live',
-    href: '/resources',
+    href: '/resources/catalog',
   },
   {
     title: 'Booking management',
@@ -172,7 +172,7 @@ export function UserHomePage() {
           <div className="button-row">
 
             {/* 🆕 RESOURCES */}
-            <Link className="secondary-button" to="/resources">
+            <Link className="secondary-button" to={user?.role === 'ADMIN' ? '/resources/catalog' : '/resources/list'}>
               Resources
             </Link>
             
