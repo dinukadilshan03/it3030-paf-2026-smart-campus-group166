@@ -3,6 +3,12 @@ import { useAuth } from '../auth/AuthContext';
 
 const studentQuickActions = [
   {
+    title: 'Book Resources',
+    description: 'Start a new booking request for lecture halls, labs, and shared spaces.',
+    action: 'Book now',
+    href: '/admin/bookings',
+  },
+  {
     title: 'Browse Resources',
     description: 'Find classrooms, labs, and campus facilities you can use.',
     action: 'Open resources',
