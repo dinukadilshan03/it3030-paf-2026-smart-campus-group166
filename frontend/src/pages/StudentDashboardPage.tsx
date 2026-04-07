@@ -6,13 +6,13 @@ const studentQuickActions = [
     title: 'Book Resources',
     description: 'Start a new booking request for lecture halls, labs, and shared spaces.',
     action: 'Book now',
-    href: '/admin/bookings',
+    href: '/student/bookings',
   },
   {
     title: 'Browse Resources',
     description: 'Find classrooms, labs, and campus facilities you can use.',
     action: 'Open resources',
-    href: '/resources/list',
+    href: '/student/bookings',
   },
   {
     title: 'University Help Desk',
