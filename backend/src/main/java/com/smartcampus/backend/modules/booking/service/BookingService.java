@@ -102,6 +102,15 @@ public class BookingService {
 
         booking.setStatus("APPROVED");
         booking.setApprovalReason(approvalReason);
+        
+        // Generate QR code for approved booking
+        try {
+            String qrCodeBase64 = qrCodeService.generateQRCodeBase64(String.valueOf(booking.getId()));
+            booking.setQrCodeBase64(qrCodeBase64);
+        } catch (Exception e) {
+            // Log error but don't fail the approval
+            System.err.println("Failed to generate QR code: " + e.getMessage());
+        }
 
         return bookingRepository.save(booking);
     }

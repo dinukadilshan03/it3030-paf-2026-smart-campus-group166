@@ -303,7 +303,7 @@ export function StudentBookingsPage() {
                     {studentBookings
                       .filter((b) => b.status === 'APPROVED')
                       .map((booking) => (
-                        <div key={booking.id} className="booking-item approved">
+                        <div key={booking.id} className="booking-item approved approved-with-qr">
                           <div className="booking-info">
                             <h4>{booking.resource?.name}</h4>
                             <p className="booking-dates">
@@ -311,6 +311,20 @@ export function StudentBookingsPage() {
                             </p>
                             {booking.purpose && <p className="booking-purpose">Purpose: {booking.purpose}</p>}
                           </div>
+                          
+                          {/* QR Code Section */}
+                          {booking.qrCodeBase64 && (
+                            <div className="qr-code-section">
+                              <img 
+                                src={`data:image/png;base64,${booking.qrCodeBase64}`} 
+                                alt="Check-in QR Code"
+                                className="qr-code-image"
+                                title="Show this QR code at the resource access point to check in"
+                              />
+                              <p className="qr-hint">📱 Show this QR code when checking in</p>
+                            </div>
+                          )}
+                          
                           <span className="status-badge approved">Approved</span>
                         </div>
                       ))}
@@ -652,6 +666,40 @@ export function StudentBookingsPage() {
           font-style: italic;
         }
 
+        .booking-item.approved-with-qr {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 1rem;
+        }
+
+        .qr-code-section {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 1rem;
+          background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+          border-radius: 8px;
+          border: 2px dashed #16a34a;
+        }
+
+        .qr-code-image {
+          width: 200px;
+          height: 200px;
+          padding: 0.75rem;
+          background: white;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(22, 163, 74, 0.2);
+        }
+
+        .qr-hint {
+          margin: 0;
+          font-size: 0.9rem;
+          font-weight: 600;
+          color: #15803d;
+          text-align: center;
+        }
+
         @media (max-width: 768px) {
           .browse-header {
             flex-direction: column;
@@ -675,9 +723,14 @@ export function StudentBookingsPage() {
             align-items: flex-start;
           }
 
-          .booking-item .status-badge {
+          .booking-item:not(.approved-with-qr) .status-badge {
             margin-top: 1rem;
             align-self: flex-end;
+          }
+
+          .qr-code-image {
+            width: 160px;
+            height: 160px;
           }
         }
       `}</style>

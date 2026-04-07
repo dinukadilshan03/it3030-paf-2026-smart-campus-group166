@@ -274,6 +274,18 @@ export function AdminBookingsPage() {
                         </span>
                       </div>
                     )}
+
+                    {/* QR Code Display for Approved Bookings */}
+                    {booking.status === 'APPROVED' && booking.qrCodeBase64 && (
+                      <div className="qr-code-container">
+                        <img
+                          src={`data:image/png;base64,${booking.qrCodeBase64}`}
+                          alt="Booking Check-in QR Code"
+                          className="booking-qr-code"
+                        />
+                        <p className="qr-code-label">Check-in QR Code</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Action Buttons - Only for Pending */}
@@ -599,6 +611,34 @@ export function AdminBookingsPage() {
           border: 1px solid #c3e6cb;
         }
 
+        .qr-code-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 1rem;
+          background: #f0fdf4;
+          border-radius: 8px;
+          border: 2px solid #16a34a;
+          margin-top: 1rem;
+        }
+
+        .booking-qr-code {
+          width: 150px;
+          height: 150px;
+          padding: 0.5rem;
+          background: white;
+          border-radius: 6px;
+          box-shadow: 0 2px 8px rgba(22, 163, 74, 0.2);
+        }
+
+        .qr-code-label {
+          margin: 0;
+          font-size: 0.85rem;
+          font-weight: 600;
+          color: #15803d;
+        }
+
         @media (max-width: 768px) {
           .bookings-grid {
             grid-template-columns: 1fr;
@@ -615,6 +655,11 @@ export function AdminBookingsPage() {
 
           .modal-content {
             width: 95%;
+          }
+
+          .booking-qr-code {
+            width: 120px;
+            height: 120px;
           }
         }
       `}</style>
