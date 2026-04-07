@@ -84,3 +84,27 @@ export async function deleteBooking(bookingId: number) {
     method: 'DELETE',
   });
 }
+
+export async function approveBooking(bookingId: number, reason?: string) {
+  const url = reason 
+    ? `/api/bookings/${bookingId}/approve?reason=${encodeURIComponent(reason)}`
+    : `/api/bookings/${bookingId}/approve`;
+  
+  const response = await apiFetch<BookingEnvelope<BookingRecord>>(url, {
+    method: 'POST',
+  });
+
+  return response.data;
+}
+
+export async function rejectBooking(bookingId: number, reason?: string) {
+  const url = reason 
+    ? `/api/bookings/${bookingId}/reject?reason=${encodeURIComponent(reason)}`
+    : `/api/bookings/${bookingId}/reject`;
+  
+  const response = await apiFetch<BookingEnvelope<BookingRecord>>(url, {
+    method: 'POST',
+  });
+
+  return response.data;
+}
