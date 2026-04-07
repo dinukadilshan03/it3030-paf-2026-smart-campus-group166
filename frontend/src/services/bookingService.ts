@@ -28,6 +28,7 @@ export interface BookingRecord {
   expectedAttendees: number | null;
   status: string;
   approvalReason: string | null;
+  qrCodeBase64: string | null;
   createdAt: string;
   updatedAt: string;
   checkedIn: boolean;

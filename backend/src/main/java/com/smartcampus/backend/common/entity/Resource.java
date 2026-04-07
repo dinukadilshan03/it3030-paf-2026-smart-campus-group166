@@ -2,9 +2,11 @@ package com.smartcampus.backend.common.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
 @Table(name = "resources")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Resource {
 
     @Id

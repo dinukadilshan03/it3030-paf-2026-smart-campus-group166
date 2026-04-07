@@ -5,20 +5,22 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import com.smartcampus.backend.common.entity.Resource;
 import com.smartcampus.backend.common.entity.User;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
 @Table(name = "bookings")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Booking {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "resource_id", nullable = false)
     private Resource resource;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 

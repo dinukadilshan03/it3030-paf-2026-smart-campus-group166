@@ -10,6 +10,7 @@ import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { HomeRedirectPage } from './pages/HomeRedirectPage';
 import { LoginPage } from './pages/LoginPage';
 import { StudentDashboardPage } from './pages/StudentDashboardPage';
+import { StudentBookingsPage } from './pages/StudentBookingsPage';
 import { UserHomePage } from './pages/UserHomePage';
 import ResourcePage from "./pages/ResourcePage";
 import ResourcesCatalogPage from './pages/ResourcesCatalogPage.tsx';
@@ -35,6 +36,15 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['USER', 'TECHNICIAN']}>
             <StudentDashboardPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/student/bookings"
+        element={
+          <ProtectedRoute allowedRoles={['USER', 'TECHNICIAN']}>
+            <StudentBookingsPage />
           </ProtectedRoute>
         }
       />

@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 
 import com.smartcampus.backend.common.enums.OAuthProvider;
 import com.smartcampus.backend.common.enums.UserStatus;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
 @Table(name = "users")
@@ -15,6 +16,7 @@ import com.smartcampus.backend.common.enums.UserStatus;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class User {
 
     @Id
@@ -35,6 +37,7 @@ public class User {
     // Lazy loading avoids unnecessary joins when listing users.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "role_id", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private Role role;
 
     @Column(name = "department", length = 120)
