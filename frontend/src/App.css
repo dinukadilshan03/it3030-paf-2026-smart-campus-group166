@@ -28,6 +28,47 @@
   padding: 28px 18px;
 }
 
+.student-page {
+  background:
+    radial-gradient(circle at 10% 8%, rgba(205, 233, 255, 0.5), transparent 28%),
+    radial-gradient(circle at 88% 20%, rgba(201, 246, 230, 0.55), transparent 24%),
+    linear-gradient(180deg, #f3f7ff 0%, #edf5ff 100%);
+}
+
+.student-topbar {
+  border-color: #cad8eb;
+}
+
+.student-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.student-card {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid #d5e0ef;
+  border-radius: var(--radius-lg);
+  background: #ffffff;
+  box-shadow: var(--shadow);
+}
+
+.student-card h3,
+.student-card p {
+  margin: 0;
+}
+
+.student-card p {
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.student-help-panel p {
+  margin-top: 10px;
+}
+
 .workspace-page {
   min-height: 100vh;
   padding: 16px;
@@ -1194,6 +1235,25 @@
 }
 
 .badge.status-SUSPENDED {
+  color: #7a3028;
+  background: var(--danger-soft);
+  border-color: #ecc6bf;
+}
+
+.badge.booking-status-PENDING {
+  color: #705f25;
+  background: var(--warning-soft);
+  border-color: #eadfb3;
+}
+
+.badge.booking-status-APPROVED {
+  color: #29563b;
+  background: var(--success-soft);
+  border-color: #cfe4d7;
+}
+
+.badge.booking-status-REJECTED,
+.badge.booking-status-CANCELLED {
   color: #7a3028;
   background: var(--danger-soft);
   border-color: #ecc6bf;

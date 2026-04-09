@@ -27,7 +27,8 @@ public class QRCodeService {
         String content = "BOOKING:" + bookingId;
 
         MultiFormatWriter writer = new MultiFormatWriter();
-        BitMatrix bitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, 200, 200);
+        // Increased size to 400x400 for better scannability
+        BitMatrix bitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, 400, 400);
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         MatrixToImageWriter.writeToStream(bitMatrix, "PNG", outputStream);

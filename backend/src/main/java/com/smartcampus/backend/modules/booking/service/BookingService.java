@@ -102,6 +102,15 @@ public class BookingService {
 
         booking.setStatus("APPROVED");
         booking.setApprovalReason(approvalReason);
+        
+        // Generate QR code for approved booking
+        try {
+            String qrCodeBase64 = qrCodeService.generateQRCodeBase64(String.valueOf(booking.getId()));
+            booking.setQrCodeBase64(qrCodeBase64);
+        } catch (Exception e) {
+            // Log error but don't fail the approval
+            System.err.println("Failed to generate QR code: " + e.getMessage());
+        }
 
         return bookingRepository.save(booking);
     }
@@ -201,6 +210,10 @@ public class BookingService {
     /**
      * Get all bookings
      */
+    /**
+     * Get all bookings
+     */
+    @Transactional
     public List<Booking> getAllBookings() {
         return bookingRepository.findAll();
     }
@@ -208,6 +221,7 @@ public class BookingService {
     /**
      * Get booking by ID
      */
+    @Transactional
     public Booking getBookingById(Long id) {
         return bookingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
@@ -216,12 +230,14 @@ public class BookingService {
     /**
      * Get bookings by user
      */
+    @Transactional
     public List<Booking> getBookingsByUser(Long userId) {
         return bookingRepository.findByUser_UserId(userId);
     }
     
     /**
      * Get bookings by resource
+    @Transactional
      */
     public List<Booking> getBookingsByResource(Long resourceId) {
         return bookingRepository.findByResource_Id(resourceId);
@@ -229,6 +245,7 @@ public class BookingService {
     
     /**
      * Get pending bookings for a resource
+    @Transactional
      */
     public List<Booking> getPendingBookingsByResource(Long resourceId) {
         return bookingRepository.findByResource_IdAndStatus(resourceId, "PENDING");

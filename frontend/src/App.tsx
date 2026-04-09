@@ -3,11 +3,14 @@ import './App.css';
 import { AuthProvider } from './auth/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AccessDeniedPage } from './pages/AccessDeniedPage';
+import { AdminBookingsPage } from './pages/AdminBookingsPage';
 import { AdminTicketsPage } from './pages/AdminTicketsPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { HomeRedirectPage } from './pages/HomeRedirectPage';
 import { LoginPage } from './pages/LoginPage';
+import { StudentDashboardPage } from './pages/StudentDashboardPage';
+import { StudentBookingsPage } from './pages/StudentBookingsPage';
 import { UserHomePage } from './pages/UserHomePage';
 import ResourcePage from "./pages/ResourcePage";
 import ResourcesCatalogPage from './pages/ResourcesCatalogPage.tsx';
@@ -29,6 +32,24 @@ function AppRoutes() {
       />
 
       <Route
+        path="/student/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={['USER', 'TECHNICIAN']}>
+            <StudentDashboardPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/student/bookings"
+        element={
+          <ProtectedRoute allowedRoles={['USER', 'TECHNICIAN']}>
+            <StudentBookingsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/access-denied"
         element={
           <ProtectedRoute>
@@ -42,6 +63,15 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['ADMIN']}>
             <AdminUsersPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/bookings"
+        element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'TECHNICIAN']}>
+            <AdminBookingsPage />
           </ProtectedRoute>
         }
       />
