@@ -12,7 +12,7 @@ const studentQuickActions = [
     title: 'Browse Resources',
     description: 'Find classrooms, labs, and campus facilities you can use.',
     action: 'Open resources',
-    href: '/student/bookings',
+    href: '/resources/list',
   },
   {
     title: 'University Help Desk',
