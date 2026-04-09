@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from 'react-router-dom';
+import ResourceList from "../components/ResourceList";
+import ResourceForm from "../components/ResourceForm";
 import {
   getAllResources,
+  createResource,
+  updateResource,
   deleteResource,
 } from "../services/resourceService";
+import type { Resource } from "../services/resourceService";
 import "../FacilitiesCatalogue.css";
 
 function ResourcesCatalogPage() {
@@ -11,7 +16,6 @@ function ResourcesCatalogPage() {
   const [resources, setResources] = useState<any[]>([]);
   const [search, setSearch] = useState("");
 
-  // 🔄 Load data
   const load = async () => {
     try {
       const data = await getAllResources();
@@ -22,25 +26,50 @@ function ResourcesCatalogPage() {
     }
   };
 
+  const [editingResource, setEditingResource] = useState<Resource | null>(null);
+
+  const handleAddOrUpdate = async (resource: Resource) => {
+    try {
+      if (editingResource && editingResource.id) {
+        await updateResource(editingResource.id, resource);
+      } else {
+        await createResource(resource);
+      }
+
+      setEditingResource(null);
+      await load();
+    } catch (err) {
+      console.error('Failed to save resource:', err);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete this resource?')) return;
+    try {
+      await deleteResource(id);
+      await load();
+    } catch (err) {
+      console.error('Failed to delete resource:', err);
+    }
+  };
+
   useEffect(() => {
     load();
   }, []);
 
-  // 🔍 Search filter
   useEffect(() => {
     const id = setTimeout(() => {
       const q = (search || "").toLowerCase().trim();
-
       if (!q) {
         setResources(allResources);
         return;
       }
 
-      const tokens = q.split(/\s+/).filter(Boolean);
+      const tokens = q.split(/\s+/).filter((t) => t.length > 0);
 
-      const filtered = allResources.filter((r: any) => {
-        const name = (r.name || "").toLowerCase();
-        const type = (r.type || "").toLowerCase();
+      const filtered = (allResources || []).filter((r: any) => {
+        const name = (r.name || r.resourceName || "").toLowerCase();
+        const type = (r.type || r.resourceType || "").toLowerCase();
         const location = (r.location || "").toLowerCase();
         const description = (r.description || "").toLowerCase();
         const status = (r.status || "").toLowerCase();
@@ -60,89 +89,46 @@ function ResourcesCatalogPage() {
     return () => clearTimeout(id);
   }, [search, allResources]);
 
-  // ❌ Delete
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this resource?")) return;
-    try {
-      await deleteResource(id);
-      await load();
-    } catch (err) {
-      console.error("Failed to delete resource:", err);
-    }
-  };
-
   return (
     <div className="container">
-      <h1 className="page-title">Available Resources</h1>
+      <h1 className="page-title">Resources Catalog</h1>
 
-      {/* 🔝 TOP BAR */}
-      <div className="top-bar">
+      <div style={{ marginBottom: "20px", display: 'flex', gap: '12px', alignItems: 'center' }}>
         <input
           type="text"
-          placeholder="Search by name, type, or location..."
+          placeholder="Search resources (any word)..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="search-input"
+          style={{ padding: "10px", width: "360px", borderRadius: "8px", border: "1px solid #ccc" }}
         />
-
-        <div className="top-buttons">
-          <Link to="/" className="secondary-button">
-            Dashboard
-          </Link>
-
-          <Link to="/resources" className="primary-button">
-            Add Resource
-          </Link>
-        </div>
+        <Link to="/resources" className="secondary-button">
+          Add Resource
+        </Link>
       </div>
 
-      {/* 🔥 CARDS */}
-      {resources.length === 0 ? (
-        <p className="empty-message">No matching resources found.</p>
-      ) : (
-        <div className="resource-grid">
-          {resources.map((r: any) => (
-            <div className="resource-card" key={r.id}>
-              
-              {/* Header */}
-              <div className="card-header">
-                <span className="badge">
-                  {r.location || "Location"}
-                </span>
-              </div>
-
-              {/* Body */}
-              <div className="card-body">
-                <h3>{r.name}</h3>
-
-                <p><strong>Type:</strong> {r.type}</p>
-                <p><strong>Location:</strong> {r.location}</p>
-                <p><strong>Capacity:</strong> {r.capacity} people</p>
-                <p className="desc">{r.description}</p>
-              </div>
-
-              {/* Footer */}
-              <div className="card-footer">
-                <div className="actions">
-                  <Link
-                    to={`/resources/edit/${r.id}`}
-                    className="btn-edit"
-                  >
-                    ✏️ Edit
-                  </Link>
-
-                  <button
-                    className="btn-delete"
-                    onClick={() => handleDelete(r.id)}
-                  >
-                    🗑️ Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+      {/* Edit form appears only when editing a resource; no direct "Add" in catalog */}
+      {editingResource ? (
+        <div className="card">
+          <ResourceForm
+            onSubmit={handleAddOrUpdate}
+            editingResource={editingResource}
+            clearEdit={() => setEditingResource(null)}
+          />
         </div>
-      )}
+      ) : null}
+
+      <div className="card">
+        {resources.length === 0 ? (
+          <p style={{ padding: "10px" }}>No matching resources found.</p>
+        ) : (
+          <ResourceList
+            resources={resources}
+            onEdit={(r) => setEditingResource(r)}
+            onDelete={handleDelete}
+            showActions={true}
+          />
+        )}
+      </div>
     </div>
   );
 }

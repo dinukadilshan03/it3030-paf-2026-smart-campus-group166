@@ -2,7 +2,6 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import './App.css';
 import { AuthProvider } from './auth/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
-
 import { AccessDeniedPage } from './pages/AccessDeniedPage';
 import { AdminBookingsPage } from './pages/AdminBookingsPage';
 import { AdminTicketsPage } from './pages/AdminTicketsPage';
@@ -13,20 +12,16 @@ import { LoginPage } from './pages/LoginPage';
 import { StudentDashboardPage } from './pages/StudentDashboardPage';
 import { StudentBookingsPage } from './pages/StudentBookingsPage';
 import { UserHomePage } from './pages/UserHomePage';
-
 import ResourcePage from "./pages/ResourcePage";
-import ResourcesCatalogPage from './pages/ResourcesCatalogPage';
+import ResourcesCatalogPage from './pages/ResourcesCatalogPage.tsx';
 import ResourceListOnlyPage from './pages/ResourceListOnlyPage';
-import EditResourcePage from './pages/EditResource'; 
 
 function AppRoutes() {
   return (
     <Routes>
-      {/* 🔐 Auth */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
-      {/* 🏠 App Home */}
       <Route
         path="/app"
         element={
@@ -36,7 +31,6 @@ function AppRoutes() {
         }
       />
 
-      {/* 🎓 Student */}
       <Route
         path="/student/dashboard"
         element={
@@ -55,7 +49,6 @@ function AppRoutes() {
         }
       />
 
-      {/* 🚫 Access */}
       <Route
         path="/access-denied"
         element={
@@ -65,7 +58,6 @@ function AppRoutes() {
         }
       />
 
-      {/* 🛠 Admin */}
       <Route
         path="/admin/users"
         element={
@@ -93,7 +85,6 @@ function AppRoutes() {
         }
       />
 
-      {/* 📦 Resources */}
       <Route
         path="/resources"
         element={
@@ -112,16 +103,6 @@ function AppRoutes() {
         }
       />
 
-      {/* ✅ 🔥 EDIT RESOURCE PAGE (THIS WAS MISSING) */}
-      <Route
-        path="/resources/edit/:id"
-        element={
-          <ProtectedRoute allowedRoles={["ADMIN"]}>
-            <EditResourcePage />
-          </ProtectedRoute>
-        }
-      />
-
       <Route
         path="/resources/list"
         element={
@@ -131,7 +112,6 @@ function AppRoutes() {
         }
       />
 
-      {/* 🔁 Default */}
       <Route path="/" element={<HomeRedirectPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
