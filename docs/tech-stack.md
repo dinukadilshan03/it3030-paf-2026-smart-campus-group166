@@ -2,241 +2,232 @@
 
 ## Overview
 
-This project uses a **modern full-stack architecture** with a clear separation between frontend, backend, database, and infrastructure layers.
-
-The stack is designed to:
-
-* satisfy assignment requirements (React client + Spring Boot API)
-* support team collaboration
-* enable scalable and clean architecture
-* integrate authentication, storage, and notifications
+SmartCampus uses a clean split between frontend, backend, database, and storage.
+The first implementation layer is intentionally backend-owned so the team can share one hosted Supabase database without letting multiple clients mutate schema or business rules in different ways.
 
 ---
 
-# 1. Frontend
+## 1. Frontend
 
-## Framework
+Framework:
 
-* **Next.js (App Router)**
+- Next.js with App Router
 
-## Language
+Language:
 
-* **TypeScript**
+- TypeScript
 
-## Styling
+Styling:
 
-* **Tailwind CSS**
+- Tailwind CSS
 
-## State & Data Fetching
+Responsibilities:
 
-* Native React state + hooks
-* Optional: React Query (recommended)
+- UI rendering
+- route protection and role-aware navigation
+- form handling
+- calling Spring Boot APIs
+- displaying bookings, tickets, and notifications
 
-## Responsibilities
+Important boundary:
 
-* UI rendering
-* Form handling
-* API communication
-* Role-based routing
-* Display workflows (bookings, tickets, notifications)
-
-## Key Features Used
-
-* File-based routing
-* Server & Client components
-* API route integration (optional proxy)
-* Middleware for route protection
+- frontend does not connect directly to the Supabase database
+- frontend consumes backend DTOs only
 
 ---
 
-# 2. Backend
+## 2. Backend
 
-## Framework
+Framework:
 
-* **Spring Boot**
+- Spring Boot
 
-## Language
+Language:
 
-* **Java**
+- Java 21
 
-## Architecture
+Architecture:
 
-* Layered architecture:
+- controller
+- service
+- repository
+- DTO / mapper
+- security
+- Flyway migrations
 
-  * Controller
-  * Service
-  * Repository
-  * DTO / Mapper
-  * Security
+Responsibilities:
 
-## Responsibilities
+- business logic
+- validation
+- auth and role resolution
+- conflict detection
+- storage coordination
+- database access
 
-* Business logic
-* Validation
-* Authentication handling
-* Authorization (RBAC)
-* Booking conflict detection
-* Ticket workflow management
-* Notification triggering
+Key libraries:
 
-## Key Libraries
-
-* Spring Web
-* Spring Data JPA
-* Spring Security
-* Bean Validation (Jakarta Validation)
-* Lombok (optional)
-
----
-
-# 3. Database
-
-## Primary Database
-
-* **PostgreSQL (via Supabase)**
-
-## Why Supabase
-
-* Managed PostgreSQL
-* Easy setup for team collaboration
-* Built-in authentication support (optional)
-* Integrated storage for files
-
-## Responsibilities
-
-* Persistent data storage
-* Relational integrity
-* Query performance
-* Support for all entities:
-
-  * users
-  * resources
-  * bookings
-  * tickets
-  * comments
-  * notifications
+- Spring Web
+- Spring Data JPA
+- Spring Security
+- Flyway
+- PostgreSQL JDBC driver
+- Jakarta Validation
+- Lombok
 
 ---
 
-# 4. File Storage
+## 3. Database
 
-## Service
+Primary database:
 
-* **Supabase Storage**
+- PostgreSQL via Supabase
 
-## Usage
+Why this setup:
 
-* Ticket attachments (images)
-* Resource images
+- one hosted online database for all team members
+- easier shared development and review
+- strong relational support
+- direct compatibility with Spring Boot + Flyway
 
-## Features
+Database ownership model:
 
-* Public/private buckets
-* Secure file access
-* Easy integration with backend
+- Spring Boot is the only app layer that connects to the database
+- Flyway is the only supported path for schema changes
+- Supabase dashboard should not be used for manual schema drift
 
----
+Current schema surface:
 
-# 5. Authentication
-
-## Method
-
-* **Google OAuth 2.0**
-
-## Flow
-
-* User logs in via Google
-* Backend validates token
-* User record created or retrieved
-* Session/JWT issued
-
-## Responsibilities
-
-* User identity verification
-* Secure login
-* Integration with RBAC
-
----
-
-# 6. Authorization
-
-## Model
-
-* **Role-Based Access Control (RBAC)**
-
-## Roles
-
-* STUDENT
-* STAFF
-* ADMIN
-
-## Implementation
-
-* Backend: Spring Security
-* Frontend: route protection + UI guards
+- `roles`
+- `users`
+- `user_roles`
+- `locations`
+- `resource_categories`
+- `resources`
+- `resource_availability_windows`
+- `bookings`
+- `ticket_categories`
+- `tickets`
+- `ticket_attachments`
+- `ticket_comments`
+- `ticket_assignments`
+- `notifications`
+- `audit_logs`
 
 ---
 
-# 7. API Design
+## 4. File Storage
 
-## Style
+Service:
 
-* **RESTful API**
+- Supabase Storage
 
-## Format
+Usage:
 
-* JSON request/response
+- ticket attachment files
+- resource image files
 
-## Standards
+Storage model:
 
-* Proper HTTP methods:
-
-  * GET
-  * POST
-  * PUT / PATCH
-  * DELETE
-* Consistent error responses
-* DTO-based data transfer
+- files live in buckets
+- database stores metadata such as `storage_bucket` and `storage_path`
+- backend owns secure storage integration
 
 ---
 
-# 8. DevOps & Tooling
+## 5. Authentication
 
-## Version Control
+Method:
 
-* **Git + GitHub**
+- Google OAuth 2.0 through Spring Security
 
-## CI/CD
+Responsibilities:
 
-* **GitHub Actions**
+- identify the user
+- create or update the `users` record
+- resolve one active role through `user_roles`
+- expose current user state to the frontend
 
-## CI Tasks
+Important note:
 
-* Frontend build
-* Backend build
-* Linting (optional)
-* Tests (optional but recommended)
-
-## Environment Management
-
-* `.env` files
-* `.env.example` for setup
+- Supabase Auth is not the v1 auth owner
+- Supabase is used for database and storage in this setup
 
 ---
 
-# 9. Development Tools
+## 6. Authorization
 
-## Frontend
+Model:
 
-* VS Code
-* Chrome DevTools
+- role-based access control
 
-## Backend
+Roles:
 
-* IntelliJ IDEA / VS Code
+- `STUDENT`
+- `STAFF`
+- `ADMIN`
 
-## Database
+Implementation:
 
-* Supabase Dashboard
+- backend enforces authorization
+- frontend mirrors access rules in navigation and page guards
 
+---
 
+## 7. API Design
+
+Style:
+
+- RESTful JSON API
+
+Direction:
+
+- Next.js -> Spring Boot API -> Supabase Postgres / Supabase Storage
+
+Baseline DTO contracts:
+
+- current user
+- resource summary
+- booking summary
+- ticket summary
+- notification summary
+
+---
+
+## 8. DevOps and Tooling
+
+Version control:
+
+- Git + GitHub
+
+CI:
+
+- GitHub Actions
+
+Expected backend checks:
+
+- build
+- tests
+- migration validation through application startup in shared environments
+
+Environment management:
+
+- backend `.env.example` for local setup guidance
+- real credentials stay local and untracked
+
+---
+
+## 9. Development Tools
+
+Frontend:
+
+- VS Code
+- browser devtools
+
+Backend:
+
+- IntelliJ IDEA or VS Code
+
+Database:
+
+- Supabase dashboard for inspection
+- Flyway migrations for schema changes

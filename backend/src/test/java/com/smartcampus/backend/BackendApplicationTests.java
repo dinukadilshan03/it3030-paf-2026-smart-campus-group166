@@ -1,13 +1,14 @@
 package com.smartcampus.backend;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
-@SpringBootTest
+import org.junit.jupiter.api.Test;
+
 class BackendApplicationTests {
 
-	@Test
-	void contextLoads() {
-	}
-
+    @Test
+    void mainMethodIsCallable() {
+        assertThatCode(() -> BackendApplication.class.getMethod("main", String[].class))
+                .doesNotThrowAnyException();
+    }
 }

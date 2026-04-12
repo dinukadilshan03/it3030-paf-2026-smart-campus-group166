@@ -2,30 +2,25 @@
 
 ## Overview
 
-This entity model is designed for the **Smart Campus Operations Hub** and covers all required processes:
-- facilities and assets catalogue
-- booking workflow and approval
-- maintenance and incident ticketing
-- ticket assignment
-- ticket conversation between student and staff
-- notifications
-- authentication and authorization
+This document is the source of truth for the first SmartCampus database layer.
+It defines the baseline schema that Spring Boot owns through Flyway migrations and that all team members share through the hosted Supabase PostgreSQL database.
 
-The design is based on the coursework requirements for:
-- resource metadata, location, status, and availability
-- booking requests with approval/rejection and conflict prevention
-- incident tickets with category, priority, attachments, assignment, and comments
-- in-app notifications
-- role-based access control with Google OAuth login. :contentReference[oaicite:0]{index=0}
+Key v1 decisions:
+
+- Spring Boot is the only application layer that connects to the database.
+- Next.js consumes backend APIs and DTOs only.
+- Supabase provides hosted PostgreSQL and Storage.
+- All internal primary keys use `bigint` identity columns.
+- `roles` and `user_roles` stay in the schema, but the system enforces one active role per user in v1.
 
 ---
 
 ## Role Model
 
-The system uses 3 main access layers:
-
 ### `STUDENT`
+
 Can:
+
 - browse resources
 - create booking requests
 - view own bookings
@@ -35,28 +30,32 @@ Can:
 - receive notifications
 
 ### `STAFF`
+
 Can:
+
 - view assigned tickets
 - update ticket status
 - add resolution notes
-- comment on tickets
-- manage operational work related to assigned issues
+- add public replies and internal notes
+- receive notifications related to assigned work
 
 ### `ADMIN`
+
 Can:
+
 - manage resources, categories, and locations
 - approve or reject bookings
 - view all bookings
 - view and assign all tickets
-- manage roles and operational settings
+- manage effective user roles
 - oversee the full system
 
 ---
 
 ## Entity List
 
-1. `users`
-2. `roles`
+1. `roles`
+2. `users`
 3. `user_roles`
 4. `locations`
 5. `resource_categories`
@@ -75,69 +74,73 @@ Can:
 
 ## Entities
 
-### 1. `users`
+### 1. `roles`
 
-**Purpose:**  
-Stores all authenticated users in the system.
+Purpose: defines the fixed access roles available in the system.
 
-**Fields:**
+Fields:
+
 - `id`
-- `google_sub`
-- `email`
+- `code` (`STUDENT`, `STAFF`, `ADMIN`) unique
+- `name`
+- `description`
+
+Notes:
+
+- seeded by migration
+- used with `user_roles` instead of a direct `role_id` on `users`
+
+### 2. `users`
+
+Purpose: stores authenticated people who use the platform.
+
+Fields:
+
+- `id`
+- `google_sub` unique, nullable
+- `email` unique, required
 - `first_name`
 - `last_name`
 - `display_name`
 - `phone`
 - `profile_image_url`
-- `status` (`ACTIVE`, `INACTIVE`, `SUSPENDED`)
+- `status` (`ACTIVE`, `INACTIVE`, `SUSPENDED`) default `ACTIVE`
 - `created_at`
 - `updated_at`
 - `last_login_at`
 
-**Notes:**
-- Created when a user signs in through Google OAuth
-- Used by bookings, tickets, comments, notifications, and role assignment
+Notes:
 
----
-
-### 2. `roles`
-
-**Purpose:**  
-Defines available system roles.
-
-**Fields:**
-- `id`
-- `code` (`STUDENT`, `STAFF`, `ADMIN`)
-- `name`
-- `description`
-
----
+- users are created or updated through the backend auth flow
+- `google_sub` is unique when present
 
 ### 3. `user_roles`
 
-**Purpose:**  
-Maps users to roles.
+Purpose: stores role assignment history while allowing exactly one active role per user in v1.
 
-**Fields:**
+Fields:
+
 - `id`
 - `user_id`
 - `role_id`
 - `assigned_at`
-- `assigned_by`
+- `assigned_by_user_id`
+- `is_active` default `true`
+- `ended_at`
 
-**Notes:**
-- Allows flexibility if one user needs multiple roles later
+Notes:
 
----
+- partial unique index enforces only one active role per user
+- old assignments remain as history rows when roles change later
 
 ### 4. `locations`
 
-**Purpose:**  
-Stores location details for resources and tickets.
+Purpose: stores reusable physical location records for resources and tickets.
 
-**Fields:**
+Fields:
+
 - `id`
-- `code`
+- `code` unique
 - `name`
 - `building`
 - `floor`
@@ -146,90 +149,75 @@ Stores location details for resources and tickets.
 - `created_at`
 - `updated_at`
 
-**Notes:**
-- Shared by resource management and incident ticketing
-
----
-
 ### 5. `resource_categories`
 
-**Purpose:**  
-Classifies resources into types.
+Purpose: classifies managed facilities and assets.
 
-**Examples:**
-- lecture hall
-- lab
-- meeting room
-- projector
-- camera
+Fields:
 
-**Fields:**
 - `id`
-- `code`
+- `code` unique
 - `name`
 - `description`
-- `is_active`
+- `is_active` default `true`
 - `created_at`
 - `updated_at`
-
----
 
 ### 6. `resources`
 
-**Purpose:**  
-Stores all bookable assets and facilities.
+Purpose: stores facilities and assets that can be managed and, when relevant, booked or referenced in tickets.
 
-**Fields:**
+Fields:
+
 - `id`
 - `resource_category_id`
 - `location_id`
-- `resource_code`
+- `resource_code` unique
 - `name`
 - `description`
 - `capacity`
-- `status` (`ACTIVE`, `OUT_OF_SERVICE`, `MAINTENANCE`, `INACTIVE`)
-- `requires_approval`
+- `status` (`ACTIVE`, `OUT_OF_SERVICE`, `MAINTENANCE`, `INACTIVE`) default `ACTIVE`
+- `requires_approval` default `true`
 - `image_url`
 - `notes`
-- `created_by`
-- `updated_by`
+- `created_by_user_id`
+- `updated_by_user_id`
 - `created_at`
 - `updated_at`
 
-**Notes:**
-- Main catalogue entity for facilities and assets
-- Must support filtering by type, capacity, and location as required in the brief. :contentReference[oaicite:1]{index=1}
+Notes:
 
----
+- `image_url` is expected to reference a Supabase Storage-backed asset
+- `capacity` is non-negative when present
 
 ### 7. `resource_availability_windows`
 
-**Purpose:**  
-Defines standard availability windows for each resource.
+Purpose: stores recurring availability rules for each resource.
 
-**Fields:**
+Fields:
+
 - `id`
 - `resource_id`
-- `day_of_week`
+- `day_of_week` (ISO-style `1-7`)
 - `start_time`
 - `end_time`
-- `is_available`
+- `is_available` default `true`
 - `effective_from`
 - `effective_to`
 - `created_at`
 - `updated_at`
 
-**Notes:**
-- Supports the requirement that resources include availability windows. :contentReference[oaicite:2]{index=2}
+Notes:
 
----
+- `start_time` must be earlier than `end_time`
+- `effective_to` must be on or after `effective_from` when both exist
 
 ### 8. `bookings`
 
-**Purpose:**  
-Stores booking requests and booking lifecycle data.
+Purpose: stores booking requests and their review/cancellation lifecycle.
 
-**Fields:**
+Fields:
+
 - `id`
 - `resource_id`
 - `requester_user_id`
@@ -239,55 +227,44 @@ Stores booking requests and booking lifecycle data.
 - `purpose`
 - `expected_attendees`
 - `request_notes`
-- `status` (`PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`)
-- `reviewed_by`
+- `status` (`PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`) default `PENDING`
+- `reviewed_by_user_id`
 - `reviewed_at`
 - `review_reason`
-- `cancelled_by`
+- `cancelled_by_user_id`
 - `cancelled_at`
 - `cancellation_reason`
 - `created_at`
 - `updated_at`
 
-**Notes:**
-- Supports approval/rejection workflow
-- Supports cancellation after approval
-- Time overlap validation should be enforced in backend service logic
-- Covers booking date, time range, purpose, and attendees from the brief. :contentReference[oaicite:3]{index=3}
+Notes:
 
----
+- booking overlap is validated in backend service logic, not by a DB unique constraint
+- `start_time` must be earlier than `end_time`
+- `expected_attendees` must be positive when present
 
 ### 9. `ticket_categories`
 
-**Purpose:**  
-Classifies maintenance and incident tickets.
+Purpose: classifies maintenance and incident tickets.
 
-**Examples:**
-- electrical
-- network
-- equipment_damage
-- cleanliness
-- access_issue
+Fields:
 
-**Fields:**
 - `id`
-- `code`
+- `code` unique
 - `name`
 - `description`
-- `is_active`
+- `is_active` default `true`
 - `created_at`
 - `updated_at`
 
----
-
 ### 10. `tickets`
 
-**Purpose:**  
-Stores the main maintenance or incident ticket record.
+Purpose: stores the main incident or maintenance record.
 
-**Fields:**
+Fields:
+
 - `id`
-- `ticket_number`
+- `ticket_number` unique
 - `reporter_user_id`
 - `assigned_staff_user_id`
 - `resource_id` nullable
@@ -295,8 +272,8 @@ Stores the main maintenance or incident ticket record.
 - `ticket_category_id`
 - `title`
 - `description`
-- `priority` (`LOW`, `MEDIUM`, `HIGH`, `URGENT`)
-- `status` (`OPEN`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, `REJECTED`)
+- `priority` (`LOW`, `MEDIUM`, `HIGH`, `URGENT`) default `MEDIUM`
+- `status` (`OPEN`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, `REJECTED`) default `OPEN`
 - `preferred_contact_name`
 - `preferred_contact_email`
 - `preferred_contact_phone`
@@ -307,69 +284,66 @@ Stores the main maintenance or incident ticket record.
 - `created_at`
 - `updated_at`
 
-**Notes:**
-- Supports ticket creation, assignment, status changes, and closure
-- `resource_id` is optional because some incidents may refer only to a location
-- Covers category, description, priority, and preferred contact details from the brief. :contentReference[oaicite:4]{index=4}
+Notes:
 
----
+- resource is preferred when the incident is tied to a managed asset or facility
+- location is allowed as a fallback when there is no specific resource record
+- at least one of `resource_id` or `location_id` must be present
+- if both are present, backend validation must ensure the resource belongs to the same location
+- `assigned_staff_user_id` stores current assignment, while `ticket_assignments` stores assignment history
 
 ### 11. `ticket_attachments`
 
-**Purpose:**  
-Stores metadata for ticket evidence uploads.
+Purpose: stores metadata for ticket evidence files.
 
-**Fields:**
+Fields:
+
 - `id`
 - `ticket_id`
-- `uploaded_by`
+- `uploaded_by_user_id`
 - `file_name`
 - `storage_bucket`
-- `storage_path`
+- `storage_path` unique
 - `mime_type`
 - `file_size`
 - `attachment_type`
 - `created_at`
 
-**Notes:**
-- Files are stored in Supabase Storage
-- Backend should enforce the rule of up to 3 attachments per ticket. :contentReference[oaicite:5]{index=5}
+Notes:
 
----
+- files live in Supabase Storage
+- this table stores metadata only
+- backend validation limits a ticket to 3 attachments
 
 ### 12. `ticket_comments`
 
-**Purpose:**  
-Stores the conversation thread for each ticket.
+Purpose: stores the conversation and system notes on a ticket.
 
-**Fields:**
+Fields:
+
 - `id`
 - `ticket_id`
 - `author_user_id`
 - `body`
 - `comment_type` (`PUBLIC_REPLY`, `INTERNAL_NOTE`, `STATUS_NOTE`)
-- `parent_comment_id` nullable
-- `is_edited`
+- `parent_comment_id`
+- `is_edited` default `false`
 - `edited_at`
 - `created_at`
 - `updated_at`
 
-**Notes:**
-- This entity handles the conversation between student and staff
-- `PUBLIC_REPLY` is visible to reporter and staff/admin
-- `INTERNAL_NOTE` is visible only to staff/admin
-- `STATUS_NOTE` can be generated automatically for assignment or status changes
-- Ownership rules for edit/delete should be enforced by role and comment author
-- This directly supports the brief’s requirement for comments and ownership rules. :contentReference[oaicite:6]{index=6}
+Notes:
 
----
+- `PUBLIC_REPLY` is visible to reporter, staff, and admin
+- `INTERNAL_NOTE` is visible only to staff and admin
+- `STATUS_NOTE` is system-generated for workflow events
 
 ### 13. `ticket_assignments`
 
-**Purpose:**  
-Tracks ticket assignment history.
+Purpose: stores assignment history for each ticket.
 
-**Fields:**
+Fields:
+
 - `id`
 - `ticket_id`
 - `assigned_to_user_id`
@@ -377,46 +351,40 @@ Tracks ticket assignment history.
 - `assignment_note`
 - `assigned_at`
 - `unassigned_at`
-- `is_active`
+- `is_active` default `true`
 
-**Notes:**
-- Keeps historical assignment records
-- Useful for reassignment and audit history
-- Better than relying only on `assigned_staff_user_id` in `tickets`
+Notes:
 
----
+- only one active assignment is allowed per ticket
+- older rows remain for audit history
 
 ### 14. `notifications`
 
-**Purpose:**  
-Stores in-app notifications for users.
+Purpose: stores in-app notifications for users.
 
-**Fields:**
+Fields:
+
 - `id`
 - `user_id`
 - `type` (`BOOKING`, `TICKET`, `COMMENT`, `SYSTEM`)
 - `title`
 - `message`
-- `reference_type` (`BOOKING`, `TICKET`, `COMMENT`)
-- `reference_id`
-- `is_read`
+- `reference_type` (`BOOKING`, `TICKET`, `COMMENT`) nullable
+- `reference_id` nullable
+- `is_read` default `false`
 - `read_at`
 - `created_at`
 
-**Notes:**
-- Supports booking approval/rejection notifications
-- Supports ticket status change notifications
-- Supports new comment notifications
-- Matches the notification requirements in the brief. :contentReference[oaicite:7]{index=7}
+Notes:
 
----
+- system-level notifications may have no reference
 
 ### 15. `audit_logs`
 
-**Purpose:**  
-Stores important system activity for traceability.
+Purpose: stores important system changes for traceability.
 
-**Fields:**
+Fields:
+
 - `id`
 - `actor_user_id`
 - `entity_type`
@@ -426,69 +394,69 @@ Stores important system activity for traceability.
 - `new_value_json`
 - `created_at`
 
-**Notes:**
-- Recommended for admin tracking, debugging, and report evidence
-- Not strictly required, but very useful for demonstrating workflow changes
+Notes:
+
+- JSON payloads are stored in PostgreSQL `jsonb`
+- included from the start even if v1 uses it lightly
 
 ---
 
-## Entity Relationships
+## Relationship Summary
 
-### User and role relationships
-- one `user` can have many `user_roles`
+- one `user` can have many `user_roles`, but only one active row at a time in v1
 - one `role` can have many `user_roles`
-
-### Resource relationships
-- one `resource_category` can have many `resources`
 - one `location` can have many `resources`
+- one `resource_category` can have many `resources`
 - one `resource` can have many `resource_availability_windows`
 - one `resource` can have many `bookings`
-
-### Booking relationships
 - one `user` can create many `bookings`
-- one `booking` belongs to one `resource`
-
-### Ticket relationships
-- one `user` can create many `tickets`
-- one `staff` user can be assigned many `tickets`
 - one `ticket_category` can have many `tickets`
-- one `location` can have many `tickets`
-- one `resource` can have many `tickets`
+- one `user` can report many `tickets`
+- one `user` can be assigned to many `tickets`
 - one `ticket` can have many `ticket_attachments`
 - one `ticket` can have many `ticket_comments`
 - one `ticket` can have many `ticket_assignments`
-
-### Notification relationships
 - one `user` can have many `notifications`
 
 ---
 
-## Enums
+## Enum Set
+
+### Role Codes
+
+- `STUDENT`
+- `STAFF`
+- `ADMIN`
 
 ### User Status
+
 - `ACTIVE`
 - `INACTIVE`
 - `SUSPENDED`
 
 ### Resource Status
+
 - `ACTIVE`
 - `OUT_OF_SERVICE`
 - `MAINTENANCE`
 - `INACTIVE`
 
 ### Booking Status
+
 - `PENDING`
 - `APPROVED`
 - `REJECTED`
 - `CANCELLED`
 
 ### Ticket Priority
+
 - `LOW`
 - `MEDIUM`
 - `HIGH`
 - `URGENT`
 
 ### Ticket Status
+
 - `OPEN`
 - `IN_PROGRESS`
 - `RESOLVED`
@@ -496,65 +464,35 @@ Stores important system activity for traceability.
 - `REJECTED`
 
 ### Comment Type
+
 - `PUBLIC_REPLY`
 - `INTERNAL_NOTE`
 - `STATUS_NOTE`
 
 ### Notification Type
+
 - `BOOKING`
 - `TICKET`
 - `COMMENT`
 - `SYSTEM`
 
----
+### Notification Reference Type
 
-## Design Notes
-
-### Facilities and assets module
-Requires:
-- `resource_categories`
-- `resources`
-- `locations`
-- `resource_availability_windows`
-
-### Booking management module
-Requires:
-- `bookings`
-- `resources`
-- `users`
-
-### Maintenance and incident ticketing module
-Requires:
-- `tickets`
-- `ticket_categories`
-- `ticket_attachments`
-- `ticket_comments`
-- `ticket_assignments`
-- `locations`
-- optional `resources`
-
-### Notifications module
-Requires:
-- `notifications`
-
-### Authentication and authorization module
-Requires:
-- `users`
-- `roles`
-- `user_roles`
+- `BOOKING`
+- `TICKET`
+- `COMMENT`
 
 ---
 
-## Final Notes
+## Implementation Notes
 
-This entity design is intended to:
-- satisfy all required coursework workflows
-- support a clean Spring Boot REST API
-- support a normalized Supabase Postgres schema
-- support a clear Next.js frontend flow
-- make individual team contributions easier to separate and document
+- Flyway owns schema changes.
+- JPA entities must match Flyway exactly.
+- Supabase dashboard changes must not bypass migrations.
+- Legacy folders are reference-only and do not define the new schema contract.
 
-Recommended next files:
+Recommended next docs:
+
 - `docs/database/schema.md`
 - `docs/database/relationships.md`
 - `docs/api/endpoints.md`

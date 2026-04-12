@@ -2,406 +2,268 @@
 
 ## Overview
 
-This document defines all core workflows required for the system based on the assignment specification.
-Each workflow is written in a way that maps directly to backend logic, database entities, and frontend flows.
+This document maps user workflows to the baseline schema defined in `docs/entity.md`.
+It is intentionally aligned to the entity-first implementation: Spring Boot owns validation and workflow logic, while the shared Supabase database stores the persistent state.
 
 ---
 
-# 1. Resource Management Workflow (Admin)
+## 1. Resource Management Workflow
 
-## Goal
+Goal: allow admins to manage facilities and assets.
 
-Allow admins to manage facilities and assets.
+Flow:
 
-## Flow
+1. Admin opens Resource Management.
+2. Admin creates or edits:
+   - `resource_categories`
+   - `locations`
+   - `resources`
+   - `resource_availability_windows`
+3. When creating a resource, the admin supplies:
+   - category
+   - location
+   - name
+   - capacity
+   - description
+   - status
+   - approval requirement
+4. Availability windows are stored separately for each resource.
 
-1. Admin logs in
+Rules:
 
-2. Navigates to **Resource Management**
-
-3. Creates or edits:
-
-   * Resource Category
-   * Location
-   * Resource
-
-4. When creating a resource:
-
-   * Select category (`resource_categories`)
-   * Select location (`locations`)
-   * Enter:
-
-     * name
-     * capacity
-     * description
-     * status
-     * availability
-
-5. Save resource → stored in `resources`
-
-## Rules
-
-* Only `ADMIN` can create/update/delete resources
-* Resource must always have:
-
-  * category
-  * location
-  * status
-* Availability stored in `resource_availability_windows`
+- only `ADMIN` can create, update, or delete resources
+- every resource must belong to a category and location
+- resource status must be one of the defined enum values
+- resource images are expected to be backed by Supabase Storage
 
 ---
 
-# 2. Booking Workflow
+## 2. Booking Workflow
 
-## Goal
+Goal: allow students to request bookings and admins to approve or reject them.
 
-Allow students to request bookings and admins to approve/reject.
+Flow:
 
-## Flow
+1. Student selects a resource.
+2. Student submits:
+   - `booking_date`
+   - `start_time`
+   - `end_time`
+   - `purpose`
+   - optional `expected_attendees`
+   - optional `request_notes`
+3. Backend creates a `bookings` row with `status = PENDING`.
+4. Admin reviews pending bookings.
+5. Admin approves or rejects:
+   - approved: set `status = APPROVED`, `reviewed_by_user_id`, `reviewed_at`
+   - rejected: set `status = REJECTED`, `reviewed_by_user_id`, `reviewed_at`, `review_reason`
+6. Student or admin can cancel later:
+   - set `status = CANCELLED`
+   - set `cancelled_by_user_id`, `cancelled_at`, `cancellation_reason`
 
-### Step 1 — Create Booking (Student)
+Rules:
 
-1. Student selects resource
-2. Inputs:
+- booking overlap is checked in backend service logic
+- overlap check ignores `REJECTED` and `CANCELLED`
+- `start_time` must be earlier than `end_time`
+- `expected_attendees` must be positive when provided
 
-   * date
-   * start_time
-   * end_time
-   * purpose
-   * expected attendees
-3. Submit request
+Notifications:
 
-→ Create `bookings` record:
-
-* status = `PENDING`
-
----
-
-### Step 2 — Conflict Validation (Backend)
-
-Before saving:
-
-* Check for overlapping bookings:
-
-  * same `resource_id`
-  * overlapping time range
-  * status NOT in (`REJECTED`, `CANCELLED`)
-
-If conflict:
-
-* Reject request with error
+- booking approved -> notify requester
+- booking rejected -> notify requester
 
 ---
 
-### Step 3 — Admin Review
+## 3. Ticket Creation Workflow
 
-1. Admin views pending bookings
+Goal: allow users to report incidents and maintenance issues.
 
-2. Admin chooses:
+Flow:
 
-   * APPROVE
-   * REJECT
+1. User opens Create Ticket.
+2. User submits:
+   - category
+   - title
+   - description
+   - optional priority
+   - resource when a specific managed asset/facility is involved
+   - location as fallback when there is no specific resource record
+   - preferred contact details
+3. User may upload up to 3 attachments.
+4. Backend creates:
+   - a `tickets` row with `status = OPEN`
+   - up to 3 `ticket_attachments` rows storing Supabase Storage metadata
 
-3. If APPROVED:
+Rules:
 
-   * status = `APPROVED`
-   * set `reviewed_by`, `reviewed_at`
-
-4. If REJECTED:
-
-   * status = `REJECTED`
-   * store `review_reason`
-
----
-
-### Step 4 — Cancellation
-
-* User or Admin cancels:
-
-  * status = `CANCELLED`
-  * store reason + timestamp
-
----
-
-### Notifications Triggered
-
-* Booking approved → notify user
-* Booking rejected → notify user
+- `priority` defaults to `MEDIUM`
+- at least one of `resource_id` or `location_id` must be present
+- if both are supplied, backend must validate that the resource belongs to that location
+- files are stored in Supabase Storage; the database stores only metadata
 
 ---
 
-# 3. Ticket Creation Workflow
+## 4. Ticket Assignment Workflow
 
-## Goal
+Goal: allow admins to assign tickets to staff and keep assignment history.
 
-Allow students to report incidents.
+Flow:
 
-## Flow
+1. Admin opens an unassigned or reassigned ticket.
+2. Admin selects a staff user.
+3. Backend updates:
+   - `tickets.assigned_staff_user_id`
+   - inserts a new `ticket_assignments` row with `is_active = true`
+4. If the ticket had an active assignment already:
+   - previous `ticket_assignments` row is closed with `is_active = false` and `unassigned_at`
+5. System creates a `STATUS_NOTE` comment for the assignment event.
 
-1. Student opens **Create Ticket**
+Rules:
 
-2. Inputs:
-
-   * category
-   * title
-   * description
-   * priority
-   * location OR resource
-   * preferred contact details
-
-3. Upload up to 3 images
-
-4. Submit
-
-→ Create:
-
-* `tickets` (status = `OPEN`)
-* `ticket_attachments`
+- only one active assignment row is allowed per ticket
+- `ticket_assignments` is the history table
+- `tickets.assigned_staff_user_id` is the current-state shortcut
 
 ---
 
-## Rules
+## 5. Ticket Lifecycle Workflow
 
-* Max 3 attachments
-* Must have either:
+Goal: track operational progress on a ticket.
 
-  * `location_id` OR `resource_id`
-* Default priority = `MEDIUM` if not provided
+State flow:
 
----
+`OPEN -> IN_PROGRESS -> RESOLVED -> CLOSED`
 
-# 4. Ticket Assignment Workflow
+Rejection path:
 
-## Goal
+`OPEN -> REJECTED`
 
-Admin assigns tickets to staff.
+Flow:
 
-## Flow
+- staff/admin can move `OPEN` to `IN_PROGRESS`
+- staff/admin can move `IN_PROGRESS` to `RESOLVED` and provide `resolution_summary`
+- admin can move `RESOLVED` to `CLOSED`
+- admin can reject a ticket with `rejection_reason`
 
-1. Admin views unassigned tickets
-2. Selects staff member
-3. Assigns ticket
+Rules:
 
-→ Updates:
-
-* `tickets.assigned_staff_user_id`
-* create record in `ticket_assignments`
-
-→ System creates `STATUS_NOTE` comment
+- student users do not change ticket status
+- all status changes create `STATUS_NOTE` comments
 
 ---
 
-## Reassignment
+## 6. Ticket Conversation Workflow
 
-* Admin can reassign:
+Goal: support communication around each ticket.
 
-  * deactivate previous assignment
-  * create new assignment record
+Flow:
 
----
+1. Reporter, staff, or admin adds a comment.
+2. Backend creates a `ticket_comments` row.
 
-# 5. Ticket Lifecycle Workflow
+Comment types:
 
-## Goal
+- `PUBLIC_REPLY`: visible to reporter, staff, and admin
+- `INTERNAL_NOTE`: visible only to staff and admin
+- `STATUS_NOTE`: system-generated workflow note
 
-Track ticket progress.
+Ownership rules:
 
-## States
-
-```
-OPEN → IN_PROGRESS → RESOLVED → CLOSED
-                ↘ REJECTED
-```
+- users can edit or delete only their own comments when business rules allow it
+- admin can moderate all comments
 
 ---
 
-## Flow
+## 7. Notification Workflow
 
-### OPEN → IN_PROGRESS
+Goal: keep users informed about important events.
 
-* Staff starts working
+Triggers:
 
-### IN_PROGRESS → RESOLVED
+- booking approved
+- booking rejected
+- ticket assigned
+- ticket status changed
+- ticket comment added
 
-* Staff marks issue fixed
-* adds resolution summary
+Flow:
 
-### RESOLVED → CLOSED
+1. A backend workflow event occurs.
+2. Backend creates a `notifications` row.
+3. Frontend displays notifications from backend APIs.
 
-* Admin confirms completion
+Structure:
 
-### Any → REJECTED
-
-* Admin rejects ticket with reason
-
----
-
-## Rules
-
-* Only staff/admin can update status
-* Student cannot change status
-* All status changes create `STATUS_NOTE`
-
----
-
-# 6. Ticket Conversation Workflow
-
-## Goal
-
-Enable communication between student and staff.
-
-## Flow
-
-1. User or staff adds comment
-
-→ Create `ticket_comments` record
+- `type`
+- `title`
+- `message`
+- optional `reference_type`
+- optional `reference_id`
 
 ---
 
-## Comment Types
+## 8. Authentication Workflow
 
-### PUBLIC_REPLY
+Goal: authenticate users and resolve one effective role for the app session.
 
-* Visible to:
+Flow:
 
-  * student
-  * staff
-  * admin
+1. User signs in through Google OAuth.
+2. Spring Boot handles the callback.
+3. Backend finds or creates the `users` row.
+4. Backend ensures the user has one active `user_roles` row.
+5. Frontend consumes current user state from the backend API.
 
-### INTERNAL_NOTE
+Rules:
 
-* Visible only to:
-
-  * staff
-  * admin
-
-### STATUS_NOTE
-
-* Auto-generated
+- backend owns authentication and role resolution
+- frontend does not connect directly to the database
+- v1 uses one effective role per user even though the schema keeps role history
 
 ---
 
-## Ownership Rules
+## 9. Authorization Workflow
 
-* User can edit/delete:
+Access model:
 
-  * their own comments only
-* Admin can:
+| Action | Student | Staff | Admin |
+| --- | --- | --- | --- |
+| View resources | Yes | Yes | Yes |
+| Create booking | Yes | No | Yes |
+| Approve booking | No | No | Yes |
+| Create ticket | Yes | Yes | Yes |
+| Assign ticket | No | No | Yes |
+| Update ticket | No | Yes | Yes |
+| View all tickets | No | Yes | Yes |
 
-  * moderate all comments
+Rules:
 
----
-
-# 7. Notification Workflow
-
-## Goal
-
-Inform users of system events.
-
-## Triggers
-
-### Booking
-
-* Approved
-* Rejected
-
-### Tickets
-
-* Assigned
-* Status changed
-* Comment added
+- Spring Security enforces protected access
+- role checks are resolved from the active `user_roles` row
 
 ---
 
-## Flow
+## 10. Integrity Rules
 
-1. Event occurs
-2. Create `notifications` record
-3. Display in UI
+Booking rules:
 
----
+- no overlapping bookings for the same resource in active statuses
+- valid time range required
 
-## Notification Structure
+Ticket rules:
 
-* title
-* message
-* reference_type
-* reference_id
+- max 3 attachments
+- valid category required
+- at least one of resource or location required
+- if both resource and location are present, they must be consistent
 
----
+Comment rules:
 
-# 8. Authentication Workflow (Google OAuth)
+- ownership rules enforced
+- internal notes restricted to staff/admin
 
-## Flow
+Role rules:
 
-1. User clicks login
-
-2. Redirect to Google OAuth
-
-3. Google returns:
-
-   * email
-   * name
-   * google_sub
-
-4. Backend:
-
-   * if user exists → login
-   * else → create user
-
-5. Assign default role:
-
-   * STUDENT
-
-6. Create session/JWT
-
----
-
-## Rules
-
-* All protected endpoints require authentication
-* Role-based access enforced in backend
-
----
-
-# 9. Authorization (RBAC)
-
-## Access Control Matrix
-
-| Action           | Student | Staff | Admin |
-| ---------------- | ------- | ----- | ----- |
-| View resources   | ✓       | ✓     | ✓     |
-| Create booking   | ✓       | ✗     | ✓     |
-| Approve booking  | ✗       | ✗     | ✓     |
-| Create ticket    | ✓       | ✓     | ✓     |
-| Assign ticket    | ✗       | ✗     | ✓     |
-| Update ticket    | ✗       | ✓     | ✓     |
-| View all tickets | ✗       | ✓     | ✓     |
-
----
-
-# 10. System Integrity Rules
-
-## Booking Rules
-
-* No overlapping bookings
-* Must have valid time range
-
-## Ticket Rules
-
-* Max 3 attachments
-* Must have category
-* Must have location OR resource
-
-## Comment Rules
-
-* Ownership enforced
-* Internal notes restricted
-
-## Resource Rules
-
-* Must belong to category
-* Must have location
-
-
-
+- only one active role per user in v1
+- role history preserved through `user_roles`
