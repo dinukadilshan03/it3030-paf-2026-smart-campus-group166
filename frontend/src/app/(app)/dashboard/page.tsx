@@ -1,11 +1,13 @@
-import { PagePlaceholder } from "@/components/ui/PagePlaceholder";
+import { RoleDashboard } from "@/components/dashboard/RoleDashboard";
+import { requireCurrentUser } from "@/lib/auth/session";
+import { getDashboardDefinition } from "@/lib/navigation/dashboard-config";
 
-export default function DashboardPage() {
-  return (
-    <PagePlaceholder
-      eyebrow="Workspace"
-      title="Dashboard"
-      description="This is the shared landing page for the authenticated app shell. Your team can later turn this into a real overview with metrics, tasks, and role-aware quick actions."
-    />
-  );
+export default async function DashboardPage() {
+  const user = await requireCurrentUser();
+
+  if (!user.role) {
+    return null;
+  }
+
+  return <RoleDashboard user={user} definition={getDashboardDefinition(user.role)} />;
 }

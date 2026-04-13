@@ -11,11 +11,11 @@ type AppShellProps = {
 function getRoleLabel(role: CurrentUser["role"]) {
   switch (role) {
     case "ADMIN":
-      return "Admin workspace";
+      return "Admin dashboard";
     case "STAFF":
-      return "Staff workspace";
+      return "Staff dashboard";
     case "STUDENT":
-      return "Student workspace";
+      return "Student dashboard";
     default:
       return "SmartCampus";
   }
@@ -34,11 +34,11 @@ export function AppShell({ user, navItems, children }: AppShellProps) {
             </span>
             <div>
               <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
-                Campus operations
+                Role navigation
               </h1>
               <p className="mt-2 text-sm leading-7 text-slate-600">
-                Route scaffolding for your team to build bookings, tickets, and
-                management workflows.
+                A role-aware shell for your team to plug feature pages into
+                without changing the app flow later.
               </p>
             </div>
           </div>
@@ -66,6 +66,9 @@ export function AppShell({ user, navItems, children }: AppShellProps) {
                 <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
                   {getRoleLabel(user.role)}
                 </h2>
+                <p className="mt-2 text-sm leading-7 text-slate-600">
+                  Navigate into the placeholder pages available for this role.
+                </p>
               </div>
 
               <div className="flex flex-col items-start gap-3 md:flex-row md:items-center">

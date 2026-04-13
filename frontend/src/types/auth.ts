@@ -26,4 +26,19 @@ export type NavItem = {
   title: string;
   href: string;
   roles: RoleCode[];
+  description?: string;
+};
+
+export type DashboardCard = {
+  title: string;
+  href: string;
+  description: string;
+  roles: RoleCode[];
+};
+
+export type DashboardDefinition = {
+  badge: string;
+  heading: string;
+  description: string;
+  cards: DashboardCard[];
 };

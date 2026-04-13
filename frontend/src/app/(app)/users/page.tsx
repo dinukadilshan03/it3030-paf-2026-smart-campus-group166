@@ -9,6 +9,7 @@ export default async function UsersPage() {
       eyebrow="Admin workflow"
       title="Users"
       description="This placeholder page is reserved for admin user management, role changes, and account status controls."
+      audience="Admins"
     />
   );
 }

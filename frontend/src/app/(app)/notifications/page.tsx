@@ -9,6 +9,7 @@ export default async function NotificationsPage() {
       eyebrow="Future workflow"
       title="Notifications"
       description="This placeholder page is in place so the notification experience can be added later without changing the core app shell."
+      audience="Admins"
     />
   );
 }
