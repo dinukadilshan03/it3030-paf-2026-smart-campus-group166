@@ -399,26 +399,205 @@ Request shape:
 
 ---
 
-## Planned Ticket Endpoints
+## Ticket Workflow Endpoints
+
+### `GET /api/v1/ticket-categories`
+
+Purpose:
+
+- return ticket categories for authenticated users
+
+Response shape:
+
+- collection of `TicketCategorySummaryResponse`
+
+### `GET /api/v1/ticket-categories/{id}`
+
+Purpose:
+
+- return one ticket category
+
+Response shape:
+
+- `TicketCategoryDetailResponse`
+
+### `POST /api/v1/ticket-categories`
+
+Purpose:
+
+- create a ticket category
+
+Access:
+
+- admin only
+
+Request shape:
+
+- `CreateTicketCategoryRequest`
+
+### `PATCH /api/v1/ticket-categories/{id}`
+
+Purpose:
+
+- update a ticket category
+
+Access:
+
+- admin only
+
+Request shape:
+
+- `UpdateTicketCategoryRequest`
+
+### `DELETE /api/v1/ticket-categories/{id}`
+
+Purpose:
+
+- delete a ticket category when no tickets still reference it
+
+Access:
+
+- admin only
 
 ### `GET /api/v1/tickets`
 
-Returns:
+Purpose:
+
+- return tickets through a role-aware API
+
+Access:
+
+- `STUDENT`: own reported tickets only
+- `STAFF`: currently assigned tickets only
+- `ADMIN`: all tickets
+
+Query parameters:
+
+- optional `status`
+- optional `priority`
+- optional `ticketCategoryId`
+- optional `search`
+
+Response shape:
 
 - collection of `TicketSummaryResponse`
+
+### `GET /api/v1/tickets/{id}`
+
+Purpose:
+
+- return one ticket detail record
+
+Response shape:
+
+- `TicketDetailResponse`
 
 ### `POST /api/v1/tickets`
 
 Purpose:
 
-- create a ticket
+- create a ticket for the authenticated user
+
+Access:
+
+- `STUDENT`, `STAFF`, and `ADMIN`
 
 Key validations:
 
-- valid category
+- valid active category
 - at least one of resource or location
-- no more than 3 attachments
 - resource/location consistency when both are supplied
+
+Request shape:
+
+- `CreateTicketRequest`
+
+### `PATCH /api/v1/tickets/{id}/assignment`
+
+Purpose:
+
+- assign or reassign a ticket to a staff user
+
+Access:
+
+- admin only
+
+Request shape:
+
+- `UpdateTicketAssignmentRequest`
+
+### `PATCH /api/v1/tickets/{id}/status`
+
+Purpose:
+
+- update ticket lifecycle state
+
+Access:
+
+- assigned staff or admin, depending on target transition
+
+Request shape:
+
+- `UpdateTicketStatusRequest`
+
+### `GET /api/v1/tickets/{id}/comments`
+
+Purpose:
+
+- list ticket comments visible to the current user
+
+Response shape:
+
+- collection of `TicketCommentResponse`
+
+### `POST /api/v1/tickets/{id}/comments`
+
+Purpose:
+
+- create a public reply or internal note
+
+Request shape:
+
+- `CreateTicketCommentRequest`
+
+### `GET /api/v1/tickets/{id}/attachments`
+
+Purpose:
+
+- list ticket attachment metadata visible to the current user
+
+Response shape:
+
+- collection of `TicketAttachmentResponse`
+
+### `POST /api/v1/tickets/{id}/attachments`
+
+Purpose:
+
+- create ticket attachment metadata
+
+Access:
+
+- reporter or admin
+
+Key validations:
+
+- max 3 attachments
+- unique storage path
+
+Request shape:
+
+- `CreateTicketAttachmentRequest`
+
+### `DELETE /api/v1/tickets/{ticketId}/attachments/{attachmentId}`
+
+Purpose:
+
+- delete ticket attachment metadata
+
+Access:
+
+- reporter or admin
 
 ---
 
@@ -465,5 +644,17 @@ Purpose:
 - `CreateBookingRequest`
 - `ReviewBookingRequest`
 - `CancelBookingRequest`
+- `TicketCategorySummaryResponse`
+- `TicketCategoryDetailResponse`
+- `CreateTicketCategoryRequest`
+- `UpdateTicketCategoryRequest`
+- `CreateTicketRequest`
+- `UpdateTicketAssignmentRequest`
+- `UpdateTicketStatusRequest`
 - `TicketSummaryResponse`
+- `TicketDetailResponse`
+- `CreateTicketCommentRequest`
+- `TicketCommentResponse`
+- `CreateTicketAttachmentRequest`
+- `TicketAttachmentResponse`
 - `NotificationSummaryResponse`

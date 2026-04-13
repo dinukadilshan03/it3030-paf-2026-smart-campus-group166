@@ -1,0 +1,331 @@
+package com.smartcampus.backend.modules.ticket.service;
+
+import com.smartcampus.backend.common.entity.User;
+import com.smartcampus.backend.common.entity.UserRole;
+import com.smartcampus.backend.common.enums.RoleCode;
+import com.smartcampus.backend.common.enums.TicketPriority;
+import com.smartcampus.backend.common.enums.TicketStatus;
+import com.smartcampus.backend.common.enums.UserStatus;
+import com.smartcampus.backend.common.exception.ResourceConflictException;
+import com.smartcampus.backend.common.exception.ResourceNotFoundException;
+import com.smartcampus.backend.modules.resource.entity.Location;
+import com.smartcampus.backend.modules.resource.entity.Resource;
+import com.smartcampus.backend.modules.resource.service.LocationService;
+import com.smartcampus.backend.modules.resource.service.ResourceService;
+import com.smartcampus.backend.modules.ticket.dto.CreateTicketRequest;
+import com.smartcampus.backend.modules.ticket.dto.TicketAssignmentResponse;
+import com.smartcampus.backend.modules.ticket.dto.TicketDetailResponse;
+import com.smartcampus.backend.modules.ticket.dto.TicketSummaryResponse;
+import com.smartcampus.backend.modules.ticket.dto.UpdateTicketAssignmentRequest;
+import com.smartcampus.backend.modules.ticket.dto.UpdateTicketStatusRequest;
+import com.smartcampus.backend.modules.ticket.entity.Ticket;
+import com.smartcampus.backend.modules.ticket.entity.TicketAssignment;
+import com.smartcampus.backend.modules.ticket.entity.TicketCategory;
+import com.smartcampus.backend.modules.ticket.mapper.TicketMapper;
+import com.smartcampus.backend.modules.ticket.repository.TicketAssignmentRepository;
+import com.smartcampus.backend.modules.ticket.repository.TicketRepository;
+import com.smartcampus.backend.modules.user.repository.UserRepository;
+import com.smartcampus.backend.modules.user.repository.UserRoleRepository;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+public class TicketService {
+
+    private final TicketRepository ticketRepository;
+    private final TicketAssignmentRepository ticketAssignmentRepository;
+    private final TicketCategoryService ticketCategoryService;
+    private final TicketCommentService ticketCommentService;
+    private final ResourceService resourceService;
+    private final LocationService locationService;
+    private final TicketAccessService ticketAccessService;
+    private final UserRepository userRepository;
+    private final UserRoleRepository userRoleRepository;
+    private final TicketMapper ticketMapper;
+
+    @Transactional(readOnly = true)
+    public List<TicketSummaryResponse> getTickets(
+            TicketStatus status, TicketPriority priority, Long ticketCategoryId, String search) {
+        UserRole membership = ticketAccessService.getRequiredCurrentMembership();
+        List<Ticket> tickets =
+                switch (membership.getRole().getCode()) {
+                    case ADMIN -> ticketRepository.searchAll(
+                            status, priority, ticketCategoryId, normalizeSearch(search));
+                    case STAFF -> ticketRepository.searchForAssignedStaff(
+                            membership.getUser().getId(),
+                            status,
+                            priority,
+                            ticketCategoryId,
+                            normalizeSearch(search));
+                    case STUDENT -> ticketRepository.searchForReporter(
+                            membership.getUser().getId(),
+                            status,
+                            priority,
+                            ticketCategoryId,
+                            normalizeSearch(search));
+                };
+
+        return tickets.stream().map(ticketMapper::toSummary).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public TicketDetailResponse getTicketById(Long id) {
+        UserRole membership = ticketAccessService.getRequiredCurrentMembership();
+        Ticket ticket = getDetailedTicket(id);
+        ticketAccessService.ensureCanViewTicket(membership, ticket);
+
+        List<TicketAssignmentResponse> assignments =
+                ticketAssignmentRepository.findByTicketIdOrderByAssignedAtDesc(id).stream()
+                        .map(ticketMapper::toAssignmentResponse)
+                        .toList();
+
+        return ticketMapper.toDetail(ticket, assignments);
+    }
+
+    @Transactional
+    public TicketDetailResponse create(CreateTicketRequest request) {
+        UserRole membership = ticketAccessService.getRequiredCurrentMembership();
+        TicketCategory category = ticketCategoryService.getManagedCategory(request.ticketCategoryId());
+        if (!Boolean.TRUE.equals(category.getIsActive())) {
+            throw new IllegalArgumentException("Ticket category must be active");
+        }
+
+        Resource resource =
+                request.resourceId() == null ? null : resourceService.getManagedResource(request.resourceId());
+        Location location = resolveConsistentLocation(resource, request.locationId());
+
+        Ticket ticket =
+                Ticket.builder()
+                        .ticketNumber(generateTicketNumber())
+                        .reporterUser(membership.getUser())
+                        .resource(resource)
+                        .location(location)
+                        .ticketCategory(category)
+                        .title(request.title().trim())
+                        .description(request.description().trim())
+                        .priority(request.priority() == null ? TicketPriority.MEDIUM : request.priority())
+                        .status(TicketStatus.OPEN)
+                        .preferredContactName(normalizeOptionalText(request.preferredContactName()))
+                        .preferredContactEmail(normalizeOptionalText(request.preferredContactEmail()))
+                        .preferredContactPhone(normalizeOptionalText(request.preferredContactPhone()))
+                        .build();
+
+        Ticket savedTicket = ticketRepository.save(ticket);
+        return ticketMapper.toDetail(savedTicket, List.of());
+    }
+
+    @Transactional
+    public TicketDetailResponse updateAssignment(Long id, UpdateTicketAssignmentRequest request) {
+        UserRole membership = ticketAccessService.getRequiredCurrentMembership();
+        if (membership.getRole().getCode() != RoleCode.ADMIN) {
+            throw new AccessDeniedException("Only admins can assign tickets");
+        }
+
+        Ticket ticket = getManagedTicket(id);
+        User assignedUser = validateAssignedStaff(request.assignedStaffUserId());
+        TicketAssignment activeAssignment = ticketAssignmentRepository.findActiveByTicketId(id).orElse(null);
+
+        if (activeAssignment != null && activeAssignment.getAssignedToUser().getId().equals(assignedUser.getId())) {
+            return getTicketById(id);
+        }
+
+        if (activeAssignment != null) {
+            activeAssignment.setIsActive(false);
+            activeAssignment.setUnassignedAt(LocalDateTime.now());
+            ticketAssignmentRepository.save(activeAssignment);
+        }
+
+        ticket.setAssignedStaffUser(assignedUser);
+        ticketRepository.save(ticket);
+
+        TicketAssignment newAssignment =
+                TicketAssignment.builder()
+                        .ticket(ticket)
+                        .assignedToUser(assignedUser)
+                        .assignedByUser(membership.getUser())
+                        .assignmentNote(normalizeOptionalText(request.assignmentNote()))
+                        .isActive(true)
+                        .build();
+        ticketAssignmentRepository.save(newAssignment);
+
+        String noteBody =
+                activeAssignment == null
+                        ? "Ticket assigned to " + resolveDisplayName(assignedUser)
+                        : "Ticket reassigned from "
+                                + resolveDisplayName(activeAssignment.getAssignedToUser())
+                                + " to "
+                                + resolveDisplayName(assignedUser);
+        ticketCommentService.createSystemStatusNote(ticket, noteBody, membership.getUser());
+
+        return getTicketById(id);
+    }
+
+    @Transactional
+    public TicketDetailResponse updateStatus(Long id, UpdateTicketStatusRequest request) {
+        UserRole membership = ticketAccessService.getRequiredCurrentMembership();
+        Ticket ticket = getManagedTicket(id);
+        validateStatusPermission(membership, ticket, request.status());
+        validateStatusTransition(ticket.getStatus(), request.status());
+
+        switch (request.status()) {
+            case IN_PROGRESS -> ticket.setRejectionReason(null);
+            case RESOLVED -> {
+                if (request.resolutionSummary() == null || request.resolutionSummary().isBlank()) {
+                    throw new IllegalArgumentException("Resolution summary is required when resolving a ticket");
+                }
+                ticket.setResolutionSummary(request.resolutionSummary().trim());
+                ticket.setResolvedAt(LocalDateTime.now());
+                ticket.setRejectionReason(null);
+                ticket.setClosedAt(null);
+            }
+            case CLOSED -> ticket.setClosedAt(LocalDateTime.now());
+            case REJECTED -> {
+                if (request.rejectionReason() == null || request.rejectionReason().isBlank()) {
+                    throw new IllegalArgumentException("Rejection reason is required when rejecting a ticket");
+                }
+                ticket.setRejectionReason(request.rejectionReason().trim());
+                ticket.setResolutionSummary(null);
+                ticket.setResolvedAt(null);
+                ticket.setClosedAt(null);
+            }
+            case OPEN -> {
+            }
+        }
+
+        ticket.setStatus(request.status());
+        ticketRepository.save(ticket);
+
+        ticketCommentService.createSystemStatusNote(
+                ticket,
+                "Ticket status changed to " + request.status().name().replace('_', ' '),
+                membership.getUser());
+
+        return getTicketById(id);
+    }
+
+    @Transactional(readOnly = true)
+    public Ticket getDetailedTicketEntity(Long id) {
+        return getDetailedTicket(id);
+    }
+
+    @Transactional(readOnly = true)
+    public Ticket getManagedTicketEntity(Long id) {
+        return getManagedTicket(id);
+    }
+
+    private Location resolveConsistentLocation(Resource resource, Long locationId) {
+        if (resource == null && locationId == null) {
+            throw new IllegalArgumentException("At least one of resourceId or locationId is required");
+        }
+        if (resource != null && locationId == null) {
+            return resource.getLocation();
+        }
+
+        Location location = locationService.getManagedLocation(locationId);
+        if (resource != null && !resource.getLocation().getId().equals(location.getId())) {
+            throw new ResourceConflictException("Resource and location must refer to the same location");
+        }
+        return location;
+    }
+
+    private User validateAssignedStaff(Long userId) {
+        User user =
+                userRepository
+                        .findById(userId)
+                        .orElseThrow(() -> new ResourceNotFoundException("User not found for id: " + userId));
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new IllegalArgumentException("Assigned staff user must be active");
+        }
+
+        UserRole activeRole =
+                userRoleRepository
+                        .findActiveByUserId(userId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Active role not found for user id: " + userId));
+        if (activeRole.getRole().getCode() != RoleCode.STAFF) {
+            throw new IllegalArgumentException("Assigned user must have an active STAFF role");
+        }
+        return user;
+    }
+
+    private void validateStatusPermission(UserRole membership, Ticket ticket, TicketStatus targetStatus) {
+        if (membership.getRole().getCode() == RoleCode.ADMIN) {
+            return;
+        }
+        if (membership.getRole().getCode() != RoleCode.STAFF
+                || ticket.getAssignedStaffUser() == null
+                || !ticket.getAssignedStaffUser().getId().equals(membership.getUser().getId())) {
+            throw new AccessDeniedException("You do not have permission to update this ticket");
+        }
+        if (targetStatus == TicketStatus.REJECTED || targetStatus == TicketStatus.CLOSED) {
+            throw new AccessDeniedException("Only admins can reject or close tickets");
+        }
+    }
+
+    private void validateStatusTransition(TicketStatus currentStatus, TicketStatus nextStatus) {
+        boolean validTransition =
+                switch (currentStatus) {
+                    case OPEN -> nextStatus == TicketStatus.IN_PROGRESS || nextStatus == TicketStatus.REJECTED;
+                    case IN_PROGRESS -> nextStatus == TicketStatus.RESOLVED;
+                    case RESOLVED -> nextStatus == TicketStatus.CLOSED;
+                    case CLOSED, REJECTED -> false;
+                };
+        if (!validTransition) {
+            throw new IllegalArgumentException(
+                    "Invalid ticket status transition from " + currentStatus + " to " + nextStatus);
+        }
+    }
+
+    private Ticket getManagedTicket(Long id) {
+        return ticketRepository
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found for id: " + id));
+    }
+
+    private Ticket getDetailedTicket(Long id) {
+        return ticketRepository
+                .findDetailedById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found for id: " + id));
+    }
+
+    private String generateTicketNumber() {
+        String candidate;
+        do {
+            candidate =
+                    "TCK-"
+                            + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss", Locale.ROOT))
+                            + "-"
+                            + UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
+        } while (ticketRepository.existsByTicketNumber(candidate));
+        return candidate;
+    }
+
+    private String normalizeOptionalText(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeSearch(String search) {
+        if (search == null || search.isBlank()) {
+            return null;
+        }
+        return search.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String resolveDisplayName(User user) {
+        if (user.getDisplayName() != null && !user.getDisplayName().isBlank()) {
+            return user.getDisplayName();
+        }
+        return user.getEmail();
+    }
+}
