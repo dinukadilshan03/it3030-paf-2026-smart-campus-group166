@@ -20,7 +20,8 @@ class AuthControllerTest {
 
     @Test
     void returnsAnonymousCurrentUserResponse() {
-        CurrentUserResponse anonymous = new CurrentUserResponse(false, null, null, null, null, null);
+        CurrentUserResponse anonymous =
+                new CurrentUserResponse(false, null, null, null, null, null, false);
         when(authService.getCurrentUser()).thenReturn(anonymous);
 
         CurrentUserResponse response = authController.getCurrentUser();

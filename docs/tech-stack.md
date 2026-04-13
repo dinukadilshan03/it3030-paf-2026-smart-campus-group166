@@ -136,9 +136,10 @@ Storage model:
 
 ## 5. Authentication
 
-Method:
+Methods:
 
-- Google OAuth 2.0 through Spring Security
+- Google OAuth 2.0 through Spring Security for students
+- local email/password credentials through Spring Security-backed sessions for staff and admins
 
 Responsibilities:
 
@@ -146,7 +147,9 @@ Responsibilities:
 - create or update the `users` record
 - resolve one active role through `user_roles`
 - block non-active users from completing sign-in
-- verify local user and active role provisioning before treating OAuth login as successful
+- verify local user and active role provisioning before treating Google login as successful
+- enforce Google-only login for students
+- enforce local-only login for staff and admins
 - expose current user state to the frontend
 
 Important note:
@@ -154,6 +157,7 @@ Important note:
 - Supabase Auth is not the v1 auth owner
 - Supabase is used for database and storage in this setup
 - local Google OAuth redirect URI should point to `http://localhost:8080/login/oauth2/code/google`
+- local staff/admin passwords are stored only as hashes in `local_auth_credentials`
 
 ---
 

@@ -37,18 +37,19 @@ public class UserMapper {
                 user.getLastLoginAt());
     }
 
-    public CurrentUserResponse toCurrentUser(User user, RoleCode role) {
+    public CurrentUserResponse toCurrentUser(User user, RoleCode role, boolean passwordChangeRequired) {
         return new CurrentUserResponse(
                 true,
                 user.getId(),
                 user.getEmail(),
                 resolveDisplayName(user),
                 role,
-                user.getStatus());
+                user.getStatus(),
+                passwordChangeRequired);
     }
 
     public CurrentUserResponse anonymousCurrentUser() {
-        return new CurrentUserResponse(false, null, null, null, null, null);
+        return new CurrentUserResponse(false, null, null, null, null, null, false);
     }
 
     public void applyUpdates(User user, String firstName, String lastName, String displayName, String phone, String profileImageUrl) {

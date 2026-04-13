@@ -30,6 +30,29 @@ export function resolveAuthFeedback(
         message:
           "Google sign-in succeeded, but SmartCampus could not finish creating your local app account. Please try again.",
       };
+    case "oauth_not_allowed":
+      return {
+        tone: "error",
+        message:
+          "This account must use the staff or admin email-password login instead of Google.",
+      };
+    case "local_login_not_allowed":
+      return {
+        tone: "error",
+        message:
+          "This account must use the student Google sign-in instead of email and password.",
+      };
+    case "invalid_credentials":
+      return {
+        tone: "error",
+        message: "The email or password you entered is incorrect.",
+      };
+    case "password_change_required":
+      return {
+        tone: "error",
+        message:
+          "Your temporary password must be changed before you can continue into the workspace.",
+      };
     case "oauth_failed":
       return {
         tone: "error",
@@ -48,7 +71,8 @@ export function resolveAuthFeedback(
     default:
       return {
         tone: "info",
-        message: "Use your SmartCampus Google account to enter the protected workspace.",
+        message:
+          "Students sign in with Google. Staff and admins sign in with email and password.",
       };
   }
 }

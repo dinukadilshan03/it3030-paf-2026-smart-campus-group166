@@ -35,6 +35,16 @@ If this file and the migration ever disagree, the migration wins and this doc sh
 - default: `is_active = true`
 - partial unique index: one active role per user
 
+### `local_auth_credentials`
+
+- unique: `user_id`
+- required FK: `user_id`
+- defaults:
+  - `must_change_password = true`
+  - `failed_attempt_count = 0`
+- validation:
+  - `failed_attempt_count >= 0`
+
 ### `locations`
 
 - unique: `code`
@@ -126,3 +136,4 @@ If this file and the migration ever disagree, the migration wins and this doc sh
 - resource/location consistency when both are supplied on a ticket
 - role-specific authorization rules
 - ensuring assigned staff actually has a staff/admin role
+- enforcing Google-only student auth vs local-only staff/admin auth

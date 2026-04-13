@@ -9,4 +9,5 @@ public record CurrentUserResponse(
         String email,
         String displayName,
         RoleCode role,
-        UserStatus status) {}
+        UserStatus status,
+        boolean passwordChangeRequired) {}

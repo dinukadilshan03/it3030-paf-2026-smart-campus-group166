@@ -6,7 +6,11 @@ export type AuthErrorCode =
   | "oauth_failed"
   | "account_blocked"
   | "invalid_profile"
-  | "provisioning_failed";
+  | "provisioning_failed"
+  | "oauth_not_allowed"
+  | "local_login_not_allowed"
+  | "invalid_credentials"
+  | "password_change_required";
 
 export type AuthApiError = {
   code: AuthErrorCode;
@@ -20,6 +24,7 @@ export type CurrentUser = {
   displayName: string | null;
   role: RoleCode | null;
   status: UserStatus | null;
+  passwordChangeRequired: boolean;
 };
 
 export type NavItem = {

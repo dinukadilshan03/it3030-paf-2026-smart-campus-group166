@@ -17,13 +17,11 @@ import com.smartcampus.backend.modules.user.repository.UserRepository;
 import com.smartcampus.backend.modules.user.repository.UserRoleRepository;
 import java.util.Map;
 import java.util.Optional;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class OAuthUserProvisioningServiceTest {
@@ -33,11 +31,6 @@ class OAuthUserProvisioningServiceTest {
     @Mock private UserRoleRepository userRoleRepository;
 
     @InjectMocks private OAuthUserProvisioningService service;
-
-    @BeforeEach
-    void setUp() {
-        ReflectionTestUtils.setField(service, "bootstrapAdminEmail", "");
-    }
 
     @Test
     void createsStudentUserOnFirstGoogleLogin() {
@@ -74,7 +67,38 @@ class OAuthUserProvisioningServiceTest {
     }
 
     @Test
-    void preservesExistingActiveRoleOnLaterLogins() {
+    void preservesExistingStudentRoleOnLaterLogins() {
+        User existingUser =
+                User.builder()
+                        .id(11L)
+                        .email("student@example.com")
+                        .googleSub("google-student")
+                        .status(UserStatus.ACTIVE)
+                        .build();
+        Role studentRole = Role.builder().id(2L).code(RoleCode.STUDENT).name("Student").build();
+        UserRole existingMembership =
+                UserRole.builder().id(21L).user(existingUser).role(studentRole).isActive(true).build();
+
+        when(userRepository.findByEmailIgnoreCase("student@example.com")).thenReturn(Optional.of(existingUser));
+        when(userRepository.findByGoogleSub("google-student")).thenReturn(Optional.of(existingUser));
+        when(userRepository.save(existingUser)).thenReturn(existingUser);
+        when(userRoleRepository.findActiveByUserId(11L)).thenReturn(Optional.of(existingMembership));
+
+        UserRole result =
+                service.provisionFromGoogleAttributes(
+                        Map.of(
+                                "email", "student@example.com",
+                                "sub", "google-student",
+                                "name", "Student User",
+                                "given_name", "Student",
+                                "family_name", "User"));
+
+        assertThat(result.getRole().getCode()).isEqualTo(RoleCode.STUDENT);
+        assertThat(existingUser.getDisplayName()).isEqualTo("Student User");
+    }
+
+    @Test
+    void blocksStaffFromGoogleSignIn() {
         User existingUser =
                 User.builder()
                         .id(11L)
@@ -91,17 +115,17 @@ class OAuthUserProvisioningServiceTest {
         when(userRepository.save(existingUser)).thenReturn(existingUser);
         when(userRoleRepository.findActiveByUserId(11L)).thenReturn(Optional.of(existingMembership));
 
-        UserRole result =
-                service.provisionFromGoogleAttributes(
-                        Map.of(
-                                "email", "staff@example.com",
-                                "sub", "google-staff",
-                                "name", "Staff User",
-                                "given_name", "Staff",
-                                "family_name", "User"));
-
-        assertThat(result.getRole().getCode()).isEqualTo(RoleCode.STAFF);
-        assertThat(existingUser.getDisplayName()).isEqualTo("Staff User");
+        assertThatThrownBy(
+                        () ->
+                                service.provisionFromGoogleAttributes(
+                                        Map.of(
+                                                "email", "staff@example.com",
+                                                "sub", "google-staff",
+                                                "name", "Staff User",
+                                                "given_name", "Staff",
+                                                "family_name", "User")))
+                .isInstanceOf(AuthFlowException.class)
+                .hasMessageContaining("Google sign-in is only available for student accounts");
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.smartcampus.backend.modules.auth.service;
 
 import com.smartcampus.backend.common.entity.UserRole;
+import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.UserStatus;
 import com.smartcampus.backend.modules.auth.exception.AuthFailureCode;
 import com.smartcampus.backend.modules.user.repository.UserRoleRepository;
@@ -29,6 +30,14 @@ public class AuthProvisioningVerifier {
                     email,
                     membership.get().getUser().getStatus());
             return Optional.of(AuthFailureCode.ACCOUNT_BLOCKED);
+        }
+
+        if (membership.get().getRole().getCode() != RoleCode.STUDENT) {
+            log.warn(
+                    "Auth provisioning verification failed: role={} is not allowed for Google sign-in email={}",
+                    membership.get().getRole().getCode(),
+                    email);
+            return Optional.of(AuthFailureCode.OAUTH_NOT_ALLOWED);
         }
 
         return Optional.empty();

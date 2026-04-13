@@ -1,5 +1,8 @@
 package com.smartcampus.backend.common.exception;
 
+import com.smartcampus.backend.modules.auth.dto.AuthErrorResponse;
+import com.smartcampus.backend.modules.auth.exception.AuthFailureCode;
+import com.smartcampus.backend.modules.auth.exception.AuthFlowException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.time.LocalDateTime;
@@ -82,6 +85,16 @@ public class GlobalExceptionHandler {
             AuthenticationException ex,
             HttpServletRequest request) {
         return buildResponse(HttpStatus.UNAUTHORIZED, ex.getMessage(), request.getRequestURI(), null);
+    }
+
+    @ExceptionHandler(AuthFlowException.class)
+    public ResponseEntity<AuthErrorResponse> handleAuthFlowException(AuthFlowException ex) {
+        HttpStatus status =
+                ex.getFailureCode() == AuthFailureCode.PASSWORD_CHANGE_REQUIRED
+                        ? HttpStatus.FORBIDDEN
+                        : HttpStatus.UNAUTHORIZED;
+        return ResponseEntity.status(status)
+                .body(new AuthErrorResponse(ex.getFailureCode().getQueryValue(), ex.getMessage()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

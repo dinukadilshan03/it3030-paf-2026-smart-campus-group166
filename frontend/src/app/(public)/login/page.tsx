@@ -1,3 +1,4 @@
+import { LocalSignInForm } from "@/components/auth/LocalSignInForm";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { redirectIfAuthenticated } from "@/lib/auth/session";
 import { resolveAuthFeedback } from "@/lib/auth/feedback";
@@ -19,7 +20,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-16">
-      <section className="w-full max-w-md rounded-[2rem] border border-white/70 bg-white/90 p-8 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+      <section className="w-full max-w-xl rounded-[2rem] border border-white/70 bg-white/90 p-8 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
           SmartCampus login
         </p>
@@ -37,8 +38,37 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             {feedback.message}
           </p>
         </div>
-        <div className="mt-8">
-          <GoogleSignInButton className="w-full justify-center" />
+        <div className="mt-8 grid gap-8 md:grid-cols-2">
+          <div className="space-y-4 rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-5">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Student access
+              </p>
+              <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
+                Google sign-in
+              </h2>
+              <p className="mt-2 text-sm leading-7 text-slate-600">
+                Students enter SmartCampus using their Google account.
+              </p>
+            </div>
+            <GoogleSignInButton className="w-full justify-center" />
+          </div>
+
+          <div className="space-y-4 rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-5">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Staff and admin access
+              </p>
+              <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
+                Email and password
+              </h2>
+              <p className="mt-2 text-sm leading-7 text-slate-600">
+                Staff and admin users sign in with the local account created by an
+                administrator.
+              </p>
+            </div>
+            <LocalSignInForm />
+          </div>
         </div>
       </section>
     </main>

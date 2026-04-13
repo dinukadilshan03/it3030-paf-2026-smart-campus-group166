@@ -1,11 +1,15 @@
 package com.smartcampus.backend.modules.user.service;
 
+import com.smartcampus.backend.common.entity.LocalAuthCredential;
 import com.smartcampus.backend.common.entity.Role;
 import com.smartcampus.backend.common.entity.User;
 import com.smartcampus.backend.common.entity.UserRole;
 import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.UserStatus;
+import com.smartcampus.backend.common.exception.ResourceConflictException;
 import com.smartcampus.backend.common.exception.ResourceNotFoundException;
+import com.smartcampus.backend.modules.auth.repository.LocalAuthCredentialRepository;
+import com.smartcampus.backend.modules.user.dto.CreateUserRequest;
 import com.smartcampus.backend.modules.user.dto.UpdateUserRequest;
 import com.smartcampus.backend.modules.user.dto.UserDetailResponse;
 import com.smartcampus.backend.modules.user.dto.UserSummaryResponse;
@@ -18,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +33,8 @@ public class UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
+    private final LocalAuthCredentialRepository localAuthCredentialRepository;
+    private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
 
     @Transactional(readOnly = true)
@@ -64,6 +71,38 @@ public class UserService {
     }
 
     @Transactional
+    public UserDetailResponse createUser(CreateUserRequest request) {
+        String email = normalizeRequiredEmail(request.email());
+        if (userRepository.findByEmailIgnoreCase(email).isPresent()) {
+            throw new ResourceConflictException("A user already exists for email: " + email);
+        }
+
+        validateManagedRole(request.role());
+        Role role =
+                roleRepository
+                        .findByCode(request.role())
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Role not found for code: " + request.role()));
+
+        User user =
+                User.builder()
+                        .email(email)
+                        .firstName(trimToNull(request.firstName()))
+                        .lastName(trimToNull(request.lastName()))
+                        .displayName(trimToNull(request.displayName()))
+                        .phone(trimToNull(request.phone()))
+                        .profileImageUrl(trimToNull(request.profileImageUrl()))
+                        .status(request.status() == null ? UserStatus.ACTIVE : request.status())
+                        .build();
+        User savedUser = userRepository.save(user);
+        userRoleRepository.save(UserRole.builder().user(savedUser).role(role).isActive(true).build());
+
+        return userMapper.toDetail(savedUser, role.getCode());
+    }
+
+    @Transactional
     public UserDetailResponse updateUser(Long id, UpdateUserRequest request) {
         User user = getManagedUser(id);
         userMapper.applyUpdates(
@@ -82,6 +121,7 @@ public class UserService {
     @Transactional
     public UserDetailResponse updateUserRole(Long id, RoleCode roleCode) {
         User user = getManagedUser(id);
+        validateManagedRole(roleCode);
         UserRole currentRole = getActiveRole(user.getId());
         if (currentRole.getRole().getCode() != roleCode) {
             currentRole.setIsActive(false);
@@ -107,6 +147,54 @@ public class UserService {
         user.setStatus(status);
         User savedUser = userRepository.save(user);
         return userMapper.toDetail(savedUser, activeRole.getRole().getCode());
+    }
+
+    @Transactional
+    public UserDetailResponse createLocalCredentials(Long id, String temporaryPassword) {
+        User user = getManagedUser(id);
+        UserRole activeRole = getActiveRole(user.getId());
+        validateLocalCredentialEligibleRole(activeRole.getRole().getCode());
+        if (localAuthCredentialRepository.existsByUserId(user.getId())) {
+            throw new ResourceConflictException("Local credentials already exist for this user");
+        }
+
+        localAuthCredentialRepository.save(
+                LocalAuthCredential.builder()
+                        .user(user)
+                        .passwordHash(passwordEncoder.encode(temporaryPassword))
+                        .mustChangePassword(true)
+                        .lastPasswordChangedAt(LocalDateTime.now())
+                        .build());
+
+        return userMapper.toDetail(user, activeRole.getRole().getCode());
+    }
+
+    @Transactional
+    public UserDetailResponse resetLocalPassword(Long id, String temporaryPassword) {
+        User user = getManagedUser(id);
+        UserRole activeRole = getActiveRole(user.getId());
+        validateLocalCredentialEligibleRole(activeRole.getRole().getCode());
+        LocalAuthCredential credential =
+                localAuthCredentialRepository
+                        .findByUserId(user.getId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Local credentials not found for user id: " + id));
+
+        credential.setPasswordHash(passwordEncoder.encode(temporaryPassword));
+        credential.setMustChangePassword(true);
+        credential.setFailedAttemptCount(0);
+        credential.setLockedUntil(null);
+        credential.setLastPasswordChangedAt(LocalDateTime.now());
+        localAuthCredentialRepository.save(credential);
+
+        return userMapper.toDetail(user, activeRole.getRole().getCode());
+    }
+
+    @Transactional
+    public UserDetailResponse deleteLocalCredentials(Long id) {
+        User user = getManagedUser(id);
+        UserRole activeRole = getActiveRole(user.getId());
+        localAuthCredentialRepository.deleteByUserId(user.getId());
+        return userMapper.toDetail(user, activeRole.getRole().getCode());
     }
 
     private User getManagedUser(Long id) {
@@ -138,5 +226,29 @@ public class UserService {
             return null;
         }
         return search.trim().toLowerCase();
+    }
+
+    private String normalizeRequiredEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase();
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private void validateManagedRole(RoleCode roleCode) {
+        if (roleCode == RoleCode.STUDENT) {
+            throw new IllegalArgumentException("Students are created through Google sign-in, not admin user creation");
+        }
+    }
+
+    private void validateLocalCredentialEligibleRole(RoleCode roleCode) {
+        if (roleCode == RoleCode.STUDENT) {
+            throw new IllegalArgumentException("Student accounts cannot receive local credentials");
+        }
     }
 }

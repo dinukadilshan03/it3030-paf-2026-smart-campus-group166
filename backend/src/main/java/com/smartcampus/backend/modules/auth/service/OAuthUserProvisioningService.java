@@ -15,7 +15,6 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,9 +26,6 @@ public class OAuthUserProvisioningService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
-
-    @Value("${app.bootstrap-admin.email:}")
-    private String bootstrapAdminEmail;
 
     @Transactional
     public UserRole provisionFromGoogleAttributes(Map<String, Object> attributes) {
@@ -56,7 +52,7 @@ public class OAuthUserProvisioningService {
                 existingUser ? "updated" : "created",
                 savedUser.getEmail(),
                 savedUser.getId());
-        return userRoleRepository
+        UserRole activeRole = userRoleRepository
                 .findActiveByUserId(savedUser.getId())
                 .map(
                         userRole -> {
@@ -67,6 +63,8 @@ public class OAuthUserProvisioningService {
                             return userRole;
                         })
                 .orElseGet(() -> createDefaultRoleAssignment(savedUser));
+        validateGoogleRole(activeRole);
+        return activeRole;
     }
 
     private void validateUserStatus(User user) {
@@ -78,7 +76,7 @@ public class OAuthUserProvisioningService {
     }
 
     private UserRole createDefaultRoleAssignment(User user) {
-        RoleCode roleCode = resolveDefaultRole(user.getEmail());
+        RoleCode roleCode = RoleCode.STUDENT;
         Role role =
                 roleRepository
                         .findByCode(roleCode)
@@ -91,13 +89,12 @@ public class OAuthUserProvisioningService {
         return userRole;
     }
 
-    private RoleCode resolveDefaultRole(String email) {
-        if (bootstrapAdminEmail != null
-                && !bootstrapAdminEmail.isBlank()
-                && bootstrapAdminEmail.equalsIgnoreCase(email)) {
-            return RoleCode.ADMIN;
+    private void validateGoogleRole(UserRole activeRole) {
+        if (activeRole.getRole().getCode() != RoleCode.STUDENT) {
+            throw new AuthFlowException(
+                    AuthFailureCode.OAUTH_NOT_ALLOWED,
+                    "Google sign-in is only available for student accounts");
         }
-        return RoleCode.STUDENT;
     }
 
     private void validateGoogleSubOwnership(Long currentUserId, String googleSub) {

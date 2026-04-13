@@ -113,6 +113,30 @@ Notes:
 
 - users are created or updated through the backend auth flow
 - `google_sub` is unique when present
+- students authenticate with Google OAuth
+- staff and admin users authenticate with local email/password credentials stored separately from `users`
+
+### `local_auth_credentials`
+
+Purpose: stores secure local login credentials for staff and admin accounts.
+
+Fields:
+
+- `id`
+- `user_id` unique
+- `password_hash`
+- `must_change_password`
+- `failed_attempt_count`
+- `locked_until`
+- `last_password_changed_at`
+- `created_at`
+- `updated_at`
+
+Notes:
+
+- only staff and admin users should have a local credential row
+- passwords are stored only as hashes
+- temporary passwords force a change before full workspace access
 
 ### 3. `user_roles`
 

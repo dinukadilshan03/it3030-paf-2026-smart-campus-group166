@@ -6,10 +6,15 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smartcampus.backend.common.entity.Role;
 import com.smartcampus.backend.common.entity.User;
+import com.smartcampus.backend.common.entity.UserRole;
+import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.UserStatus;
+import com.smartcampus.backend.modules.auth.repository.LocalAuthCredentialRepository;
 import com.smartcampus.backend.modules.auth.service.AuthenticatedEmailResolver;
 import com.smartcampus.backend.modules.user.repository.UserRepository;
+import com.smartcampus.backend.modules.user.repository.UserRoleRepository;
 import java.io.IOException;
 import java.util.Optional;
 import jakarta.servlet.ServletException;
@@ -28,6 +33,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 class ActiveUserSessionFilterTest {
 
     @Mock private UserRepository userRepository;
+    @Mock private UserRoleRepository userRoleRepository;
+    @Mock private LocalAuthCredentialRepository localAuthCredentialRepository;
     @Mock private AuthenticatedEmailResolver authenticatedEmailResolver;
 
     @AfterEach
@@ -38,7 +45,12 @@ class ActiveUserSessionFilterTest {
     @Test
     void allowsActiveAuthenticatedUsers() throws ServletException, IOException {
         ActiveUserSessionFilter filter =
-                new ActiveUserSessionFilter(userRepository, authenticatedEmailResolver, new ObjectMapper());
+                new ActiveUserSessionFilter(
+                        userRepository,
+                        userRoleRepository,
+                        localAuthCredentialRepository,
+                        authenticatedEmailResolver,
+                        new ObjectMapper());
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/resources");
         request.setServletPath("/api/v1/resources");
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -59,6 +71,16 @@ class ActiveUserSessionFilterTest {
                                         .email("active@example.com")
                                         .status(UserStatus.ACTIVE)
                                         .build()));
+        when(userRoleRepository.findActiveByUserId(1L))
+                .thenReturn(
+                        Optional.of(
+                                UserRole.builder()
+                                        .user(User.builder().id(1L).email("active@example.com").status(UserStatus.ACTIVE).build())
+                                        .role(Role.builder().id(1L).code(RoleCode.ADMIN).name("Admin").build())
+                                        .isActive(true)
+                                        .build()));
+        when(authenticatedEmailResolver.isGoogleAuthentication(authentication)).thenReturn(false);
+        when(localAuthCredentialRepository.findByUserId(1L)).thenReturn(Optional.empty());
 
         filter.doFilter(request, response, filterChain);
 
@@ -69,7 +91,12 @@ class ActiveUserSessionFilterTest {
     @Test
     void clearsSessionWhenUserIsNoLongerActive() throws ServletException, IOException {
         ActiveUserSessionFilter filter =
-                new ActiveUserSessionFilter(userRepository, authenticatedEmailResolver, new ObjectMapper());
+                new ActiveUserSessionFilter(
+                        userRepository,
+                        userRoleRepository,
+                        localAuthCredentialRepository,
+                        authenticatedEmailResolver,
+                        new ObjectMapper());
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/resources");
         request.setServletPath("/api/v1/resources");
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -100,7 +127,12 @@ class ActiveUserSessionFilterTest {
     @Test
     void returnsProvisioningFailureWhenSessionHasNoLocalUser() throws ServletException, IOException {
         ActiveUserSessionFilter filter =
-                new ActiveUserSessionFilter(userRepository, authenticatedEmailResolver, new ObjectMapper());
+                new ActiveUserSessionFilter(
+                        userRepository,
+                        userRoleRepository,
+                        localAuthCredentialRepository,
+                        authenticatedEmailResolver,
+                        new ObjectMapper());
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/auth/me");
         request.setServletPath("/api/v1/auth/me");
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -124,7 +156,12 @@ class ActiveUserSessionFilterTest {
     @Test
     void skipsAnonymousRequests() throws ServletException, IOException {
         ActiveUserSessionFilter filter =
-                new ActiveUserSessionFilter(userRepository, authenticatedEmailResolver, new ObjectMapper());
+                new ActiveUserSessionFilter(
+                        userRepository,
+                        userRoleRepository,
+                        localAuthCredentialRepository,
+                        authenticatedEmailResolver,
+                        new ObjectMapper());
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/health");
         request.setServletPath("/api/v1/health");
         MockHttpServletResponse response = new MockHttpServletResponse();

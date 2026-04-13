@@ -209,13 +209,16 @@ Goal: authenticate users and resolve one effective role for the app session.
 
 Flow:
 
-1. User signs in through Google OAuth.
-2. Spring Boot handles the callback.
-3. Backend finds or creates the `users` row.
-4. Backend ensures the user has one active `user_roles` row.
-5. Backend blocks sign-in for users whose status is not `ACTIVE`.
-6. Backend redirects back to frontend `/auth/callback` on success or `/login` with a stable error code on failure.
-7. Frontend consumes current user state from the backend API.
+1. Students sign in through Google OAuth.
+2. Spring Boot handles the Google callback.
+3. Backend finds or creates the `users` row for student sign-in.
+4. Backend ensures the student has one active `user_roles` row.
+5. Staff and admin users sign in through local email/password credentials.
+6. Backend blocks sign-in for users whose status is not `ACTIVE`.
+7. Backend blocks Google sign-in for `STAFF` and `ADMIN`.
+8. Backend blocks local sign-in for `STUDENT`.
+9. Backend redirects back to frontend `/auth/callback` on Google success or returns local login JSON/session state for email/password success.
+10. Frontend consumes current user state from the backend API.
 
 Rules:
 
@@ -224,6 +227,8 @@ Rules:
 - v1 uses one effective role per user even though the schema keeps role history
 - login failures use stable frontend-facing error codes such as `oauth_failed`, `account_blocked`, `invalid_profile`, and `provisioning_failed`
 - Google callback success must only happen after local `users` and active `user_roles` data are verifiably available
+- staff and admin local passwords are stored in `local_auth_credentials`
+- temporary staff/admin passwords must be changed before normal workspace access
 
 ---
 

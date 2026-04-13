@@ -12,6 +12,7 @@ import com.smartcampus.backend.common.entity.User;
 import com.smartcampus.backend.common.entity.UserRole;
 import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.UserStatus;
+import com.smartcampus.backend.modules.auth.repository.LocalAuthCredentialRepository;
 import com.smartcampus.backend.modules.user.dto.UpdateUserRequest;
 import com.smartcampus.backend.modules.user.dto.UserSummaryResponse;
 import com.smartcampus.backend.modules.user.mapper.UserMapper;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -33,12 +35,21 @@ class UserServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private RoleRepository roleRepository;
     @Mock private UserRoleRepository userRoleRepository;
+    @Mock private LocalAuthCredentialRepository localAuthCredentialRepository;
+    @Mock private PasswordEncoder passwordEncoder;
 
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, roleRepository, userRoleRepository, new UserMapper());
+        userService =
+                new UserService(
+                        userRepository,
+                        roleRepository,
+                        userRoleRepository,
+                        localAuthCredentialRepository,
+                        passwordEncoder,
+                        new UserMapper());
     }
 
     @Test

@@ -43,12 +43,40 @@ Frontend auth query semantics:
 - `/login?error=account_blocked`
 - `/login?error=invalid_profile`
 - `/login?error=provisioning_failed`
+- `/login?error=oauth_not_allowed`
+- `/login?error=local_login_not_allowed`
+- `/login?error=invalid_credentials`
+- `/login?error=password_change_required`
 - `/login?reason=signed_out`
 
 Authenticated-but-invalid session responses may also return JSON auth error payloads such as:
 
 - `{"code":"account_blocked","message":"..."}`
 - `{"code":"provisioning_failed","message":"..."}`
+
+### `POST /api/v1/auth/login`
+
+Purpose:
+
+- sign in a staff or admin user with local email/password credentials
+
+Request shape:
+
+- `LoginRequest`
+
+Response shape:
+
+- `CurrentUserResponse`
+
+### `POST /api/v1/auth/change-password`
+
+Purpose:
+
+- let a signed-in staff or admin user change a temporary or existing local password
+
+Request shape:
+
+- `ChangePasswordRequest`
 
 ---
 
@@ -109,6 +137,42 @@ Purpose:
 Request shape:
 
 - `UpdateUserStatusRequest`
+
+### `POST /api/v1/users`
+
+Purpose:
+
+- create a staff or admin user record
+
+Request shape:
+
+- `CreateUserRequest`
+
+### `POST /api/v1/users/{id}/local-credentials`
+
+Purpose:
+
+- create temporary local credentials for a staff or admin user
+
+Request shape:
+
+- `CreateLocalCredentialsRequest`
+
+### `PATCH /api/v1/users/{id}/local-credentials/reset-password`
+
+Purpose:
+
+- rotate a staff or admin user's local password and require a fresh password change
+
+Request shape:
+
+- `ResetLocalPasswordRequest`
+
+### `DELETE /api/v1/users/{id}/local-credentials`
+
+Purpose:
+
+- remove local login access for a user without deleting the user record
 
 ---
 

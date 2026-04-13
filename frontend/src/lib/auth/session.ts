@@ -10,6 +10,7 @@ const ANONYMOUS_USER: CurrentUser = {
   displayName: null,
   role: null,
   status: null,
+  passwordChangeRequired: false,
 };
 
 type CurrentUserResult =
@@ -56,6 +57,10 @@ export async function requireCurrentUser() {
     redirect("/login");
   }
 
+  if (result.user.passwordChangeRequired) {
+    redirect("/change-password");
+  }
+
   return result.user;
 }
 
@@ -73,6 +78,6 @@ export async function redirectIfAuthenticated(destination = "/dashboard") {
   const result = await getCurrentUserResult();
 
   if (result.kind === "authenticated") {
-    redirect(destination);
+    redirect(result.user.passwordChangeRequired ? "/change-password" : destination);
   }
 }
