@@ -1,335 +1,305 @@
-//handles the business logic for managing bookings.
 package com.smartcampus.backend.modules.booking.service;
 
+import com.smartcampus.backend.common.entity.User;
+import com.smartcampus.backend.common.entity.UserRole;
+import com.smartcampus.backend.common.enums.BookingStatus;
+import com.smartcampus.backend.common.enums.ResourceStatus;
+import com.smartcampus.backend.common.enums.RoleCode;
+import com.smartcampus.backend.common.exception.ResourceConflictException;
+import com.smartcampus.backend.common.exception.ResourceNotFoundException;
+import com.smartcampus.backend.modules.auth.service.CurrentUserService;
+import com.smartcampus.backend.modules.booking.dto.BookingDetailResponse;
+import com.smartcampus.backend.modules.booking.dto.BookingReviewDecision;
+import com.smartcampus.backend.modules.booking.dto.BookingSummaryResponse;
+import com.smartcampus.backend.modules.booking.dto.CancelBookingRequest;
+import com.smartcampus.backend.modules.booking.dto.CreateBookingRequest;
+import com.smartcampus.backend.modules.booking.dto.ReviewBookingRequest;
+import com.smartcampus.backend.modules.booking.entity.Booking;
+import com.smartcampus.backend.modules.booking.mapper.BookingMapper;
+import com.smartcampus.backend.modules.booking.repository.BookingRepository;
+import com.smartcampus.backend.modules.resource.entity.Resource;
+import com.smartcampus.backend.modules.resource.entity.ResourceAvailabilityWindow;
+import com.smartcampus.backend.modules.resource.repository.ResourceAvailabilityWindowRepository;
+import com.smartcampus.backend.modules.resource.service.ResourceService;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.List;
-import java.util.Optional;
-
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.smartcampus.backend.modules.booking.dto.BookingCreateDTO;
-import com.smartcampus.backend.modules.booking.dto.BookingUpdateDTO;
-import com.smartcampus.backend.modules.booking.entity.Booking;
-import com.smartcampus.backend.modules.booking.repository.BookingRepository;
-import com.smartcampus.backend.common.entity.Resource;
-import com.smartcampus.backend.common.entity.User;
-import com.smartcampus.backend.common.repository.UserRepository;
-
 @Service
+@RequiredArgsConstructor
 public class BookingService {
-    
-    @Autowired
-    private BookingRepository bookingRepository;
-    
-    @Autowired
-    private UserRepository userRepository;
 
-    @Autowired
-    private QRCodeService qrCodeService;
-    
-    /**
-     * Create a new booking
-     * Validates time slot availability and business rules
-     */
-    public Booking addBooking(BookingCreateDTO bookingDTO) {
-        // Validation checks
-        validateBookingTime(bookingDTO.getStartTime(), bookingDTO.getEndTime());
-        validateResourceAvailability(bookingDTO.getResourceId(), 
-                                    bookingDTO.getStartTime(), 
-                                    bookingDTO.getEndTime());
-        
-        Booking booking = new Booking();
-        booking.setStatus("PENDING");
-        booking.setStartTime(bookingDTO.getStartTime());
-        booking.setEndTime(bookingDTO.getEndTime());
-        booking.setPurpose(bookingDTO.getPurpose());
-        booking.setExpectedAttendees(bookingDTO.getExpectedAttendees());
-        
-        // Set resource and user
-        if (bookingDTO.getResourceId() != null) {
-            Resource resource = new Resource();
-            resource.setId(bookingDTO.getResourceId());
-            booking.setResource(resource);
+    private static final EnumSet<BookingStatus> OVERLAP_IGNORED_STATUSES =
+            EnumSet.of(BookingStatus.REJECTED, BookingStatus.CANCELLED);
+
+    private final BookingRepository bookingRepository;
+    private final ResourceService resourceService;
+    private final ResourceAvailabilityWindowRepository resourceAvailabilityWindowRepository;
+    private final CurrentUserService currentUserService;
+    private final BookingMapper bookingMapper;
+
+    @Transactional(readOnly = true)
+    public List<BookingSummaryResponse> getBookings(
+            BookingStatus status,
+            Long resourceId,
+            Long requesterUserId,
+            LocalDate bookingDate) {
+        UserRole membership = getRequiredCurrentMembership();
+        RoleCode roleCode = membership.getRole().getCode();
+
+        if (roleCode == RoleCode.STAFF) {
+            throw new AccessDeniedException("Staff users cannot access bookings");
         }
-        
-        if (bookingDTO.getUserId() != null) {
-            User user = new User();
-            user.setUserId(bookingDTO.getUserId());
-            booking.setUser(user);
-        }
-        
-        // Save booking first to get the ID
-        booking = bookingRepository.save(booking);
-        
-        // Generate QR code after saving to get the booking ID
-        try {
-            String qrCodeBase64 = qrCodeService.generateQRCodeBase64(String.valueOf(booking.getId()));
-            booking.setQrCodeBase64(qrCodeBase64);
-            booking = bookingRepository.save(booking);
-        } catch (Exception e) {
-            // Log the error but don't fail the booking creation
-            System.err.println("Failed to generate QR code for booking " + booking.getId() + ": " + e.getMessage());
-        }
-        
-        return booking;
+
+        List<Booking> bookings =
+                roleCode == RoleCode.ADMIN
+                        ? bookingRepository.searchBookingsForAdmin(
+                                status, resourceId, requesterUserId, bookingDate)
+                        : bookingRepository.findVisibleToRequester(
+                                membership.getUser().getId(), status, resourceId, bookingDate);
+
+        return bookings.stream().map(bookingMapper::toSummary).toList();
     }
 
-    /**
-     * Approve a pending booking. Ensures no approved conflicts exist.
-     */
+    @Transactional(readOnly = true)
+    public BookingDetailResponse getBookingById(Long id) {
+        UserRole membership = getRequiredCurrentMembership();
+        Booking booking = getDetailedBooking(id);
+        ensureCanViewBooking(membership, booking);
+        return bookingMapper.toDetail(booking);
+    }
+
     @Transactional
-    public Booking approveBooking(Long id, String approvalReason) {
-        Optional<Booking> existingBooking = bookingRepository.findById(id);
-
-        if (!existingBooking.isPresent()) {
-            throw new RuntimeException("Booking not found with id: " + id);
+    public BookingDetailResponse create(CreateBookingRequest request) {
+        UserRole membership = getRequiredCurrentMembership();
+        RoleCode roleCode = membership.getRole().getCode();
+        if (roleCode != RoleCode.STUDENT && roleCode != RoleCode.ADMIN) {
+            throw new AccessDeniedException("Only students and admins can create bookings");
         }
 
-        Booking booking = existingBooking.get();
+        validateTimeRange(request.bookingDate(), request.startTime(), request.endTime());
+        Resource resource = resourceService.getManagedResource(request.resourceId());
+        validateResourceBookable(resource, request.bookingDate(), request.startTime(), request.endTime());
+        validateOverlap(resource.getId(), request.bookingDate(), request.startTime(), request.endTime(), null);
 
-        if (!"PENDING".equals(booking.getStatus())) {
-            throw new RuntimeException("Only pending bookings can be approved");
-        }
+        BookingStatus initialStatus =
+                Boolean.TRUE.equals(resource.getRequiresApproval())
+                        ? BookingStatus.PENDING
+                        : BookingStatus.APPROVED;
 
-        if (booking.getResource() == null || booking.getResource().getId() == null) {
-            throw new RuntimeException("Booking has no associated resource");
-        }
+        Booking booking =
+                Booking.builder()
+                        .resource(resource)
+                        .requesterUser(membership.getUser())
+                        .bookingDate(request.bookingDate())
+                        .startTime(request.startTime())
+                        .endTime(request.endTime())
+                        .purpose(request.purpose().trim())
+                        .expectedAttendees(request.expectedAttendees())
+                        .requestNotes(normalizeOptionalText(request.requestNotes()))
+                        .status(initialStatus)
+                        .build();
 
-        // Ensure resource is still available for this time range (exclude this booking)
-        validateResourceAvailability(booking.getResource().getId(), booking.getStartTime(), booking.getEndTime(), id);
-
-        booking.setStatus("APPROVED");
-        booking.setApprovalReason(approvalReason);
-        
-        // Generate QR code for approved booking
-        try {
-            String qrCodeBase64 = qrCodeService.generateQRCodeBase64(String.valueOf(booking.getId()));
-            booking.setQrCodeBase64(qrCodeBase64);
-        } catch (Exception e) {
-            // Log error but don't fail the approval
-            System.err.println("Failed to generate QR code: " + e.getMessage());
-        }
-
-        return bookingRepository.save(booking);
+        return bookingMapper.toDetail(bookingRepository.save(booking));
     }
 
-    /**
-     * Reject a pending booking.
-     */
     @Transactional
-    public Booking rejectBooking(Long id, String reason) {
-        Optional<Booking> existingBooking = bookingRepository.findById(id);
-
-        if (!existingBooking.isPresent()) {
-            throw new RuntimeException("Booking not found with id: " + id);
+    public BookingDetailResponse reviewBooking(Long id, ReviewBookingRequest request) {
+        UserRole membership = getRequiredCurrentMembership();
+        if (membership.getRole().getCode() != RoleCode.ADMIN) {
+            throw new AccessDeniedException("Only admins can review bookings");
         }
 
-        Booking booking = existingBooking.get();
-
-        if (!"PENDING".equals(booking.getStatus())) {
-            throw new RuntimeException("Only pending bookings can be rejected");
+        Booking booking = getManagedBooking(id);
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new IllegalArgumentException("Only pending bookings can be reviewed");
         }
 
-        booking.setStatus("REJECTED");
-        booking.setApprovalReason(reason);
+        LocalDateTime reviewedAt = LocalDateTime.now();
+        booking.setReviewedByUser(membership.getUser());
+        booking.setReviewedAt(reviewedAt);
 
-        return bookingRepository.save(booking);
+        if (request.decision() == BookingReviewDecision.APPROVE) {
+            validateResourceBookable(
+                    booking.getResource(),
+                    booking.getBookingDate(),
+                    booking.getStartTime(),
+                    booking.getEndTime());
+            validateOverlap(
+                    booking.getResource().getId(),
+                    booking.getBookingDate(),
+                    booking.getStartTime(),
+                    booking.getEndTime(),
+                    booking.getId());
+            booking.setStatus(BookingStatus.APPROVED);
+            booking.setReviewReason(null);
+        } else {
+            if (request.reason() == null || request.reason().isBlank()) {
+                throw new IllegalArgumentException("A rejection reason is required");
+            }
+            booking.setStatus(BookingStatus.REJECTED);
+            booking.setReviewReason(request.reason().trim());
+        }
+
+        return bookingMapper.toDetail(bookingRepository.save(booking));
     }
-    
-    /**
-     * Update an existing booking
-     * Allows updates only for PENDING bookings
-     */
-    public Booking updateBooking(Long id, BookingUpdateDTO updateDTO) {
-        Optional<Booking> existingBooking = bookingRepository.findById(id);
-        
-        if (!existingBooking.isPresent()) {
-            throw new RuntimeException("Booking not found with id: " + id);
-        }
-        
-        Booking booking = existingBooking.get();
-        
-        // Prevent updates on cancelled or approved bookings
-        if ("CANCELLED".equals(booking.getStatus()) || "APPROVED".equals(booking.getStatus())) {
-            throw new RuntimeException("Cannot update booking with status: " + booking.getStatus());
-        }
-        
-        // Validate new time slot if times are being updated
-        if (updateDTO.getStartTime() != null && updateDTO.getEndTime() != null) {
-            validateBookingTime(updateDTO.getStartTime(), updateDTO.getEndTime());
-            validateResourceAvailability(booking.getResource().getId(), 
-                                       updateDTO.getStartTime(), 
-                                       updateDTO.getEndTime(), 
-                                       id); // Exclude current booking from conflict check
-            booking.setStartTime(updateDTO.getStartTime());
-            booking.setEndTime(updateDTO.getEndTime());
-        }
-        
-        if (updateDTO.getPurpose() != null) {
-            booking.setPurpose(updateDTO.getPurpose());
-        }
-        
-        if (updateDTO.getExpectedAttendees() != null) {
-            booking.setExpectedAttendees(updateDTO.getExpectedAttendees());
-        }
-        
-        // Status update (typically done through approve/reject endpoints)
-        if (updateDTO.getStatus() != null && "PENDING".equals(booking.getStatus())) {
-            booking.setStatus(updateDTO.getStatus());
-        }
-        
-        return bookingRepository.save(booking);
-    }
-    
-    /**
-     * Cancel a booking
-     * Changes status to CANCELLED and stores cancellation reason
-     */
-    public Booking cancelBooking(Long id, String cancellationReason) {
-        Optional<Booking> existingBooking = bookingRepository.findById(id);
-        
-        if (!existingBooking.isPresent()) {
-            throw new RuntimeException("Booking not found with id: " + id);
-        }
-        
-        Booking booking = existingBooking.get();
-        
-        // Prevent cancellation of already cancelled bookings
-        if ("CANCELLED".equals(booking.getStatus())) {
-            throw new RuntimeException("Booking is already cancelled");
-        }
-        
-        booking.setStatus("CANCELLED");
-        booking.setApprovalReason(cancellationReason);
-        
-        return bookingRepository.save(booking);
-    }
-    
-    /**
-     * Get all bookings
-     */
-    /**
-     * Get all bookings
-     */
+
     @Transactional
-    public List<Booking> getAllBookings() {
-        return bookingRepository.findAll();
-    }
-    
-    /**
-     * Get booking by ID
-     */
-    @Transactional
-    public Booking getBookingById(Long id) {
-        return bookingRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
-    }
-    
-    /**
-     * Get bookings by user
-     */
-    @Transactional
-    public List<Booking> getBookingsByUser(Long userId) {
-        return bookingRepository.findByUser_UserId(userId);
-    }
-    
-    /**
-     * Get bookings by resource
-    @Transactional
-     */
-    public List<Booking> getBookingsByResource(Long resourceId) {
-        return bookingRepository.findByResource_Id(resourceId);
-    }
-    
-    /**
-     * Get pending bookings for a resource
-    @Transactional
-     */
-    public List<Booking> getPendingBookingsByResource(Long resourceId) {
-        return bookingRepository.findByResource_IdAndStatus(resourceId, "PENDING");
-    }
-    
-    /**
-     * Delete a booking (soft delete - consider using status instead)
-     */
-    public void deleteBooking(Long id) {
-        if (!bookingRepository.existsById(id)) {
-            throw new RuntimeException("Booking not found with id: " + id);
+    public BookingDetailResponse cancelBooking(Long id, CancelBookingRequest request) {
+        UserRole membership = getRequiredCurrentMembership();
+        Booking booking = getManagedBooking(id);
+
+        boolean isAdmin = membership.getRole().getCode() == RoleCode.ADMIN;
+        boolean isRequester = booking.getRequesterUser().getId().equals(membership.getUser().getId());
+        if (!isAdmin && !isRequester) {
+            throw new AccessDeniedException("You do not have permission to cancel this booking");
         }
-        bookingRepository.deleteById(id);
+
+        if (booking.getStatus() != BookingStatus.PENDING
+                && booking.getStatus() != BookingStatus.APPROVED) {
+            throw new IllegalArgumentException("Only pending or approved bookings can be cancelled");
+        }
+
+        booking.setStatus(BookingStatus.CANCELLED);
+        booking.setCancelledByUser(membership.getUser());
+        booking.setCancelledAt(LocalDateTime.now());
+        booking.setCancellationReason(
+                request == null ? null : normalizeOptionalText(request.reason()));
+
+        return bookingMapper.toDetail(bookingRepository.save(booking));
     }
-    
-    /**
-     * Check in a booking via QR code
-     * Marks the booking as checked in and records the check-in time
-     */
-    public Booking checkInBooking(Long id) {
-        Optional<Booking> existingBooking = bookingRepository.findById(id);
-        
-        if (!existingBooking.isPresent()) {
-            throw new RuntimeException("Booking not found with id: " + id);
-        }
-        
-        Booking booking = existingBooking.get();
-        
-        if (booking.isCheckedIn()) {
-            throw new RuntimeException("Booking is already checked in");
-        }
-        
-        booking.setCheckedIn(true);
-        booking.setCheckInTime(LocalDateTime.now());
-        
-        return bookingRepository.save(booking);
+
+    private Booking getManagedBooking(Long id) {
+        return bookingRepository
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found for id: " + id));
     }
-    
-    // ============ Helper Methods ============
-    
-    /**
-     * Validate booking time constraints
-     */
-    private void validateBookingTime(LocalDateTime startTime, LocalDateTime endTime) {
-        if (startTime == null || endTime == null) {
-            throw new RuntimeException("Start time and end time are required");
+
+    private Booking getDetailedBooking(Long id) {
+        return bookingRepository
+                .findDetailedById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found for id: " + id));
+    }
+
+    private void ensureCanViewBooking(UserRole membership, Booking booking) {
+        RoleCode roleCode = membership.getRole().getCode();
+        if (roleCode == RoleCode.ADMIN) {
+            return;
         }
-        
-        if (startTime.isAfter(endTime)) {
-            throw new RuntimeException("Start time must be before end time");
+        if (roleCode == RoleCode.STUDENT
+                && booking.getRequesterUser().getId().equals(membership.getUser().getId())) {
+            return;
         }
-        
-        if (startTime.isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("Cannot book for past dates");
+        throw new AccessDeniedException("You do not have permission to access this booking");
+    }
+
+    private void validateTimeRange(LocalDate bookingDate, java.time.LocalTime startTime, java.time.LocalTime endTime) {
+        if (bookingDate.isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("Booking date must be today or later");
         }
-        
-        // Check minimum booking duration (e.g., 30 minutes)
-        if (startTime.plusMinutes(30).isAfter(endTime)) {
-            throw new RuntimeException("Booking duration must be at least 30 minutes");
+        if (!startTime.isBefore(endTime)) {
+            throw new IllegalArgumentException("Start time must be earlier than end time");
         }
     }
-    
-    /**
-     * Validate resource availability
-     */
-    private void validateResourceAvailability(Long resourceId, LocalDateTime startTime, LocalDateTime endTime) {
-        validateResourceAvailability(resourceId, startTime, endTime, null);
+
+    private void validateResourceBookable(
+            Resource resource,
+            LocalDate bookingDate,
+            java.time.LocalTime startTime,
+            java.time.LocalTime endTime) {
+        if (resource.getStatus() != ResourceStatus.ACTIVE) {
+            throw new ResourceConflictException("Resource is not currently bookable");
+        }
+
+        List<ResourceAvailabilityWindow> matchingWindows =
+                resourceAvailabilityWindowRepository.findByResource_IdOrderByDayOfWeekAscStartTimeAsc(
+                                resource.getId())
+                        .stream()
+                        .filter(window -> window.getDayOfWeek() == bookingDate.getDayOfWeek().getValue())
+                        .filter(window -> appliesOnDate(window, bookingDate))
+                        .toList();
+
+        if (matchingWindows.isEmpty()) {
+            return;
+        }
+
+        boolean blockedByUnavailableWindow =
+                matchingWindows.stream()
+                        .filter(window -> Boolean.FALSE.equals(window.getIsAvailable()))
+                        .anyMatch(window -> overlaps(window, startTime, endTime));
+        if (blockedByUnavailableWindow) {
+            throw new ResourceConflictException(
+                    "Requested booking time falls inside an unavailable window");
+        }
+
+        boolean fitsAvailableWindow =
+                matchingWindows.stream()
+                        .filter(window -> Boolean.TRUE.equals(window.getIsAvailable()))
+                        .anyMatch(window -> fitsWithin(window, startTime, endTime));
+        if (!fitsAvailableWindow) {
+            throw new ResourceConflictException(
+                    "Requested booking time is outside the configured availability windows");
+        }
     }
-    
-    /**
-     * Validate resource availability (excluding a specific booking ID)
-     */
-    private void validateResourceAvailability(Long resourceId, LocalDateTime startTime, 
-                                             LocalDateTime endTime, Long excludeBookingId) {
-        List<Booking> conflictingBookings = bookingRepository
-                .findByResourceIdAndStatusAndTimeRange(resourceId, "APPROVED", startTime, endTime);
-        
-        // Filter out the current booking if updating
-        if (excludeBookingId != null) {
-            conflictingBookings.removeIf(b -> b.getId().equals(excludeBookingId));
+
+    private boolean appliesOnDate(ResourceAvailabilityWindow window, LocalDate bookingDate) {
+        boolean afterStart =
+                window.getEffectiveFrom() == null || !bookingDate.isBefore(window.getEffectiveFrom());
+        boolean beforeEnd =
+                window.getEffectiveTo() == null || !bookingDate.isAfter(window.getEffectiveTo());
+        return afterStart && beforeEnd;
+    }
+
+    private boolean overlaps(
+            ResourceAvailabilityWindow window,
+            java.time.LocalTime startTime,
+            java.time.LocalTime endTime) {
+        return window.getStartTime().isBefore(endTime) && window.getEndTime().isAfter(startTime);
+    }
+
+    private boolean fitsWithin(
+            ResourceAvailabilityWindow window,
+            java.time.LocalTime startTime,
+            java.time.LocalTime endTime) {
+        return !startTime.isBefore(window.getStartTime()) && !endTime.isAfter(window.getEndTime());
+    }
+
+    private void validateOverlap(
+            Long resourceId,
+            LocalDate bookingDate,
+            java.time.LocalTime startTime,
+            java.time.LocalTime endTime,
+            Long excludeBookingId) {
+        long overlaps =
+                bookingRepository.countOverlappingBookings(
+                        resourceId,
+                        bookingDate,
+                        startTime,
+                        endTime,
+                        OVERLAP_IGNORED_STATUSES,
+                        excludeBookingId);
+        if (overlaps > 0) {
+            throw new ResourceConflictException(
+                    "Resource is already booked for the requested time range");
         }
-        
-        if (!conflictingBookings.isEmpty()) {
-            throw new RuntimeException("Resource is not available for the selected time range");
+    }
+
+    private UserRole getRequiredCurrentMembership() {
+        return currentUserService
+                .getCurrentUserRole()
+                .orElseThrow(() -> new AccessDeniedException("Authenticated user context is required"));
+    }
+
+    private String normalizeOptionalText(String value) {
+        if (value == null) {
+            return null;
         }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

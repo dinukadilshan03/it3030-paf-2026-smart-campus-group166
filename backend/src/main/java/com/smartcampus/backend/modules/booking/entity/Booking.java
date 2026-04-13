@@ -1,184 +1,90 @@
-//classes
 package com.smartcampus.backend.modules.booking.entity;
 
-import jakarta.persistence.*;
-import java.time.LocalDateTime;
-import com.smartcampus.backend.common.entity.Resource;
+import com.smartcampus.backend.common.entity.AuditableEntity;
 import com.smartcampus.backend.common.entity.User;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.smartcampus.backend.common.enums.BookingStatus;
+import com.smartcampus.backend.modules.resource.entity.Resource;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "bookings")
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class Booking {
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Booking extends AuditableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "resource_id", nullable = false)
     private Resource resource;
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "requester_user_id", nullable = false)
+    private User requesterUser;
+
+    @Column(name = "booking_date", nullable = false)
+    private LocalDate bookingDate;
 
     @Column(name = "start_time", nullable = false)
-    private LocalDateTime startTime;
+    private LocalTime startTime;
 
     @Column(name = "end_time", nullable = false)
-    private LocalDateTime endTime;
+    private LocalTime endTime;
 
-    @Column(name = "purpose", length = 500)
+    @Column(name = "purpose", nullable = false, length = 500)
     private String purpose;
 
     @Column(name = "expected_attendees")
     private Integer expectedAttendees;
 
-    @Column(name = "status", length = 30, nullable = false)
-    private String status;
+    @Column(name = "request_notes")
+    private String requestNotes;
 
-    @Column(name = "approval_reason", length = 500)
-    private String approvalReason;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    @Builder.Default
+    private BookingStatus status = BookingStatus.PENDING;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reviewed_by_user_id")
+    private User reviewedByUser;
 
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+    @Column(name = "reviewed_at")
+    private LocalDateTime reviewedAt;
 
-    @Column(columnDefinition = "TEXT")
-    private String qrCodeBase64;
+    @Column(name = "review_reason")
+    private String reviewReason;
 
-    @Column(name = "checked_in", nullable = false)
-    private boolean checkedIn = false;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cancelled_by_user_id")
+    private User cancelledByUser;
 
-    @Column(name = "check_in_time")
-    private LocalDateTime checkInTime;
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
 
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
-
-    // Getters and Setters
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public Resource getResource() {
-        return resource;
-    }
-
-    public void setResource(Resource resource) {
-        this.resource = resource;
-    }
-
-    public User getUser() {
-        return user;
-    }
-
-    public void setUser(User user) {
-        this.user = user;
-    }
-
-    public LocalDateTime getStartTime() {
-        return startTime;
-    }
-
-    public void setStartTime(LocalDateTime startTime) {
-        this.startTime = startTime;
-    }
-
-    public LocalDateTime getEndTime() {
-        return endTime;
-    }
-
-    public void setEndTime(LocalDateTime endTime) {
-        this.endTime = endTime;
-    }
-
-    public String getPurpose() {
-        return purpose;
-    }
-
-    public void setPurpose(String purpose) {
-        this.purpose = purpose;
-    }
-
-    public Integer getExpectedAttendees() {
-        return expectedAttendees;
-    }
-
-    public void setExpectedAttendees(Integer expectedAttendees) {
-        this.expectedAttendees = expectedAttendees;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public String getApprovalReason() {
-        return approvalReason;
-    }
-
-    public void setApprovalReason(String approvalReason) {
-        this.approvalReason = approvalReason;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-
-    public String getQrCodeBase64() {
-        return qrCodeBase64;
-    }
-
-    public void setQrCodeBase64(String qrCodeBase64) {
-        this.qrCodeBase64 = qrCodeBase64;
-    }
-
-    public boolean isCheckedIn() {
-        return checkedIn;
-    }
-
-    public void setCheckedIn(boolean checkedIn) {
-        this.checkedIn = checkedIn;
-    }
-
-    public LocalDateTime getCheckInTime() {
-        return checkInTime;
-    }
-
-    public void setCheckInTime(LocalDateTime checkInTime) {
-        this.checkInTime = checkInTime;
-    }
+    @Column(name = "cancellation_reason")
+    private String cancellationReason;
 }

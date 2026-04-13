@@ -1,91 +1,96 @@
 package com.smartcampus.backend.modules.ticket.service;
 
 import com.smartcampus.backend.common.entity.User;
+import com.smartcampus.backend.common.entity.UserRole;
+import com.smartcampus.backend.common.enums.CommentType;
+import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.exception.ResourceNotFoundException;
-import com.smartcampus.backend.modules.auth.service.CurrentUserService;
-import com.smartcampus.backend.modules.ticket.dto.TicketCommentCreateDTO;
-import com.smartcampus.backend.modules.ticket.dto.TicketCommentResponseDTO;
-import com.smartcampus.backend.modules.ticket.dto.TicketCommentUpdateDTO;
+import com.smartcampus.backend.modules.ticket.dto.CreateTicketCommentRequest;
+import com.smartcampus.backend.modules.ticket.dto.TicketCommentResponse;
 import com.smartcampus.backend.modules.ticket.entity.Ticket;
 import com.smartcampus.backend.modules.ticket.entity.TicketComment;
 import com.smartcampus.backend.modules.ticket.mapper.TicketMapper;
 import com.smartcampus.backend.modules.ticket.repository.TicketCommentRepository;
-import org.springframework.security.access.AccessDeniedException;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-
 @Service
+@RequiredArgsConstructor
 public class TicketCommentService {
 
     private final TicketCommentRepository ticketCommentRepository;
-    private final TicketService ticketService;
-    private final CurrentUserService currentUserService;
-
-    public TicketCommentService(
-            TicketCommentRepository ticketCommentRepository,
-            TicketService ticketService,
-            CurrentUserService currentUserService
-    ) {
-        this.ticketCommentRepository = ticketCommentRepository;
-        this.ticketService = ticketService;
-        this.currentUserService = currentUserService;
-    }
-
-    @Transactional
-    public TicketCommentResponseDTO addComment(Long ticketId, TicketCommentCreateDTO commentDTO) {
-        Ticket ticket = ticketService.getTicketEntity(ticketId);
-        User user = currentUserService.getCurrentUser();
-
-        TicketComment comment = new TicketComment();
-        comment.setTicket(ticket);
-        comment.setUser(user);
-        comment.setContent(commentDTO.getContent().trim());
-
-        return TicketMapper.toCommentResponse(ticketCommentRepository.save(comment));
-    }
-
-    @Transactional
-    public TicketCommentResponseDTO updateComment(Long ticketId, Long commentId, TicketCommentUpdateDTO updateDTO) {
-        TicketComment comment = getComment(ticketId, commentId);
-        validateCommentOwnership(comment);
-        comment.setContent(updateDTO.getContent().trim());
-        return TicketMapper.toCommentResponse(ticketCommentRepository.save(comment));
-    }
+    private final TicketAccessService ticketAccessService;
+    private final TicketMapper ticketMapper;
 
     @Transactional(readOnly = true)
-    public List<TicketCommentResponseDTO> getCommentsByTicket(Long ticketId) {
-        ticketService.getTicketEntity(ticketId);
-        return ticketCommentRepository.findByTicketIdOrderByCreatedAtAsc(ticketId)
-                .stream()
-                .map(TicketMapper::toCommentResponse)
+    public List<TicketCommentResponse> getComments(Ticket ticket) {
+        UserRole membership = ticketAccessService.getRequiredCurrentMembership();
+        ticketAccessService.ensureCanViewTicket(membership, ticket);
+
+        return ticketCommentRepository.findByTicketIdOrderByCreatedAtAsc(ticket.getId()).stream()
+                .filter(
+                        comment ->
+                                comment.getCommentType() != CommentType.INTERNAL_NOTE
+                                        || canSeeInternalNotes(membership, ticket))
+                .map(ticketMapper::toCommentResponse)
                 .toList();
     }
 
     @Transactional
-    public void deleteComment(Long ticketId, Long commentId) {
-        TicketComment comment = getComment(ticketId, commentId);
-        validateCommentOwnership(comment);
-        ticketCommentRepository.delete(comment);
-    }
-
-    private TicketComment getComment(Long ticketId, Long commentId) {
-        TicketComment comment = ticketCommentRepository.findById(commentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Ticket comment not found with id: " + commentId));
-        if (!comment.getTicket().getId().equals(ticketId)) {
-            throw new IllegalArgumentException("Comment does not belong to the selected ticket");
+    public TicketCommentResponse addComment(Ticket ticket, CreateTicketCommentRequest request) {
+        UserRole membership = ticketAccessService.getRequiredCurrentMembership();
+        if (request.commentType() == CommentType.STATUS_NOTE) {
+            throw new IllegalArgumentException("Status notes are system-generated and cannot be created manually");
         }
 
-        return comment;
+        if (request.commentType() == CommentType.INTERNAL_NOTE) {
+            ticketAccessService.ensureCanAddInternalNote(membership, ticket);
+        } else {
+            ticketAccessService.ensureCanAddPublicComment(membership, ticket);
+        }
+
+        TicketComment parentComment = null;
+        if (request.parentCommentId() != null) {
+            parentComment =
+                    ticketCommentRepository
+                            .findByIdAndTicketId(request.parentCommentId(), ticket.getId())
+                            .orElseThrow(
+                                    () ->
+                                            new ResourceNotFoundException(
+                                                    "Parent comment not found for ticket id: "
+                                                            + ticket.getId()));
+        }
+
+        TicketComment comment =
+                TicketComment.builder()
+                        .ticket(ticket)
+                        .authorUser(membership.getUser())
+                        .body(request.body().trim())
+                        .commentType(request.commentType())
+                        .parentComment(parentComment)
+                        .build();
+
+        return ticketMapper.toCommentResponse(ticketCommentRepository.save(comment));
     }
 
-    private void validateCommentOwnership(TicketComment comment) {
-        User currentUser = currentUserService.getCurrentUser();
-        boolean ownsComment = comment.getUser().getUserId().equals(currentUser.getUserId());
+    @Transactional
+    public TicketComment createSystemStatusNote(Ticket ticket, String body, User actor) {
+        TicketComment comment =
+                TicketComment.builder()
+                        .ticket(ticket)
+                        .authorUser(actor)
+                        .body(body)
+                        .commentType(CommentType.STATUS_NOTE)
+                        .build();
+        return ticketCommentRepository.save(comment);
+    }
 
-        if (!ownsComment && !currentUserService.isAdmin(currentUser)) {
-            throw new AccessDeniedException("You do not have permission to manage this comment");
-        }
+    private boolean canSeeInternalNotes(UserRole membership, Ticket ticket) {
+        return membership.getRole().getCode() == RoleCode.ADMIN
+                || (membership.getRole().getCode() == RoleCode.STAFF
+                        && ticket.getAssignedStaffUser() != null
+                        && ticket.getAssignedStaffUser().getId().equals(membership.getUser().getId()));
     }
 }

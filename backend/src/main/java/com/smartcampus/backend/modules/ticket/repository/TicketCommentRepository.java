@@ -1,17 +1,32 @@
-//A Spring Data JPA repository for managing ticket comments.
 package com.smartcampus.backend.modules.ticket.repository;
 
 import com.smartcampus.backend.modules.ticket.entity.TicketComment;
+import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
 
-import java.util.List;
-
-@Repository
 public interface TicketCommentRepository extends JpaRepository<TicketComment, Long> {
 
-    @Query("SELECT tc FROM TicketComment tc WHERE tc.ticket.id = :ticketId ORDER BY tc.createdAt ASC")
+    @Query(
+            """
+            select tc
+            from TicketComment tc
+            join fetch tc.authorUser au
+            left join fetch tc.parentComment pc
+            where tc.ticket.id = :ticketId
+            order by tc.createdAt asc
+            """)
     List<TicketComment> findByTicketIdOrderByCreatedAtAsc(@Param("ticketId") Long ticketId);
+
+    @Query(
+            """
+            select tc
+            from TicketComment tc
+            where tc.id = :commentId
+              and tc.ticket.id = :ticketId
+            """)
+    Optional<TicketComment> findByIdAndTicketId(
+            @Param("commentId") Long commentId, @Param("ticketId") Long ticketId);
 }

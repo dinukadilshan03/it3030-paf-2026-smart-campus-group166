@@ -1,56 +1,83 @@
-//A Spring Data JPA repository for managing Booking entities. 
 package com.smartcampus.backend.modules.booking.repository;
 
-import java.time.LocalDateTime;
+import com.smartcampus.backend.common.enums.BookingStatus;
+import com.smartcampus.backend.modules.booking.entity.Booking;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.Collection;
 import java.util.List;
-
-import org.springframework.data.domain.Pageable;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
 
-import com.smartcampus.backend.modules.booking.entity.Booking;
-
-@Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
-    
-    List<Booking> findByUser_UserId(Long userId);
-    
-    List<Booking> findByResource_Id(Long resourceId);
-    
-    List<Booking> findByResource_IdAndStatus(Long resourceId, String status);
-    
-    /**
-     * Find bookings that conflict with a given time range for a specific resource
-     */
-    @Query("SELECT b FROM Booking b WHERE b.resource.id = :resourceId " +
-           "AND b.status = :status " +
-           "AND b.startTime < :endTime AND b.endTime > :startTime")
-    List<Booking> findByResourceIdAndStatusAndTimeRange(
-            @Param("resourceId") Long resourceId,
-            @Param("status") String status,
-            @Param("startTime") LocalDateTime startTime,
-            @Param("endTime") LocalDateTime endTime);
-    
-    /**
-     * Find all pending bookings for approval
-     */
-    List<Booking> findByStatus(String status);
-    
-    /**
-     * Find bookings created after a specific date
-     */
-    List<Booking> findByCreatedAtAfter(LocalDateTime createdAt);
 
-    /**
-     * Find top resources by booking count since an optional date.
-     * Returns rows of [resourceId, resourceName, usageCount]
-     */
-    @Query("SELECT b.resource.id, b.resource.name, COUNT(b) " +
-           "FROM Booking b " +
-           "WHERE (:since IS NULL OR b.createdAt >= :since) " +
-           "GROUP BY b.resource.id, b.resource.name " +
-           "ORDER BY COUNT(b) DESC")
-    List<Object[]> findTopResources(@Param("since") LocalDateTime since, Pageable pageable);
+    @Query(
+            """
+            select b
+            from Booking b
+            join fetch b.resource r
+            join fetch r.location l
+            join fetch b.requesterUser ru
+            left join fetch b.reviewedByUser rvu
+            left join fetch b.cancelledByUser cu
+            where b.id = :id
+            """)
+    Optional<Booking> findDetailedById(@Param("id") Long id);
+
+    @Query(
+            """
+            select b
+            from Booking b
+            join fetch b.resource r
+            join fetch b.requesterUser ru
+            where ru.id = :requesterUserId
+              and (:status is null or b.status = :status)
+              and (:resourceId is null or r.id = :resourceId)
+              and (:bookingDate is null or b.bookingDate = :bookingDate)
+            order by b.bookingDate desc, b.startTime desc, b.id desc
+            """)
+    List<Booking> findVisibleToRequester(
+            @Param("requesterUserId") Long requesterUserId,
+            @Param("status") BookingStatus status,
+            @Param("resourceId") Long resourceId,
+            @Param("bookingDate") LocalDate bookingDate);
+
+    @Query(
+            """
+            select b
+            from Booking b
+            join fetch b.resource r
+            join fetch b.requesterUser ru
+            where (:status is null or b.status = :status)
+              and (:resourceId is null or r.id = :resourceId)
+              and (:requesterUserId is null or ru.id = :requesterUserId)
+              and (:bookingDate is null or b.bookingDate = :bookingDate)
+            order by b.bookingDate desc, b.startTime desc, b.id desc
+            """)
+    List<Booking> searchBookingsForAdmin(
+            @Param("status") BookingStatus status,
+            @Param("resourceId") Long resourceId,
+            @Param("requesterUserId") Long requesterUserId,
+            @Param("bookingDate") LocalDate bookingDate);
+
+    @Query(
+            """
+            select count(b)
+            from Booking b
+            where b.resource.id = :resourceId
+              and b.bookingDate = :bookingDate
+              and b.status not in :ignoredStatuses
+              and (:excludeBookingId is null or b.id <> :excludeBookingId)
+              and b.startTime < :endTime
+              and b.endTime > :startTime
+            """)
+    long countOverlappingBookings(
+            @Param("resourceId") Long resourceId,
+            @Param("bookingDate") LocalDate bookingDate,
+            @Param("startTime") LocalTime startTime,
+            @Param("endTime") LocalTime endTime,
+            @Param("ignoredStatuses") Collection<BookingStatus> ignoredStatuses,
+            @Param("excludeBookingId") Long excludeBookingId);
 }

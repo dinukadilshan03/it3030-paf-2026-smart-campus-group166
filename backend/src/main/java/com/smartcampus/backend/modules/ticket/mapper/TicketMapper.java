@@ -1,77 +1,147 @@
 package com.smartcampus.backend.modules.ticket.mapper;
 
-import com.smartcampus.backend.modules.ticket.dto.TicketAssignmentResponseDTO;
-import com.smartcampus.backend.modules.ticket.dto.TicketAttachmentResponseDTO;
-import com.smartcampus.backend.modules.ticket.dto.TicketCommentResponseDTO;
-import com.smartcampus.backend.modules.ticket.dto.TicketResponseDTO;
+import com.smartcampus.backend.common.entity.User;
+import com.smartcampus.backend.modules.ticket.dto.TicketAssignmentResponse;
+import com.smartcampus.backend.modules.ticket.dto.TicketAttachmentResponse;
+import com.smartcampus.backend.modules.ticket.dto.TicketCategoryDetailResponse;
+import com.smartcampus.backend.modules.ticket.dto.TicketCategorySummaryResponse;
+import com.smartcampus.backend.modules.ticket.dto.TicketCommentResponse;
+import com.smartcampus.backend.modules.ticket.dto.TicketDetailResponse;
+import com.smartcampus.backend.modules.ticket.dto.TicketSummaryResponse;
 import com.smartcampus.backend.modules.ticket.entity.Ticket;
 import com.smartcampus.backend.modules.ticket.entity.TicketAssignment;
 import com.smartcampus.backend.modules.ticket.entity.TicketAttachment;
+import com.smartcampus.backend.modules.ticket.entity.TicketCategory;
 import com.smartcampus.backend.modules.ticket.entity.TicketComment;
+import java.util.List;
+import org.springframework.stereotype.Component;
 
-public final class TicketMapper {
+@Component
+public class TicketMapper {
 
-    private TicketMapper() {
+    public TicketCategorySummaryResponse toCategorySummary(TicketCategory category) {
+        return new TicketCategorySummaryResponse(
+                category.getId(),
+                category.getCode(),
+                category.getName(),
+                category.getDescription(),
+                category.getIsActive());
     }
 
-    public static TicketResponseDTO toTicketResponse(Ticket ticket, TicketAssignment currentAssignment) {
-        TicketResponseDTO response = new TicketResponseDTO();
-        response.setId(ticket.getId());
-        response.setResourceId(ticket.getResource().getId());
-        response.setResourceName(ticket.getResource().getName());
-        response.setResourceType(ticket.getResource().getType());
-        response.setResourceLocation(ticket.getResource().getLocation());
-        response.setReportedById(ticket.getReportedBy().getUserId());
-        response.setReportedByName(ticket.getReportedBy().getName());
-        response.setReportedByEmail(ticket.getReportedBy().getEmail());
-        response.setCategory(ticket.getCategory());
-        response.setPriority(ticket.getPriority().name());
-        response.setDescription(ticket.getDescription());
-        response.setStatus(ticket.getStatus().name());
-        response.setPreferredContact(ticket.getPreferredContact());
-        response.setResolutionNotes(ticket.getResolutionNotes());
-        response.setRejectionReason(ticket.getRejectionReason());
-        response.setCreatedAt(ticket.getCreatedAt());
-        response.setUpdatedAt(ticket.getUpdatedAt());
-        response.setCurrentAssignment(currentAssignment == null ? null : toAssignmentResponse(currentAssignment));
-        return response;
+    public TicketCategoryDetailResponse toCategoryDetail(TicketCategory category) {
+        return new TicketCategoryDetailResponse(
+                category.getId(),
+                category.getCode(),
+                category.getName(),
+                category.getDescription(),
+                category.getIsActive(),
+                category.getCreatedAt(),
+                category.getUpdatedAt());
     }
 
-    public static TicketAssignmentResponseDTO toAssignmentResponse(TicketAssignment assignment) {
-        TicketAssignmentResponseDTO response = new TicketAssignmentResponseDTO();
-        response.setId(assignment.getId());
-        response.setTicketId(assignment.getTicket().getId());
-        response.setTechnicianId(assignment.getTechnician().getUserId());
-        response.setTechnicianName(assignment.getTechnician().getName());
-        response.setTechnicianEmail(assignment.getTechnician().getEmail());
-        response.setAssignedById(assignment.getAssignedBy().getUserId());
-        response.setAssignedByName(assignment.getAssignedBy().getName());
-        response.setAssignedAt(assignment.getAssignedAt());
-        return response;
+    public TicketSummaryResponse toSummary(Ticket ticket) {
+        return new TicketSummaryResponse(
+                ticket.getId(),
+                ticket.getTicketNumber(),
+                ticket.getReporterUser().getId(),
+                resolveDisplayName(ticket.getReporterUser()),
+                ticket.getAssignedStaffUser() == null ? null : ticket.getAssignedStaffUser().getId(),
+                ticket.getAssignedStaffUser() == null
+                        ? null
+                        : resolveDisplayName(ticket.getAssignedStaffUser()),
+                ticket.getResource() == null ? null : ticket.getResource().getId(),
+                ticket.getResource() == null ? null : ticket.getResource().getName(),
+                ticket.getLocation() == null ? null : ticket.getLocation().getId(),
+                ticket.getLocation() == null ? null : ticket.getLocation().getName(),
+                ticket.getTicketCategory().getId(),
+                ticket.getTicketCategory().getCode(),
+                ticket.getTicketCategory().getName(),
+                ticket.getTitle(),
+                ticket.getPriority(),
+                ticket.getStatus(),
+                ticket.getCreatedAt());
     }
 
-    public static TicketCommentResponseDTO toCommentResponse(TicketComment comment) {
-        TicketCommentResponseDTO response = new TicketCommentResponseDTO();
-        response.setId(comment.getId());
-        response.setTicketId(comment.getTicket().getId());
-        response.setUserId(comment.getUser().getUserId());
-        response.setUserName(comment.getUser().getName());
-        response.setUserEmail(comment.getUser().getEmail());
-        response.setContent(comment.getContent());
-        response.setCreatedAt(comment.getCreatedAt());
-        response.setUpdatedAt(comment.getUpdatedAt());
-        return response;
+    public TicketDetailResponse toDetail(Ticket ticket, List<TicketAssignmentResponse> assignmentHistory) {
+        return new TicketDetailResponse(
+                ticket.getId(),
+                ticket.getTicketNumber(),
+                ticket.getReporterUser().getId(),
+                ticket.getReporterUser().getEmail(),
+                resolveDisplayName(ticket.getReporterUser()),
+                ticket.getAssignedStaffUser() == null ? null : ticket.getAssignedStaffUser().getId(),
+                ticket.getAssignedStaffUser() == null
+                        ? null
+                        : resolveDisplayName(ticket.getAssignedStaffUser()),
+                ticket.getResource() == null ? null : ticket.getResource().getId(),
+                ticket.getResource() == null ? null : ticket.getResource().getResourceCode(),
+                ticket.getResource() == null ? null : ticket.getResource().getName(),
+                ticket.getLocation() == null ? null : ticket.getLocation().getId(),
+                ticket.getLocation() == null ? null : ticket.getLocation().getName(),
+                ticket.getTicketCategory().getId(),
+                ticket.getTicketCategory().getCode(),
+                ticket.getTicketCategory().getName(),
+                ticket.getTitle(),
+                ticket.getDescription(),
+                ticket.getPriority(),
+                ticket.getStatus(),
+                ticket.getPreferredContactName(),
+                ticket.getPreferredContactEmail(),
+                ticket.getPreferredContactPhone(),
+                ticket.getResolutionSummary(),
+                ticket.getRejectionReason(),
+                ticket.getResolvedAt(),
+                ticket.getClosedAt(),
+                ticket.getCreatedAt(),
+                ticket.getUpdatedAt(),
+                assignmentHistory);
     }
 
-    public static TicketAttachmentResponseDTO toAttachmentResponse(TicketAttachment attachment) {
-        TicketAttachmentResponseDTO response = new TicketAttachmentResponseDTO();
-        response.setId(attachment.getId());
-        response.setTicketId(attachment.getTicket().getId());
-        response.setFileName(attachment.getFileName());
-        response.setFileUrl(attachment.getFileUrl());
-        response.setFileType(attachment.getFileType());
-        response.setFileSize(attachment.getFileSize());
-        response.setUploadedAt(attachment.getUploadedAt());
-        return response;
+    public TicketAssignmentResponse toAssignmentResponse(TicketAssignment assignment) {
+        return new TicketAssignmentResponse(
+                assignment.getId(),
+                assignment.getAssignedToUser().getId(),
+                resolveDisplayName(assignment.getAssignedToUser()),
+                assignment.getAssignedByUser().getId(),
+                resolveDisplayName(assignment.getAssignedByUser()),
+                assignment.getAssignmentNote(),
+                assignment.getIsActive(),
+                assignment.getAssignedAt(),
+                assignment.getUnassignedAt());
+    }
+
+    public TicketCommentResponse toCommentResponse(TicketComment comment) {
+        return new TicketCommentResponse(
+                comment.getId(),
+                comment.getAuthorUser().getId(),
+                resolveDisplayName(comment.getAuthorUser()),
+                comment.getBody(),
+                comment.getCommentType(),
+                comment.getParentComment() == null ? null : comment.getParentComment().getId(),
+                comment.getIsEdited(),
+                comment.getEditedAt(),
+                comment.getCreatedAt(),
+                comment.getUpdatedAt());
+    }
+
+    public TicketAttachmentResponse toAttachmentResponse(TicketAttachment attachment) {
+        return new TicketAttachmentResponse(
+                attachment.getId(),
+                attachment.getUploadedByUser().getId(),
+                resolveDisplayName(attachment.getUploadedByUser()),
+                attachment.getFileName(),
+                attachment.getStorageBucket(),
+                attachment.getStoragePath(),
+                attachment.getMimeType(),
+                attachment.getFileSize(),
+                attachment.getAttachmentType(),
+                attachment.getCreatedAt());
+    }
+
+    private String resolveDisplayName(User user) {
+        if (user.getDisplayName() != null && !user.getDisplayName().isBlank()) {
+            return user.getDisplayName();
+        }
+        return user.getEmail();
     }
 }

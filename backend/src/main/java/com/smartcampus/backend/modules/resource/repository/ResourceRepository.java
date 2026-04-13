@@ -1,23 +1,54 @@
 package com.smartcampus.backend.modules.resource.repository;
 
-import com.smartcampus.backend.common.entity.Resource;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
+import com.smartcampus.backend.common.enums.ResourceStatus;
+import com.smartcampus.backend.modules.resource.entity.Resource;
 import java.util.List;
+import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
-@Repository
 public interface ResourceRepository extends JpaRepository<Resource, Long> {
 
-    List<Resource> findByTypeContainingIgnoreCase(String type);
+    Optional<Resource> findByResourceCodeIgnoreCase(String resourceCode);
 
-    List<Resource> findByLocationContainingIgnoreCase(String location);
+    @Query(
+            """
+            select distinct r
+            from Resource r
+            join fetch r.resourceCategory rc
+            join fetch r.location l
+            where (:categoryId is null or rc.id = :categoryId)
+              and (:locationId is null or l.id = :locationId)
+              and (:status is null or r.status = :status)
+              and (:minCapacity is null or r.capacity >= :minCapacity)
+              and (
+                :search is null
+                or lower(r.name) like concat('%', lower(:search), '%')
+                or lower(r.resourceCode) like concat('%', lower(:search), '%')
+                or lower(rc.name) like concat('%', lower(:search), '%')
+                or lower(l.name) like concat('%', lower(:search), '%')
+              )
+            order by r.name asc
+            """)
+    List<Resource> searchResources(
+            @Param("categoryId") Long categoryId,
+            @Param("locationId") Long locationId,
+            @Param("status") ResourceStatus status,
+            @Param("minCapacity") Integer minCapacity,
+            @Param("search") String search);
 
-    List<Resource> findByStatusIgnoreCase(String status);
+    @Query(
+            """
+            select r
+            from Resource r
+            join fetch r.resourceCategory rc
+            join fetch r.location l
+            where r.id = :id
+            """)
+    Optional<Resource> findDetailedById(@Param("id") Long id);
 
-    List<Resource> findByCapacityGreaterThanEqual(Integer capacity);
+    boolean existsByResourceCategory_Id(Long categoryId);
 
-    List<Resource> findByTypeContainingIgnoreCaseAndLocationContainingIgnoreCaseAndStatusIgnoreCase(
-            String type, String location, String status
-    );
+    boolean existsByLocation_Id(Long locationId);
 }

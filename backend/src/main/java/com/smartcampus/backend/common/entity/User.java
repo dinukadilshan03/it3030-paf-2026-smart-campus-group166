@@ -1,13 +1,20 @@
 package com.smartcampus.backend.common.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
-
-import java.time.LocalDateTime;
-
-import com.smartcampus.backend.common.enums.OAuthProvider;
 import com.smartcampus.backend.common.enums.UserStatus;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import java.time.LocalDateTime;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "users")
@@ -16,63 +23,38 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class User {
+public class User extends AuditableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "user_id")
-    private Long userId;
+    private Long id;
 
-    @Column(name = "name", length = 120, nullable = false)
-    private String name;
+    @Column(name = "google_sub", unique = true)
+    private String googleSub;
 
-    @Column(name = "email", length = 120, unique = true, nullable = false)
+    @Column(name = "email", nullable = false, unique = true)
     private String email;
 
-    @Column(name = "password_hash")
-    private String passwordHash;
+    @Column(name = "first_name", length = 120)
+    private String firstName;
 
-    // FK -> roles.role_id
-    // Lazy loading avoids unnecessary joins when listing users.
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "role_id", nullable = false)
-    @com.fasterxml.jackson.annotation.JsonIgnore
-    private Role role;
+    @Column(name = "last_name", length = 120)
+    private String lastName;
 
-    @Column(name = "department", length = 120)
-    private String department;
+    @Column(name = "display_name", length = 160)
+    private String displayName;
 
     @Column(name = "phone", length = 30)
     private String phone;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "oauth_provider")
-    private OAuthProvider oauthProvider;
-
-    @Column(name = "oauth_id", length = 120)
-    private String oauthId;
+    @Column(name = "profile_image_url")
+    private String profileImageUrl;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status")
-    // Enum-backed status keeps lifecycle values type-safe.
-    private UserStatus status;
+    @Column(name = "status", nullable = false, length = 20)
+    @Builder.Default
+    private UserStatus status = UserStatus.ACTIVE;
 
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
-    // Auto timestamps
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
+    @Column(name = "last_login_at")
+    private LocalDateTime lastLoginAt;
 }
