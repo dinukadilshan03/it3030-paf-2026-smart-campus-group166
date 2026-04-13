@@ -1,26 +1,78 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f5efe3;
+  --foreground: #0f172a;
+  --surface: rgba(255, 255, 255, 0.78);
+  --surface-strong: #ffffff;
+  --surface-muted: #e5edf5;
+  --border: rgba(15, 23, 42, 0.1);
+  --accent: #0f766e;
+  --accent-strong: #115e59;
+  --accent-soft: rgba(15, 118, 110, 0.12);
+  --ink-soft: #475569;
+  --ink-muted: #64748b;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-app: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-surface-muted: var(--surface-muted);
+  --color-border-subtle: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-muted: var(--ink-muted);
+  --font-sans: "Segoe UI Variable", "Aptos", "Trebuchet MS", sans-serif;
+  --font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Segoe UI Variable", "Aptos", "Trebuchet MS", sans-serif;
+  min-height: 100vh;
+  background-image:
+    radial-gradient(circle at top left, rgba(15, 118, 110, 0.18), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(217, 119, 6, 0.18), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0));
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+}
+
+.hero-glow {
+  position: absolute;
+  inset-block-start: 8%;
+  height: 18rem;
+  width: 18rem;
+  border-radius: 9999px;
+  filter: blur(80px);
+  opacity: 0.55;
+}
+
+.hero-glow-left {
+  inset-inline-start: -3rem;
+  background: rgba(15, 118, 110, 0.26);
+}
+
+.hero-glow-right {
+  inset-inline-end: -3rem;
+  inset-block-start: auto;
+  inset-block-end: 10%;
+  background: rgba(217, 119, 6, 0.2);
 }
