@@ -308,13 +308,44 @@ Request shape:
 
 ---
 
-## Planned Booking Endpoints
+## Booking Workflow Endpoints
 
 ### `GET /api/v1/bookings`
 
-Returns:
+Purpose:
+
+- return bookings through one role-aware API
+
+Access:
+
+- `STUDENT`: own bookings only
+- `ADMIN`: all bookings
+
+Query parameters:
+
+- optional `status`
+- optional `resourceId`
+- optional `requesterUserId` (admin use)
+- optional `bookingDate`
+
+Response shape:
 
 - collection of `BookingSummaryResponse`
+
+### `GET /api/v1/bookings/{id}`
+
+Purpose:
+
+- return one booking detail record
+
+Access:
+
+- `STUDENT`: own bookings only
+- `ADMIN`: any booking
+
+Response shape:
+
+- `BookingDetailResponse`
 
 ### `POST /api/v1/bookings`
 
@@ -322,11 +353,49 @@ Purpose:
 
 - create a booking request
 
+Access:
+
+- `STUDENT` and `ADMIN`
+
 Key validations:
 
 - valid resource
 - valid time range
 - no overlapping active booking
+- active resource status
+- configured availability windows when present
+
+Request shape:
+
+- `CreateBookingRequest`
+
+### `PATCH /api/v1/bookings/{id}/review`
+
+Purpose:
+
+- approve or reject a pending booking
+
+Access:
+
+- admin only
+
+Request shape:
+
+- `ReviewBookingRequest`
+
+### `PATCH /api/v1/bookings/{id}/cancel`
+
+Purpose:
+
+- cancel a pending or approved booking
+
+Access:
+
+- requester or admin
+
+Request shape:
+
+- `CancelBookingRequest`
 
 ---
 
@@ -392,5 +461,9 @@ Purpose:
 - `ResourceAvailabilityWindowResponse`
 - `ReplaceResourceAvailabilityRequest`
 - `BookingSummaryResponse`
+- `BookingDetailResponse`
+- `CreateBookingRequest`
+- `ReviewBookingRequest`
+- `CancelBookingRequest`
 - `TicketSummaryResponse`
 - `NotificationSummaryResponse`

@@ -54,6 +54,14 @@ public class SecurityConfig {
                                         .authenticated()
                                         .requestMatchers("/api/v1/users/**")
                                         .hasRole("ADMIN")
+                                        .requestMatchers(HttpMethod.POST, "/api/v1/bookings/**")
+                                        .hasAnyRole("STUDENT", "ADMIN")
+                                        .requestMatchers(HttpMethod.PATCH, "/api/v1/bookings/*/review")
+                                        .hasRole("ADMIN")
+                                        .requestMatchers(HttpMethod.PATCH, "/api/v1/bookings/*/cancel")
+                                        .hasAnyRole("STUDENT", "ADMIN")
+                                        .requestMatchers(HttpMethod.GET, "/api/v1/bookings/**")
+                                        .hasAnyRole("STUDENT", "ADMIN")
                                         .requestMatchers(
                                                 HttpMethod.POST,
                                                 "/api/v1/resource-categories/**",
