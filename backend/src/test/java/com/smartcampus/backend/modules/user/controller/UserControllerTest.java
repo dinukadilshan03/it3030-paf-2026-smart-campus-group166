@@ -3,6 +3,7 @@ package com.smartcampus.backend.modules.user.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+import com.smartcampus.backend.common.enums.UserLoginMethod;
 import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.UserStatus;
 import com.smartcampus.backend.modules.user.dto.UserDetailResponse;
@@ -45,7 +46,10 @@ class UserControllerTest {
                         UserStatus.ACTIVE,
                         LocalDateTime.now(),
                         LocalDateTime.now(),
-                        LocalDateTime.now());
+                        LocalDateTime.now(),
+                        true,
+                        true,
+                        UserLoginMethod.LOCAL);
         when(userService.getUserById(1L)).thenReturn(expected);
 
         UserDetailResponse response = userController.getUserById(1L);

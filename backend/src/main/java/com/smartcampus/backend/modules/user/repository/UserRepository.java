@@ -16,12 +16,20 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query(
             value =
                     """
-            select distinct u.*
+            select u.*
             from users u
-            left join user_roles ur on ur.user_id = u.id and ur.is_active = true
-            left join roles r on r.id = ur.role_id
-            where (:roleCode is null or r.code = :roleCode)
-              and (:status is null or u.status = :status)
+            where (:status is null or u.status = :status)
+              and (
+                :roleCode is null
+                or exists (
+                  select 1
+                  from user_roles ur
+                  join roles r on r.id = ur.role_id
+                  where ur.user_id = u.id
+                    and ur.is_active = true
+                    and r.code = :roleCode
+                )
+              )
               and (
                 :search is null
                 or lower(u.email) like concat('%', lower(:search), '%')

@@ -40,10 +40,12 @@ export function SidebarNav({
           <Link
             key={item.href}
             href={item.href}
+            aria-current={active ? "page" : undefined}
+            style={active ? { color: "#f8fafc" } : undefined}
             className={`rounded-2xl px-4 py-3 text-sm font-medium transition ${
               active
-                ? "bg-slate-950 text-white shadow-[0_12px_30px_rgba(15,23,42,0.18)]"
-                : "text-slate-600 hover:bg-white hover:text-slate-950"
+                ? "bg-slate-950 font-semibold shadow-[0_12px_30px_rgba(15,23,42,0.18)]"
+                : "text-slate-700 hover:bg-white hover:text-slate-950 visited:text-slate-700"
             }`}
           >
             {item.title}

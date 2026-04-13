@@ -1,15 +1,11 @@
-import { PagePlaceholder } from "@/components/ui/PagePlaceholder";
+import { UserManagementPage } from "@/components/users/UserManagementPage";
 import { requireRole } from "@/lib/auth/session";
+import { getUserDetailServer, listUsersServer } from "@/lib/users/server";
 
 export default async function UsersPage() {
   await requireRole(["ADMIN"]);
+  const users = await listUsersServer();
+  const selectedUser = users.length > 0 ? await getUserDetailServer(users[0].id) : null;
 
-  return (
-    <PagePlaceholder
-      eyebrow="Admin workflow"
-      title="Users"
-      description="This placeholder page is reserved for admin user management, role changes, and account status controls."
-      audience="Admins"
-    />
-  );
+  return <UserManagementPage initialUsers={users} initialSelectedUser={selectedUser} />;
 }

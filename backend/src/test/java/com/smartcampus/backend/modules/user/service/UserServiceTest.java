@@ -10,6 +10,8 @@ import static org.mockito.Mockito.when;
 import com.smartcampus.backend.common.entity.Role;
 import com.smartcampus.backend.common.entity.User;
 import com.smartcampus.backend.common.entity.UserRole;
+import com.smartcampus.backend.common.entity.LocalAuthCredential;
+import com.smartcampus.backend.common.enums.UserLoginMethod;
 import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.UserStatus;
 import com.smartcampus.backend.modules.auth.repository.LocalAuthCredentialRepository;
@@ -67,11 +69,23 @@ class UserServiceTest {
 
         when(userRepository.searchUsers("ADMIN", "ACTIVE", "admin")).thenReturn(List.of(admin));
         when(userRoleRepository.findActiveByUserIds(List.of(1L))).thenReturn(List.of(membership));
+        when(localAuthCredentialRepository.findByUserIdIn(List.of(1L)))
+                .thenReturn(
+                        List.of(
+                                LocalAuthCredential.builder()
+                                        .id(99L)
+                                        .user(admin)
+                                        .passwordHash("hash")
+                                        .mustChangePassword(true)
+                                        .build()));
 
         List<UserSummaryResponse> result = userService.getUsers(RoleCode.ADMIN, UserStatus.ACTIVE, "admin");
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().role()).isEqualTo(RoleCode.ADMIN);
+        assertThat(result.getFirst().hasLocalCredentials()).isTrue();
+        assertThat(result.getFirst().mustChangePassword()).isTrue();
+        assertThat(result.getFirst().loginMethod()).isEqualTo(UserLoginMethod.LOCAL);
     }
 
     @Test
@@ -132,6 +146,7 @@ class UserServiceTest {
         when(userRepository.findById(4L)).thenReturn(Optional.of(user));
         when(userRepository.save(user)).thenReturn(user);
         when(userRoleRepository.findActiveByUserId(4L)).thenReturn(Optional.of(membership));
+        when(localAuthCredentialRepository.findByUserId(4L)).thenReturn(Optional.empty());
 
         var result =
                 userService.updateUser(

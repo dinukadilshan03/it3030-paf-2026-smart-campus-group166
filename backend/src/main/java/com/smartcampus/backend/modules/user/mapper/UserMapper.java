@@ -1,6 +1,7 @@
 package com.smartcampus.backend.modules.user.mapper;
 
 import com.smartcampus.backend.common.entity.User;
+import com.smartcampus.backend.common.enums.UserLoginMethod;
 import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.UserStatus;
 import com.smartcampus.backend.modules.auth.dto.CurrentUserResponse;
@@ -11,17 +12,30 @@ import org.springframework.stereotype.Component;
 @Component
 public class UserMapper {
 
-    public UserSummaryResponse toSummary(User user, RoleCode role) {
+    public UserSummaryResponse toSummary(
+            User user,
+            RoleCode role,
+            boolean hasLocalCredentials,
+            boolean mustChangePassword,
+            UserLoginMethod loginMethod) {
         return new UserSummaryResponse(
                 user.getId(),
                 user.getEmail(),
                 resolveDisplayName(user),
                 role,
                 user.getStatus(),
-                user.getLastLoginAt());
+                user.getLastLoginAt(),
+                hasLocalCredentials,
+                mustChangePassword,
+                loginMethod);
     }
 
-    public UserDetailResponse toDetail(User user, RoleCode role) {
+    public UserDetailResponse toDetail(
+            User user,
+            RoleCode role,
+            boolean hasLocalCredentials,
+            boolean mustChangePassword,
+            UserLoginMethod loginMethod) {
         return new UserDetailResponse(
                 user.getId(),
                 user.getEmail(),
@@ -34,7 +48,10 @@ public class UserMapper {
                 user.getStatus(),
                 user.getCreatedAt(),
                 user.getUpdatedAt(),
-                user.getLastLoginAt());
+                user.getLastLoginAt(),
+                hasLocalCredentials,
+                mustChangePassword,
+                loginMethod);
     }
 
     public CurrentUserResponse toCurrentUser(User user, RoleCode role, boolean passwordChangeRequired) {

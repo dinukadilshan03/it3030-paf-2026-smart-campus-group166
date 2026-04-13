@@ -4,6 +4,7 @@ import com.smartcampus.backend.common.entity.LocalAuthCredential;
 import com.smartcampus.backend.common.entity.Role;
 import com.smartcampus.backend.common.entity.User;
 import com.smartcampus.backend.common.entity.UserRole;
+import com.smartcampus.backend.common.enums.UserLoginMethod;
 import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.UserStatus;
 import com.smartcampus.backend.common.exception.ResourceConflictException;
@@ -51,15 +52,25 @@ public class UserService {
         Map<Long, UserRole> activeRoles =
                 userRoleRepository.findActiveByUserIds(users.stream().map(User::getId).toList()).stream()
                         .collect(java.util.stream.Collectors.toMap(ur -> ur.getUser().getId(), Function.identity()));
+        Map<Long, LocalAuthCredential> credentialsByUserId =
+                localAuthCredentialRepository.findByUserIdIn(users.stream().map(User::getId).toList()).stream()
+                        .collect(java.util.stream.Collectors.toMap(credential -> credential.getUser().getId(), Function.identity()));
 
         return users.stream()
                 .map(
-                        user ->
-                                userMapper.toSummary(
-                                        user,
-                                        activeRoles.get(user.getId()) == null
-                                                ? null
-                                                : activeRoles.get(user.getId()).getRole().getCode()))
+                        user -> {
+                            RoleCode effectiveRole =
+                                    activeRoles.get(user.getId()) == null
+                                            ? null
+                                            : activeRoles.get(user.getId()).getRole().getCode();
+                            LocalAuthCredential credential = credentialsByUserId.get(user.getId());
+                            return userMapper.toSummary(
+                                    user,
+                                    effectiveRole,
+                                    credential != null,
+                                    credential != null && credential.isMustChangePassword(),
+                                    resolveLoginMethod(effectiveRole));
+                        })
                 .toList();
     }
 
@@ -67,7 +78,7 @@ public class UserService {
     public UserDetailResponse getUserById(Long id) {
         User user = getManagedUser(id);
         UserRole activeRole = getActiveRole(user.getId());
-        return userMapper.toDetail(user, activeRole.getRole().getCode());
+        return toUserDetail(user, activeRole.getRole().getCode());
     }
 
     @Transactional
@@ -99,7 +110,7 @@ public class UserService {
         User savedUser = userRepository.save(user);
         userRoleRepository.save(UserRole.builder().user(savedUser).role(role).isActive(true).build());
 
-        return userMapper.toDetail(savedUser, role.getCode());
+        return toUserDetail(savedUser, role.getCode());
     }
 
     @Transactional
@@ -115,7 +126,7 @@ public class UserService {
 
         User savedUser = userRepository.save(user);
         UserRole activeRole = getActiveRole(savedUser.getId());
-        return userMapper.toDetail(savedUser, activeRole.getRole().getCode());
+        return toUserDetail(savedUser, activeRole.getRole().getCode());
     }
 
     @Transactional
@@ -136,7 +147,7 @@ public class UserService {
         }
 
         UserRole refreshedRole = getActiveRole(user.getId());
-        return userMapper.toDetail(user, refreshedRole.getRole().getCode());
+        return toUserDetail(user, refreshedRole.getRole().getCode());
     }
 
     @Transactional
@@ -146,7 +157,7 @@ public class UserService {
         validateAdminAvailability(user, activeRole.getRole().getCode(), status);
         user.setStatus(status);
         User savedUser = userRepository.save(user);
-        return userMapper.toDetail(savedUser, activeRole.getRole().getCode());
+        return toUserDetail(savedUser, activeRole.getRole().getCode());
     }
 
     @Transactional
@@ -166,7 +177,7 @@ public class UserService {
                         .lastPasswordChangedAt(LocalDateTime.now())
                         .build());
 
-        return userMapper.toDetail(user, activeRole.getRole().getCode());
+        return toUserDetail(user, activeRole.getRole().getCode());
     }
 
     @Transactional
@@ -186,7 +197,7 @@ public class UserService {
         credential.setLastPasswordChangedAt(LocalDateTime.now());
         localAuthCredentialRepository.save(credential);
 
-        return userMapper.toDetail(user, activeRole.getRole().getCode());
+        return toUserDetail(user, activeRole.getRole().getCode());
     }
 
     @Transactional
@@ -194,7 +205,7 @@ public class UserService {
         User user = getManagedUser(id);
         UserRole activeRole = getActiveRole(user.getId());
         localAuthCredentialRepository.deleteByUserId(user.getId());
-        return userMapper.toDetail(user, activeRole.getRole().getCode());
+        return toUserDetail(user, activeRole.getRole().getCode());
     }
 
     private User getManagedUser(Long id) {
@@ -250,5 +261,19 @@ public class UserService {
         if (roleCode == RoleCode.STUDENT) {
             throw new IllegalArgumentException("Student accounts cannot receive local credentials");
         }
+    }
+
+    private UserDetailResponse toUserDetail(User user, RoleCode role) {
+        LocalAuthCredential credential = localAuthCredentialRepository.findByUserId(user.getId()).orElse(null);
+        return userMapper.toDetail(
+                user,
+                role,
+                credential != null,
+                credential != null && credential.isMustChangePassword(),
+                resolveLoginMethod(role));
+    }
+
+    private UserLoginMethod resolveLoginMethod(RoleCode role) {
+        return role == RoleCode.STUDENT ? UserLoginMethod.GOOGLE : UserLoginMethod.LOCAL;
     }
 }
