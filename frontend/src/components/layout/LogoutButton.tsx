@@ -16,7 +16,7 @@ export function LogoutButton() {
           method: "POST",
         });
       } finally {
-        router.replace("/login");
+        router.replace("/login?reason=signed_out");
         router.refresh();
       }
     });

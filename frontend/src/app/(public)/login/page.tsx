@@ -1,16 +1,21 @@
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { redirectIfAuthenticated } from "@/lib/auth/session";
+import { resolveAuthFeedback } from "@/lib/auth/feedback";
 
 type LoginPageProps = {
   searchParams: Promise<{
     error?: string;
+    reason?: string;
   }>;
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   await redirectIfAuthenticated("/dashboard");
   const resolvedSearchParams = await searchParams;
-  const hasOAuthError = resolvedSearchParams.error === "oauth";
+  const feedback = resolveAuthFeedback(
+    resolvedSearchParams.error,
+    resolvedSearchParams.reason,
+  );
 
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-16">
@@ -22,15 +27,15 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           Welcome back
         </h1>
         <div className="mt-4">
-          {hasOAuthError ? (
-            <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-7 text-amber-800">
-              Google sign-in did not complete successfully. Please try again.
-            </p>
-          ) : (
-            <p className="text-sm leading-7 text-slate-600">
-              Use your SmartCampus Google account to enter the protected workspace.
-            </p>
-          )}
+          <p
+            className={`rounded-2xl px-4 py-3 text-sm leading-7 ${
+              feedback.tone === "error"
+                ? "border border-amber-200 bg-amber-50 text-amber-800"
+                : "border border-slate-200 bg-slate-50 text-slate-600"
+            }`}
+          >
+            {feedback.message}
+          </p>
         </div>
         <div className="mt-8">
           <GoogleSignInButton className="w-full justify-center" />

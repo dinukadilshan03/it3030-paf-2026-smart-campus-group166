@@ -11,7 +11,7 @@ import com.smartcampus.backend.common.entity.User;
 import com.smartcampus.backend.common.entity.UserRole;
 import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.UserStatus;
-import com.smartcampus.backend.common.exception.DuplicateResourceException;
+import com.smartcampus.backend.modules.auth.exception.AuthFlowException;
 import com.smartcampus.backend.modules.user.repository.RoleRepository;
 import com.smartcampus.backend.modules.user.repository.UserRepository;
 import com.smartcampus.backend.modules.user.repository.UserRoleRepository;
@@ -116,7 +116,38 @@ class OAuthUserProvisioningServiceTest {
                         () ->
                                 service.provisionFromGoogleAttributes(
                                         Map.of("email", "one@example.com", "sub", "shared-sub")))
-                .isInstanceOf(DuplicateResourceException.class)
+                .isInstanceOf(AuthFlowException.class)
                 .hasMessageContaining("already linked");
+    }
+
+    @Test
+    void blocksInactiveUsersFromSigningIn() {
+        User inactiveUser =
+                User.builder()
+                        .id(14L)
+                        .email("inactive@example.com")
+                        .googleSub("google-inactive")
+                        .status(UserStatus.INACTIVE)
+                        .build();
+
+        when(userRepository.findByEmailIgnoreCase("inactive@example.com"))
+                .thenReturn(Optional.of(inactiveUser));
+        when(userRepository.findByGoogleSub("google-inactive")).thenReturn(Optional.of(inactiveUser));
+
+        assertThatThrownBy(
+                        () ->
+                                service.provisionFromGoogleAttributes(
+                                        Map.of(
+                                                "email", "inactive@example.com",
+                                                "sub", "google-inactive")))
+                .isInstanceOf(AuthFlowException.class)
+                .hasMessageContaining("not allowed to sign in");
+    }
+
+    @Test
+    void rejectsProfilesMissingRequiredGoogleAttributes() {
+        assertThatThrownBy(() -> service.provisionFromGoogleAttributes(Map.of("email", "missing@example.com")))
+                .isInstanceOf(AuthFlowException.class)
+                .hasMessageContaining("Missing required Google attribute");
     }
 }

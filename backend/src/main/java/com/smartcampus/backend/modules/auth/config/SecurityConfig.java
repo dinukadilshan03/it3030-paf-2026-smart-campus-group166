@@ -1,6 +1,7 @@
 package com.smartcampus.backend.modules.auth.config;
 
 import com.smartcampus.backend.modules.auth.service.GoogleOAuth2UserService;
+import com.smartcampus.backend.modules.auth.service.GoogleOidcUserService;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.cors.CorsConfiguration;
@@ -26,7 +28,10 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private final GoogleOAuth2UserService googleOAuth2UserService;
+    private final GoogleOidcUserService googleOidcUserService;
     private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
+    private final OAuth2LoginFailureHandler oAuth2LoginFailureHandler;
+    private final ActiveUserSessionFilter activeUserSessionFilter;
 
     @Value("${app.frontend-url:http://localhost:3000}")
     private String frontendBaseUrl;
@@ -88,6 +93,7 @@ public class SecurityConfig {
                                         .hasRole("ADMIN")
                                         .anyRequest()
                                         .authenticated())
+                .addFilterAfter(activeUserSessionFilter, AnonymousAuthenticationFilter.class)
                 .exceptionHandling(
                         exceptions ->
                                 exceptions.authenticationEntryPoint(
@@ -110,13 +116,11 @@ public class SecurityConfig {
                         oauth ->
                                 oauth.userInfoEndpoint(
                                                 userInfo ->
-                                                        userInfo.userService(googleOAuth2UserService))
+                                                        userInfo.userService(googleOAuth2UserService)
+                                                                .oidcUserService(
+                                                                        googleOidcUserService))
                                         .successHandler(oAuth2LoginSuccessHandler)
-                                        .failureHandler(
-                                                (request, response, exception) ->
-                                                        response.sendRedirect(
-                                                                frontendBaseUrl
-                                                                        + "/login?error=oauth")))
+                                        .failureHandler(oAuth2LoginFailureHandler))
                 .logout(Customizer.withDefaults())
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable())

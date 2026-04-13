@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { serverApiFetch } from "@/lib/api/server";
-import type { CurrentUser, RoleCode } from "@/types/auth";
+import type { AuthApiError, CurrentUser, RoleCode } from "@/types/auth";
 
 const ANONYMOUS_USER: CurrentUser = {
   authenticated: false,
@@ -12,29 +12,51 @@ const ANONYMOUS_USER: CurrentUser = {
   status: null,
 };
 
-export async function getCurrentUser() {
+type CurrentUserResult =
+  | { kind: "authenticated"; user: CurrentUser }
+  | { kind: "anonymous"; user: CurrentUser }
+  | { kind: "error"; error: AuthApiError; user: CurrentUser };
+
+async function getCurrentUserResult(): Promise<CurrentUserResult> {
   try {
     const response = await serverApiFetch("/api/v1/auth/me");
 
-    if (!response.ok) {
-      return ANONYMOUS_USER;
+    if (response.ok) {
+      const user = (await response.json()) as CurrentUser;
+      if (user.authenticated) {
+        return { kind: "authenticated", user };
+      }
+      return { kind: "anonymous", user: ANONYMOUS_USER };
     }
 
-    const user = (await response.json()) as CurrentUser;
-    return user;
+    const apiError = (await response.json().catch(() => null)) as AuthApiError | null;
+    if (response.status === 401 && apiError?.code) {
+      return { kind: "error", error: apiError, user: ANONYMOUS_USER };
+    }
+
+    return { kind: "anonymous", user: ANONYMOUS_USER };
   } catch {
-    return ANONYMOUS_USER;
+    return { kind: "anonymous", user: ANONYMOUS_USER };
   }
 }
 
-export async function requireCurrentUser() {
-  const user = await getCurrentUser();
+export async function getCurrentUser() {
+  const result = await getCurrentUserResult();
+  return result.user;
+}
 
-  if (!user.authenticated) {
+export async function requireCurrentUser() {
+  const result = await getCurrentUserResult();
+
+  if (result.kind === "error") {
+    redirect(`/login?error=${result.error.code}`);
+  }
+
+  if (result.kind !== "authenticated") {
     redirect("/login");
   }
 
-  return user;
+  return result.user;
 }
 
 export async function requireRole(roles: RoleCode[]) {
@@ -48,9 +70,9 @@ export async function requireRole(roles: RoleCode[]) {
 }
 
 export async function redirectIfAuthenticated(destination = "/dashboard") {
-  const user = await getCurrentUser();
+  const result = await getCurrentUserResult();
 
-  if (user.authenticated) {
+  if (result.kind === "authenticated") {
     redirect(destination);
   }
 }

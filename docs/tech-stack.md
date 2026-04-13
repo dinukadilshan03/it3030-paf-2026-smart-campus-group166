@@ -145,12 +145,15 @@ Responsibilities:
 - identify the user
 - create or update the `users` record
 - resolve one active role through `user_roles`
+- block non-active users from completing sign-in
+- verify local user and active role provisioning before treating OAuth login as successful
 - expose current user state to the frontend
 
 Important note:
 
 - Supabase Auth is not the v1 auth owner
 - Supabase is used for database and storage in this setup
+- local Google OAuth redirect URI should point to `http://localhost:8080/login/oauth2/code/google`
 
 ---
 

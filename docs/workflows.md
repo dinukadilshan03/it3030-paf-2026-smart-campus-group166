@@ -213,13 +213,17 @@ Flow:
 2. Spring Boot handles the callback.
 3. Backend finds or creates the `users` row.
 4. Backend ensures the user has one active `user_roles` row.
-5. Frontend consumes current user state from the backend API.
+5. Backend blocks sign-in for users whose status is not `ACTIVE`.
+6. Backend redirects back to frontend `/auth/callback` on success or `/login` with a stable error code on failure.
+7. Frontend consumes current user state from the backend API.
 
 Rules:
 
 - backend owns authentication and role resolution
 - frontend does not connect directly to the database
 - v1 uses one effective role per user even though the schema keeps role history
+- login failures use stable frontend-facing error codes such as `oauth_failed`, `account_blocked`, `invalid_profile`, and `provisioning_failed`
+- Google callback success must only happen after local `users` and active `user_roles` data are verifiably available
 
 ---
 

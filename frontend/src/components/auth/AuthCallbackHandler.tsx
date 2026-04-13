@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { clientApiFetch } from "@/lib/api/client";
-import type { CurrentUser } from "@/types/auth";
+import type { AuthApiError, CurrentUser } from "@/types/auth";
 
 export function AuthCallbackHandler() {
   const router = useRouter();
@@ -28,12 +28,20 @@ export function AuthCallbackHandler() {
           router.refresh();
           return;
         }
+
+        if (!response.ok) {
+          const apiError = (await response.json().catch(() => null)) as AuthApiError | null;
+          if (apiError?.code) {
+            router.replace(`/login?error=${apiError.code}`);
+            return;
+          }
+        }
       } catch {
         // Redirect below on failure.
       }
 
       if (isMounted) {
-        router.replace("/login?error=oauth");
+        router.replace("/login?error=oauth_failed");
       }
     }
 

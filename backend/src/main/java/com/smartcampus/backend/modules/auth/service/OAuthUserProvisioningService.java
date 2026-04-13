@@ -5,18 +5,21 @@ import com.smartcampus.backend.common.entity.User;
 import com.smartcampus.backend.common.entity.UserRole;
 import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.UserStatus;
-import com.smartcampus.backend.common.exception.DuplicateResourceException;
 import com.smartcampus.backend.common.exception.ResourceNotFoundException;
+import com.smartcampus.backend.modules.auth.exception.AuthFailureCode;
+import com.smartcampus.backend.modules.auth.exception.AuthFlowException;
 import com.smartcampus.backend.modules.user.repository.RoleRepository;
 import com.smartcampus.backend.modules.user.repository.UserRepository;
 import com.smartcampus.backend.modules.user.repository.UserRoleRepository;
 import java.time.LocalDateTime;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OAuthUserProvisioningService {
@@ -34,7 +37,9 @@ public class OAuthUserProvisioningService {
         String googleSub = requireString(attributes, "sub");
 
         User user = userRepository.findByEmailIgnoreCase(email).orElseGet(User::new);
+        boolean existingUser = user.getId() != null;
         validateGoogleSubOwnership(user.getId(), googleSub);
+        validateUserStatus(user);
 
         user.setEmail(email);
         user.setGoogleSub(googleSub);
@@ -46,9 +51,30 @@ public class OAuthUserProvisioningService {
         user.setLastLoginAt(LocalDateTime.now());
 
         User savedUser = userRepository.save(user);
+        log.info(
+                "Local auth user {} for email={} id={}",
+                existingUser ? "updated" : "created",
+                savedUser.getEmail(),
+                savedUser.getId());
         return userRoleRepository
                 .findActiveByUserId(savedUser.getId())
+                .map(
+                        userRole -> {
+                            log.info(
+                                    "Reused existing active role={} for email={}",
+                                    userRole.getRole().getCode(),
+                                    savedUser.getEmail());
+                            return userRole;
+                        })
                 .orElseGet(() -> createDefaultRoleAssignment(savedUser));
+    }
+
+    private void validateUserStatus(User user) {
+        if (user.getId() != null && user.getStatus() != null && user.getStatus() != UserStatus.ACTIVE) {
+            throw new AuthFlowException(
+                    AuthFailureCode.ACCOUNT_BLOCKED,
+                    "This account is not allowed to sign in");
+        }
     }
 
     private UserRole createDefaultRoleAssignment(User user) {
@@ -58,8 +84,11 @@ public class OAuthUserProvisioningService {
                         .findByCode(roleCode)
                         .orElseThrow(() -> new ResourceNotFoundException("Role not found for code: " + roleCode));
 
-        return userRoleRepository.save(
+        UserRole userRole =
+                userRoleRepository.save(
                 UserRole.builder().user(user).role(role).isActive(true).build());
+        log.info("Created default role={} for email={}", roleCode, user.getEmail());
+        return userRole;
     }
 
     private RoleCode resolveDefaultRole(String email) {
@@ -77,7 +106,8 @@ public class OAuthUserProvisioningService {
                 .filter(existing -> !existing.getId().equals(currentUserId))
                 .ifPresent(
                         existing -> {
-                            throw new DuplicateResourceException(
+                            throw new AuthFlowException(
+                                    AuthFailureCode.INVALID_PROFILE,
                                     "Google account is already linked to another user");
                         });
     }
@@ -90,7 +120,9 @@ public class OAuthUserProvisioningService {
     private String requireString(Map<String, Object> attributes, String key) {
         String value = stringOrNull(attributes, key);
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("Missing required Google attribute: " + key);
+            throw new AuthFlowException(
+                    AuthFailureCode.INVALID_PROFILE,
+                    "Missing required Google attribute: " + key);
         }
         return value;
     }

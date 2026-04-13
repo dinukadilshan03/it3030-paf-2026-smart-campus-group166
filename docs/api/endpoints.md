@@ -35,6 +35,20 @@ Response shape:
 Purpose:
 
 - invalidate the current backend session
+- frontend should redirect to `/login?reason=signed_out` after a successful logout call
+
+Frontend auth query semantics:
+
+- `/login?error=oauth_failed`
+- `/login?error=account_blocked`
+- `/login?error=invalid_profile`
+- `/login?error=provisioning_failed`
+- `/login?reason=signed_out`
+
+Authenticated-but-invalid session responses may also return JSON auth error payloads such as:
+
+- `{"code":"account_blocked","message":"..."}`
+- `{"code":"provisioning_failed","message":"..."}`
 
 ---
 
