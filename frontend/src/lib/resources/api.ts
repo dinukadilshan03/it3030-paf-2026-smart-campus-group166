@@ -1,21 +1,56 @@
-const BASE_URL = "http://localhost:8080/api/v1"
+const BASE_URL = "http://localhost:8080/api/v1";
 
-export const getResources = async (filters = {}) => {
-  const query = new URLSearchParams(filters).toString()
+// ✅ GET RESOURCES
+export const getResources = async (search?: string) => {
+  let url = `${BASE_URL}/resources`;
 
-  const res = await fetch(`${BASE_URL}/resources?${query}`)
-  const data = await res.json()
+  if (search && search.trim() !== "") {
+    url += `?search=${search}`;
+  }
 
-  return Array.isArray(data) ? data : data.data || data.content || []
-}
+  const res = await fetch(url, {
+    credentials: "include",
+  });
 
+  if (!res.ok) {
+    console.error("GET ERROR:", await res.text());
+    return [];
+  }
+
+  return res.json();
+};
+
+// ✅ CREATE RESOURCE
+export const createResource = async (data: any) => {
+  const res = await fetch(`${BASE_URL}/resources`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+// ✅ GET CATEGORIES
 export const getCategories = async () => {
-  const res = await fetch(`${BASE_URL}/resource-categories`)
-  const data = await res.json()
-  return Array.isArray(data) ? data : data.data || data.content || []
-}
+  const res = await fetch(`${BASE_URL}/resource-categories`, {
+    credentials: "include",
+  });
 
+  if (!res.ok) return [];
+  return res.json();
+};
+
+// ✅ GET LOCATIONS
 export const getLocations = async () => {
-  const res = await fetch(`${BASE_URL}/locations`)
-  return res.json()
-}
+  const res = await fetch(`${BASE_URL}/locations`, {
+    credentials: "include",
+  });
+
+  if (!res.ok) return [];
+  return res.json();
+};
