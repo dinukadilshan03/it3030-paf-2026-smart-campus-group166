@@ -1,12 +1,25 @@
-import { PagePlaceholder } from "@/components/ui/PagePlaceholder";
+"use client"
 
-export default function ResourcesPage() {
+import { useEffect, useState } from "react"
+import ResourceFilters from "@/components/resources/ResourceFilters"
+import ResourceList from "@/components/resources/ResourceList"
+import { getResources } from "@/lib/resources/api"
+
+export default function ResourceManagementPage() {
+  const [resources, setResources] = useState([])
+  const [filters, setFilters] = useState({})
+
+useEffect(() => {
+  getResources(filters).then(setResources)
+}, [filters])
+
   return (
-    <PagePlaceholder
-      eyebrow="Resource workflow"
-      title="Resources"
-      description="This placeholder page marks where resource categories, locations, resources, and availability management will be built."
-      audience="Students, staff, and admins"
-    />
-  );
+    <div style={{ padding: "20px" }}>
+      <h1>Resource Management</h1>
+
+      <ResourceFilters onFilterChange={setFilters} />
+
+      <ResourceList resources={resources} />
+    </div>
+  )
 }
