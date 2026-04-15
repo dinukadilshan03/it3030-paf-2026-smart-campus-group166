@@ -15,6 +15,7 @@ export default function ResourcePage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [user, setUser] = useState<any>(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -27,9 +28,20 @@ export default function ResourcePage() {
     imageUrl: "",
   });
 
-  // LOAD DATA
+  // ✅ FIXED: ROLE BASED
+  const isAdmin = user?.role === "ADMIN";
+
   useEffect(() => {
     loadAll();
+
+    fetch("http://localhost:8080/api/v1/auth/me", {
+      credentials: "include",
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("USER:", data); // debug
+        setUser(data);
+      });
   }, []);
 
   const loadAll = async () => {
@@ -44,13 +56,13 @@ export default function ResourcePage() {
     setLocations(loc || []);
   };
 
-  // INPUT CHANGE
   const handleChange = (e: any) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // EDIT
   const handleEdit = (r: any) => {
+    if (!isAdmin) return alert("Access denied ❌");
+
     setForm({
       name: r.name,
       resourceCode: r.resourceCode,
@@ -65,11 +77,11 @@ export default function ResourcePage() {
     setEditingId(r.id);
   };
 
-  // SAVE
   const handleSave = async () => {
+    if (!isAdmin) return alert("Only admin can perform this action ❌");
+
     if (!form.name || !form.resourceCode) {
-      alert("Name & Code required ❌");
-      return;
+      return alert("Name & Code required ❌");
     }
 
     const payload = {
@@ -112,8 +124,9 @@ export default function ResourcePage() {
     }
   };
 
-  // DELETE
   const handleDelete = async (id: number) => {
+    if (!isAdmin) return alert("Only admin can delete ❌");
+
     if (!confirm("Delete this resource?")) return;
 
     try {
@@ -129,92 +142,64 @@ export default function ResourcePage() {
     <div style={{ padding: "20px" }}>
       <h2>Resources</h2>
 
-      {/* FORM */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: "20px" }}>
-        <input name="name" placeholder="Name" value={form.name} onChange={handleChange} />
-        <input name="resourceCode" placeholder="Code" value={form.resourceCode} onChange={handleChange} />
-        <input name="description" placeholder="Description" value={form.description} onChange={handleChange} />
-        <input name="capacity" type="number" placeholder="Capacity" value={form.capacity} onChange={handleChange} />
+      {/* ✅ ADMIN ONLY FORM */}
+      {isAdmin && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+          <input name="name" placeholder="Name" value={form.name} onChange={handleChange} />
+          <input name="resourceCode" placeholder="Code" value={form.resourceCode} onChange={handleChange} />
+          <input name="description" placeholder="Description" value={form.description} onChange={handleChange} />
+          <input name="capacity" type="number" placeholder="Capacity" value={form.capacity} onChange={handleChange} />
 
-        <select name="categoryId" value={form.categoryId} onChange={handleChange}>
-          <option value="">Category</option>
-          {categories.map((c: any) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
+          <select name="categoryId" value={form.categoryId} onChange={handleChange}>
+            <option value="">Category</option>
+            {categories.map((c: any) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
 
-        <select name="locationId" value={form.locationId} onChange={handleChange}>
-          <option value="">Location</option>
-          {locations.map((l: any) => (
-            <option key={l.id} value={l.id}>{l.name}</option>
-          ))}
-        </select>
+          <select name="locationId" value={form.locationId} onChange={handleChange}>
+            <option value="">Location</option>
+            {locations.map((l: any) => (
+              <option key={l.id} value={l.id}>{l.name}</option>
+            ))}
+          </select>
 
-        <input name="notes" placeholder="Notes" value={form.notes} onChange={handleChange} />
-        <input name="imageUrl" placeholder="Image URL" value={form.imageUrl} onChange={handleChange} />
+          <input name="notes" placeholder="Notes" value={form.notes} onChange={handleChange} />
+          <input name="imageUrl" placeholder="Image URL" value={form.imageUrl} onChange={handleChange} />
 
-        <button onClick={handleSave}>
-          {editingId ? "Update" : "Add"}
-        </button>
-      </div>
-
-      {/* LIST */}
-      {resources.length === 0 ? (
-        <p>No resources found</p>
-      ) : (
-        <div>
-          {resources.map((r: any) => (
-            <div
-              key={r.id}
-              style={{
-                border: "1px solid #ddd",
-                padding: "12px",
-                marginBottom: "10px",
-                borderRadius: "8px",
-              }}
-            >
-              <h3>{r.name} ({r.resourceCode})</h3>
-
-              <p><b>Description:</b> {r.description || "N/A"}</p>
-              <p><b>Capacity:</b> {r.capacity}</p>
-
-              <p>
-                <b>Category:</b> {r.categoryName || "N/A"} |
-                <b> Location:</b> {r.locationName || "N/A"}
-              </p>
-
-              <p><b>Status:</b> {r.status}</p>
-              <p><b>Approval:</b> {r.requiresApproval ? "Yes" : "No"}</p>
-              <p><b>Notes:</b> {r.notes || "N/A"}</p>
-
-              {r.imageUrl ? (
-        <img
-          src={r.imageUrl}
-          alt={r.name}
-          style={{
-            width: "120px",
-            height: "80px",
-            objectFit: "cover",
-            borderRadius: "8px",
-            marginTop: "8px"
-          }}
-          onError={(e) => {
-            (e.target as HTMLImageElement).src =
-              "https://via.placeholder.com/120";
-          }}
-        />
-      ) : (
-        <p>No Image</p>
-      )}
-
-              <br />
-
-              <button onClick={() => handleEdit(r)}>Edit ✏️</button>
-              <button onClick={() => handleDelete(r.id)}>Delete 🗑️</button>
-            </div>
-          ))}
+          <button onClick={handleSave}>
+            {editingId ? "Update" : "Add"}
+          </button>
         </div>
       )}
+
+      {/* LIST */}
+      {resources.map((r: any) => (
+        <div key={r.id} style={{ border: "1px solid #ddd", padding: "12px", marginTop: "10px" }}>
+          <h3>{r.name} ({r.resourceCode})</h3>
+
+          <p>Capacity: {r.capacity}</p>
+          <p>Category: {r.categoryName} | Location: {r.locationName}</p>
+
+          {r.imageUrl && (
+            <img
+              src={r.imageUrl}
+              width={120}
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = "https://via.placeholder.com/120";
+              }}
+            />
+          )}
+
+          {/* ✅ ADMIN ONLY BUTTONS */}
+          {isAdmin && (
+            <>
+              <button onClick={() => handleEdit(r)}>Edit ✏️</button>
+              <button onClick={() => handleDelete(r.id)}>Delete 🗑️</button>
+            </>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
