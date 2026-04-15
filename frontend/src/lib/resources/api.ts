@@ -2,40 +2,53 @@ const BASE_URL = "http://localhost:8080/api/v1";
 
 // ✅ GET RESOURCES
 export const getResources = async (search?: string) => {
-  let url = `${BASE_URL}/resources`;
+  try {
+    let url = `${BASE_URL}/resources`;
 
-  if (search && search.trim() !== "") {
-    url += `?search=${search}`;
-  }
+    if (search && search.trim() !== "") {
+      url += `?search=${search}`;
+    }
 
-  const res = await fetch(url, {
-    credentials: "include",
-  });
+    const res = await fetch(url, {
+      credentials: "include",
+    });
 
-  if (!res.ok) {
-    console.error("GET ERROR:", await res.text());
+    if (!res.ok) {
+      console.error("GET ERROR:", await res.text());
+      return [];
+    }
+
+    return await res.json();
+  } catch (err) {
+    console.error("FETCH ERROR:", err);
     return [];
   }
-
-  return res.json();
 };
 
 // ✅ GET CATEGORIES
 export const getCategories = async () => {
-  const res = await fetch(`${BASE_URL}/resource-categories`, {
-    credentials: "include",
-  });
-
-  return res.json();
+  try {
+    const res = await fetch(`${BASE_URL}/resource-categories`, {
+      credentials: "include",
+    });
+    return await res.json();
+  } catch (err) {
+    console.error(err);
+    return [];
+  }
 };
 
 // ✅ GET LOCATIONS
 export const getLocations = async () => {
-  const res = await fetch(`${BASE_URL}/locations`, {
-    credentials: "include",
-  });
-
-  return res.json();
+  try {
+    const res = await fetch(`${BASE_URL}/locations`, {
+      credentials: "include",
+    });
+    return await res.json();
+  } catch (err) {
+    console.error(err);
+    return [];
+  }
 };
 
 // ✅ CREATE
@@ -49,10 +62,7 @@ export const createResource = async (data: any) => {
     body: JSON.stringify(data),
   });
 
-  if (!res.ok) {
-    throw new Error(await res.text());
-  }
-
+  if (!res.ok) throw new Error(await res.text());
   return res.json();
 };
 
@@ -67,10 +77,7 @@ export const updateResource = async (id: number, data: any) => {
     body: JSON.stringify(data),
   });
 
-  if (!res.ok) {
-    throw new Error(await res.text());
-  }
-
+  if (!res.ok) throw new Error(await res.text());
   return res.json();
 };
 
@@ -81,7 +88,5 @@ export const deleteResource = async (id: number) => {
     credentials: "include",
   });
 
-  if (!res.ok) {
-    throw new Error(await res.text());
-  }
+  if (!res.ok) throw new Error(await res.text());
 };

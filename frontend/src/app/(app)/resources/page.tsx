@@ -19,12 +19,15 @@ export default function ResourcePage() {
   const [form, setForm] = useState({
     name: "",
     resourceCode: "",
+    description: "",
     capacity: "",
     categoryId: "",
     locationId: "",
+    notes: "",
+    imageUrl: "",
   });
 
-  // ✅ LOAD DATA
+  // LOAD DATA
   useEffect(() => {
     loadAll();
   }, []);
@@ -41,25 +44,28 @@ export default function ResourcePage() {
     setLocations(loc || []);
   };
 
-  // ✅ INPUT CHANGE
+  // INPUT CHANGE
   const handleChange = (e: any) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // ✅ EDIT CLICK
+  // EDIT
   const handleEdit = (r: any) => {
     setForm({
       name: r.name,
       resourceCode: r.resourceCode,
-      capacity: r.capacity,
-      categoryId: r.category?.id || r.resourceCategory?.id,
-      locationId: r.location?.id,
+      description: r.description || "",
+      capacity: r.capacity || "",
+      categoryId: r.categoryId,
+      locationId: r.locationId,
+      notes: r.notes || "",
+      imageUrl: r.imageUrl || "",
     });
 
     setEditingId(r.id);
   };
 
-  // ✅ SAVE (ADD + UPDATE)
+  // SAVE
   const handleSave = async () => {
     if (!form.name || !form.resourceCode) {
       alert("Name & Code required ❌");
@@ -69,11 +75,14 @@ export default function ResourcePage() {
     const payload = {
       name: form.name,
       resourceCode: form.resourceCode,
+      description: form.description,
       capacity: form.capacity ? Number(form.capacity) : null,
       status: "ACTIVE",
       requiresApproval: true,
       resourceCategoryId: Number(form.categoryId),
       locationId: Number(form.locationId),
+      notes: form.notes,
+      imageUrl: form.imageUrl,
     };
 
     try {
@@ -88,9 +97,12 @@ export default function ResourcePage() {
       setForm({
         name: "",
         resourceCode: "",
+        description: "",
         capacity: "",
         categoryId: "",
         locationId: "",
+        notes: "",
+        imageUrl: "",
       });
 
       setEditingId(null);
@@ -100,7 +112,7 @@ export default function ResourcePage() {
     }
   };
 
-  // ✅ DELETE
+  // DELETE
   const handleDelete = async (id: number) => {
     if (!confirm("Delete this resource?")) return;
 
@@ -117,62 +129,36 @@ export default function ResourcePage() {
     <div style={{ padding: "20px" }}>
       <h2>Resources</h2>
 
-      {/* 🔥 FORM */}
-      <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-        <input
-          name="name"
-          placeholder="Name"
-          value={form.name}
-          onChange={handleChange}
-        />
+      {/* FORM */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: "20px" }}>
+        <input name="name" placeholder="Name" value={form.name} onChange={handleChange} />
+        <input name="resourceCode" placeholder="Code" value={form.resourceCode} onChange={handleChange} />
+        <input name="description" placeholder="Description" value={form.description} onChange={handleChange} />
+        <input name="capacity" type="number" placeholder="Capacity" value={form.capacity} onChange={handleChange} />
 
-        <input
-          name="resourceCode"
-          placeholder="Code"
-          value={form.resourceCode}
-          onChange={handleChange}
-        />
-
-        <input
-          name="capacity"
-          placeholder="Capacity"
-          type="number"
-          value={form.capacity}
-          onChange={handleChange}
-        />
-
-        <select
-          name="categoryId"
-          value={form.categoryId}
-          onChange={handleChange}
-        >
+        <select name="categoryId" value={form.categoryId} onChange={handleChange}>
           <option value="">Category</option>
           {categories.map((c: any) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
+            <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
 
-        <select
-          name="locationId"
-          value={form.locationId}
-          onChange={handleChange}
-        >
+        <select name="locationId" value={form.locationId} onChange={handleChange}>
           <option value="">Location</option>
           {locations.map((l: any) => (
-            <option key={l.id} value={l.id}>
-              {l.name}
-            </option>
+            <option key={l.id} value={l.id}>{l.name}</option>
           ))}
         </select>
+
+        <input name="notes" placeholder="Notes" value={form.notes} onChange={handleChange} />
+        <input name="imageUrl" placeholder="Image URL" value={form.imageUrl} onChange={handleChange} />
 
         <button onClick={handleSave}>
           {editingId ? "Update" : "Add"}
         </button>
       </div>
 
-      {/* 🔥 LIST */}
+      {/* LIST */}
       {resources.length === 0 ? (
         <p>No resources found</p>
       ) : (
@@ -182,21 +168,46 @@ export default function ResourcePage() {
               key={r.id}
               style={{
                 border: "1px solid #ddd",
-                padding: "10px",
+                padding: "12px",
                 marginBottom: "10px",
                 borderRadius: "8px",
               }}
             >
-              <h3>
-                {r.name} ({r.resourceCode})
-              </h3>
+              <h3>{r.name} ({r.resourceCode})</h3>
 
-              <p>Capacity: {r.capacity}</p>
+              <p><b>Description:</b> {r.description || "N/A"}</p>
+              <p><b>Capacity:</b> {r.capacity}</p>
 
               <p>
-                Category: {r.categoryName || "N/A"} |
-Location: {r.locationName || "N/A"}
+                <b>Category:</b> {r.categoryName || "N/A"} |
+                <b> Location:</b> {r.locationName || "N/A"}
               </p>
+
+              <p><b>Status:</b> {r.status}</p>
+              <p><b>Approval:</b> {r.requiresApproval ? "Yes" : "No"}</p>
+              <p><b>Notes:</b> {r.notes || "N/A"}</p>
+
+              {r.imageUrl ? (
+        <img
+          src={r.imageUrl}
+          alt={r.name}
+          style={{
+            width: "120px",
+            height: "80px",
+            objectFit: "cover",
+            borderRadius: "8px",
+            marginTop: "8px"
+          }}
+          onError={(e) => {
+            (e.target as HTMLImageElement).src =
+              "https://via.placeholder.com/120";
+          }}
+        />
+      ) : (
+        <p>No Image</p>
+      )}
+
+              <br />
 
               <button onClick={() => handleEdit(r)}>Edit ✏️</button>
               <button onClick={() => handleDelete(r.id)}>Delete 🗑️</button>
