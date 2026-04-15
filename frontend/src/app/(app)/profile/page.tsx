@@ -1,12 +1,8 @@
-import { PagePlaceholder } from "@/components/ui/PagePlaceholder";
+import { ProfilePageContent } from "@/components/profile/ProfilePageContent";
+import { getProfileServer } from "@/lib/profile/server";
 
-export default function ProfilePage() {
-  return (
-    <PagePlaceholder
-      eyebrow="Shared account area"
-      title="Profile"
-      description="This shared profile placeholder is ready for your team to extend with personal account details, preferences, and identity settings."
-      audience="Students, staff, and admins"
-    />
-  );
+export default async function ProfilePage() {
+  const profile = await getProfileServer();
+
+  return <ProfilePageContent initialProfile={profile} />;
 }
