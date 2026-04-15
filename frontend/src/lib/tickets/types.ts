@@ -1,0 +1,273 @@
+import type { AdminUserSummary } from "@/lib/users/types";
+import type { RoleCode } from "@/types/auth";
+
+export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
+export type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED" | "REJECTED";
+
+export type CommentType = "PUBLIC_REPLY" | "INTERNAL_NOTE" | "STATUS_NOTE";
+
+export type TicketSummary = {
+  id: number;
+  ticketNumber: string;
+  reporterUserId: number;
+  reporterDisplayName: string;
+  assignedStaffUserId: number | null;
+  assignedStaffDisplayName: string | null;
+  resourceId: number | null;
+  resourceName: string | null;
+  locationId: number | null;
+  locationName: string | null;
+  ticketCategoryId: number;
+  ticketCategoryCode: string;
+  ticketCategoryName: string;
+  title: string;
+  priority: TicketPriority;
+  status: TicketStatus;
+  createdAt: string;
+};
+
+export type TicketAssignment = {
+  id: number;
+  assignedToUserId: number;
+  assignedToDisplayName: string;
+  assignedByUserId: number;
+  assignedByDisplayName: string;
+  assignmentNote: string | null;
+  isActive: boolean;
+  assignedAt: string;
+  unassignedAt: string | null;
+};
+
+export type TicketDetail = {
+  id: number;
+  ticketNumber: string;
+  reporterUserId: number;
+  reporterEmail: string;
+  reporterDisplayName: string;
+  assignedStaffUserId: number | null;
+  assignedStaffDisplayName: string | null;
+  resourceId: number | null;
+  resourceCode: string | null;
+  resourceName: string | null;
+  locationId: number | null;
+  locationName: string | null;
+  ticketCategoryId: number;
+  ticketCategoryCode: string;
+  ticketCategoryName: string;
+  title: string;
+  description: string;
+  priority: TicketPriority;
+  status: TicketStatus;
+  preferredContactName: string | null;
+  preferredContactEmail: string | null;
+  preferredContactPhone: string | null;
+  resolutionSummary: string | null;
+  rejectionReason: string | null;
+  resolvedAt: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  assignmentHistory: TicketAssignment[];
+};
+
+export type TicketComment = {
+  id: number;
+  authorUserId: number;
+  authorDisplayName: string;
+  body: string;
+  commentType: CommentType;
+  parentCommentId: number | null;
+  isEdited: boolean;
+  editedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TicketAttachment = {
+  id: number;
+  uploadedByUserId: number;
+  uploadedByDisplayName: string;
+  fileName: string;
+  storageBucket: string;
+  storagePath: string;
+  mimeType: string | null;
+  fileSize: number;
+  attachmentType: string | null;
+  createdAt: string;
+};
+
+export type TicketCategorySummary = {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+};
+
+export type TicketCategoryDetail = {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TicketResourceOption = {
+  id: number;
+  resourceCode: string;
+  name: string;
+  categoryId: number;
+  categoryCode: string;
+  categoryName: string;
+  locationId: number;
+  locationCode: string;
+  locationName: string;
+  capacity: number | null;
+  status: "ACTIVE" | "OUT_OF_SERVICE" | "MAINTENANCE" | "INACTIVE";
+  requiresApproval: boolean;
+  imageUrl: string | null;
+};
+
+export type TicketLocationOption = {
+  id: number;
+  code: string;
+  name: string;
+  building: string | null;
+  floor: string | null;
+  roomIdentifier: string | null;
+};
+
+export type TicketFilters = {
+  status?: TicketStatus | "";
+  priority?: TicketPriority | "";
+  ticketCategoryId?: number | "";
+  search?: string;
+};
+
+export type CreateTicketRequest = {
+  resourceId?: number;
+  locationId?: number;
+  ticketCategoryId: number;
+  title: string;
+  description: string;
+  priority: TicketPriority;
+  preferredContactName?: string;
+  preferredContactEmail?: string;
+  preferredContactPhone?: string;
+};
+
+export type CreateTicketSubmission = {
+  request: CreateTicketRequest;
+  attachments: CreateTicketAttachmentRequest[];
+};
+
+export type UpdateTicketAssignmentRequest = {
+  assignedStaffUserId: number;
+  assignmentNote?: string;
+};
+
+export type UpdateTicketStatusRequest = {
+  status: TicketStatus;
+  resolutionSummary?: string;
+  rejectionReason?: string;
+};
+
+export type CreateTicketCommentRequest = {
+  body: string;
+  commentType: Extract<CommentType, "PUBLIC_REPLY" | "INTERNAL_NOTE">;
+  parentCommentId?: number;
+};
+
+export type CreateTicketAttachmentRequest = {
+  fileName: string;
+  storageBucket: string;
+  storagePath: string;
+  mimeType?: string;
+  fileSize: number;
+  attachmentType?: string;
+};
+
+export type CreateTicketCategoryRequest = {
+  code: string;
+  name: string;
+  description?: string;
+  isActive?: boolean;
+};
+
+export type UpdateTicketCategoryRequest = {
+  code?: string;
+  name?: string;
+  description?: string;
+  isActive?: boolean;
+};
+
+export type TicketBundle = {
+  detail: TicketDetail;
+  comments: TicketComment[];
+  attachments: TicketAttachment[];
+};
+
+export type TicketAttachmentDraft = {
+  id: string;
+  fileName: string;
+  storageBucket: string;
+  storagePath: string;
+  mimeType: string;
+  fileSize: string;
+  attachmentType: string;
+};
+
+export type CreateTicketFormValues = {
+  resourceId: string;
+  locationId: string;
+  ticketCategoryId: string;
+  title: string;
+  description: string;
+  priority: TicketPriority;
+  preferredContactName: string;
+  preferredContactEmail: string;
+  preferredContactPhone: string;
+  attachments: TicketAttachmentDraft[];
+};
+
+export type TicketCommentFormValues = {
+  body: string;
+  commentType: Extract<CommentType, "PUBLIC_REPLY" | "INTERNAL_NOTE">;
+};
+
+export type TicketStatusFormValues = {
+  status: TicketStatus | "";
+  resolutionSummary: string;
+  rejectionReason: string;
+};
+
+export type TicketAssignmentFormValues = {
+  assignedStaffUserId: string;
+  assignmentNote: string;
+};
+
+export type TicketCategoryFormValues = {
+  code: string;
+  name: string;
+  description: string;
+  isActive: boolean;
+};
+
+export type TicketWorkspaceBootstrap = {
+  role: RoleCode;
+  tickets: TicketSummary[];
+  categories: TicketCategorySummary[];
+  locations: TicketLocationOption[];
+  resources: TicketResourceOption[];
+  activeStaffUsers: AdminUserSummary[];
+  selectedBundle: TicketBundle | null;
+};
+
+export type ApiErrorResponse = {
+  message?: string;
+  code?: string;
+  validationErrors?: Record<string, string>;
+};
