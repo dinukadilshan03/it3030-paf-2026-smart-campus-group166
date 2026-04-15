@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import {
   getResources,
   createResource,
+  updateResource,
+  deleteResource,
   getCategories,
   getLocations,
 } from "@/lib/resources/api";
@@ -12,7 +14,7 @@ export default function ResourcePage() {
   const [resources, setResources] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -22,65 +24,67 @@ export default function ResourcePage() {
     locationId: "",
   });
 
-  // ✅ LOAD ALL DATA
+  // ✅ LOAD DATA
   useEffect(() => {
     loadAll();
   }, []);
 
   const loadAll = async () => {
-    try {
-      setLoading(true);
+    const [res, cat, loc] = await Promise.all([
+      getResources(),
+      getCategories(),
+      getLocations(),
+    ]);
 
-      const [res, cat, loc] = await Promise.all([
-        getResources(),
-        getCategories(),
-        getLocations(),
-      ]);
-
-      setResources(res || []);
-      setCategories(cat || []);
-      setLocations(loc || []);
-    } catch (err) {
-      console.error("LOAD ERROR:", err);
-    } finally {
-      setLoading(false);
-    }
+    setResources(res || []);
+    setCategories(cat || []);
+    setLocations(loc || []);
   };
 
-  // ✅ HANDLE INPUT CHANGE
+  // ✅ INPUT CHANGE
   const handleChange = (e: any) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // ✅ ADD RESOURCE
-  const handleAdd = async () => {
-    console.log("FORM DATA:", form);
+  // ✅ EDIT CLICK
+  const handleEdit = (r: any) => {
+    setForm({
+      name: r.name,
+      resourceCode: r.resourceCode,
+      capacity: r.capacity,
+      categoryId: r.category?.id || r.resourceCategory?.id,
+      locationId: r.location?.id,
+    });
 
-    // 🔥 VALIDATION
-    if (!form.name.trim() || !form.resourceCode.trim()) {
-      alert("Name and Code are required ❌");
+    setEditingId(r.id);
+  };
+
+  // ✅ SAVE (ADD + UPDATE)
+  const handleSave = async () => {
+    if (!form.name || !form.resourceCode) {
+      alert("Name & Code required ❌");
       return;
     }
 
-    if (!form.categoryId || !form.locationId) {
-      alert("Select Category and Location ❌");
-      return;
-    }
+    const payload = {
+      name: form.name,
+      resourceCode: form.resourceCode,
+      capacity: form.capacity ? Number(form.capacity) : null,
+      status: "ACTIVE",
+      requiresApproval: true,
+      resourceCategoryId: Number(form.categoryId),
+      locationId: Number(form.locationId),
+    };
 
     try {
-      await createResource({
-        name: form.name.trim(),
-        resourceCode: form.resourceCode.trim(),
-        capacity: form.capacity ? Number(form.capacity) : null,
-        status: "ACTIVE",
-        requiresApproval: true,
-        resourceCategoryId: Number(form.categoryId),
-        locationId: Number(form.locationId),
-      });
+      if (editingId) {
+        await updateResource(editingId, payload);
+        alert("Updated ✏️");
+      } else {
+        await createResource(payload);
+        alert("Added ✅");
+      }
 
-      alert("Added successfully ✅");
-
-      // ✅ RESET FORM
       setForm({
         name: "",
         resourceCode: "",
@@ -89,11 +93,23 @@ export default function ResourcePage() {
         locationId: "",
       });
 
-      // ✅ RELOAD LIST
-      await loadAll();
+      setEditingId(null);
+      loadAll();
     } catch (err: any) {
-      console.error(err);
-      alert(err?.message || "Failed to add resource ❌");
+      alert(err.message);
+    }
+  };
+
+  // ✅ DELETE
+  const handleDelete = async (id: number) => {
+    if (!confirm("Delete this resource?")) return;
+
+    try {
+      await deleteResource(id);
+      alert("Deleted 🗑️");
+      loadAll();
+    } catch (err: any) {
+      alert(err.message);
     }
   };
 
@@ -102,17 +118,17 @@ export default function ResourcePage() {
       <h2>Resources</h2>
 
       {/* 🔥 FORM */}
-      <div style={{ marginBottom: "20px" }}>
+      <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
         <input
           name="name"
-          placeholder="Resource Name"
+          placeholder="Name"
           value={form.name}
           onChange={handleChange}
         />
 
         <input
           name="resourceCode"
-          placeholder="Code (R001)"
+          placeholder="Code"
           value={form.resourceCode}
           onChange={handleChange}
         />
@@ -125,13 +141,12 @@ export default function ResourcePage() {
           onChange={handleChange}
         />
 
-        {/* CATEGORY */}
         <select
           name="categoryId"
           value={form.categoryId}
           onChange={handleChange}
         >
-          <option value="">Select Category</option>
+          <option value="">Category</option>
           {categories.map((c: any) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -139,13 +154,12 @@ export default function ResourcePage() {
           ))}
         </select>
 
-        {/* LOCATION */}
         <select
           name="locationId"
           value={form.locationId}
           onChange={handleChange}
         >
-          <option value="">Select Location</option>
+          <option value="">Location</option>
           {locations.map((l: any) => (
             <option key={l.id} value={l.id}>
               {l.name}
@@ -153,26 +167,42 @@ export default function ResourcePage() {
           ))}
         </select>
 
-        <button onClick={handleAdd}>Add</button>
+        <button onClick={handleSave}>
+          {editingId ? "Update" : "Add"}
+        </button>
       </div>
 
       {/* 🔥 LIST */}
-      {loading ? (
-        <p>Loading...</p>
-      ) : resources.length === 0 ? (
+      {resources.length === 0 ? (
         <p>No resources found</p>
       ) : (
-        <ul>
+        <div>
           {resources.map((r: any) => (
-            <li key={r.id}>
-              <strong>{r.name}</strong> ({r.resourceCode}) - Capacity:{" "}
-              {r.capacity || 0}
-              <br />
-              Category: {r.category?.name} | Location:{" "}
-              {r.location?.name}
-            </li>
+            <div
+              key={r.id}
+              style={{
+                border: "1px solid #ddd",
+                padding: "10px",
+                marginBottom: "10px",
+                borderRadius: "8px",
+              }}
+            >
+              <h3>
+                {r.name} ({r.resourceCode})
+              </h3>
+
+              <p>Capacity: {r.capacity}</p>
+
+              <p>
+                Category: {r.categoryName || "N/A"} |
+Location: {r.locationName || "N/A"}
+              </p>
+
+              <button onClick={() => handleEdit(r)}>Edit ✏️</button>
+              <button onClick={() => handleDelete(r.id)}>Delete 🗑️</button>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

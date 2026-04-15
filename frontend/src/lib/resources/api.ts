@@ -20,28 +20,12 @@ export const getResources = async (search?: string) => {
   return res.json();
 };
 
-// ✅ CREATE RESOURCE
-export const createResource = async (data: any) => {
-  const res = await fetch(`${BASE_URL}/resources`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    credentials: "include",
-    body: JSON.stringify(data),
-  });
-
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-};
-
 // ✅ GET CATEGORIES
 export const getCategories = async () => {
   const res = await fetch(`${BASE_URL}/resource-categories`, {
     credentials: "include",
   });
 
-  if (!res.ok) return [];
   return res.json();
 };
 
@@ -51,6 +35,53 @@ export const getLocations = async () => {
     credentials: "include",
   });
 
-  if (!res.ok) return [];
   return res.json();
+};
+
+// ✅ CREATE
+export const createResource = async (data: any) => {
+  const res = await fetch(`${BASE_URL}/resources`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
+
+  return res.json();
+};
+
+// ✅ UPDATE
+export const updateResource = async (id: number, data: any) => {
+  const res = await fetch(`${BASE_URL}/resources/${id}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
+
+  return res.json();
+};
+
+// ✅ DELETE
+export const deleteResource = async (id: number) => {
+  const res = await fetch(`${BASE_URL}/resources/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
 };
