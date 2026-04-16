@@ -296,12 +296,10 @@ export function BookingCalendar({
                         <div
                           key={`week-${i}-${startHour}`}
                           style={{ minHeight: "72px" }}
-                          className={`border-b border-r border-slate-100 last:border-r-0 p-1 group transition-colors ${
-                            slotBookings.length === 0
-                              ? `cursor-pointer ${isToday ? "hover:bg-indigo-50/50" : "hover:bg-slate-50"}`
-                              : "cursor-default"
+                          className={`border-b border-r border-slate-100 last:border-r-0 p-1 group transition-colors cursor-pointer ${
+                            isToday ? "hover:bg-indigo-50/50" : "hover:bg-slate-50"
                           }`}
-                          onClick={() => slotBookings.length === 0 && handleSlotClick(dKey, startHour)}
+                          onClick={() => handleSlotClick(dKey, startHour)}
                         >
                           {slotBookings.length === 0 && (
                             <div className="hidden group-hover:flex items-center justify-center h-full opacity-60">
@@ -331,10 +329,8 @@ export function BookingCalendar({
                         <div
                           key={`day-${r.id}-${startHour}`}
                           style={{ minHeight: "72px" }}
-                          className={`border-b border-r border-slate-100 last:border-r-0 p-1.5 group transition-colors ${
-                            !booking ? "cursor-pointer hover:bg-slate-50" : "cursor-default"
-                          }`}
-                          onClick={() => !booking && handleSlotClick(dKey, startHour, r.id)}
+                          className="border-b border-r border-slate-100 last:border-r-0 p-1.5 group transition-colors cursor-pointer hover:bg-slate-50"
+                          onClick={() => handleSlotClick(dKey, startHour, r.id)}
                         >
                           {!booking && (
                             <div className="hidden group-hover:flex items-center justify-center h-full opacity-60">
