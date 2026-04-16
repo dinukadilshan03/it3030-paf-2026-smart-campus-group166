@@ -13,7 +13,10 @@ export default function EditResourcePage() {
   const { id } = useParams();
   const router = useRouter();
 
-  const [form, setForm] = useState<any>({
+  const [categories, setCategories] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
+
+  const [form, setForm] = useState({
     name: "",
     resourceCode: "",
     description: "",
@@ -22,10 +25,9 @@ export default function EditResourcePage() {
     locationId: "",
     notes: "",
     imageUrl: "",
+    status: "ACTIVE",
+    requiresApproval: true,
   });
-
-  const [categories, setCategories] = useState<any[]>([]);
-  const [locations, setLocations] = useState<any[]>([]);
 
   useEffect(() => {
     loadData();
@@ -57,23 +59,37 @@ export default function EditResourcePage() {
       locationId: resource.locationId,
       notes: resource.notes || "",
       imageUrl: resource.imageUrl || "",
+      status: resource.status || "ACTIVE",
+      requiresApproval: resource.requiresApproval ?? true,
     });
   };
 
   const handleChange = (e: any) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value, type, checked } = e.target;
+
+    setForm({
+      ...form,
+      [name]: type === "checkbox" ? checked : value,
+    });
   };
 
   const handleUpdate = async () => {
     try {
       const payload = {
-        ...form,
+        name: form.name,
+        resourceCode: form.resourceCode,
+        description: form.description || null,
         capacity: form.capacity ? Number(form.capacity) : null,
         resourceCategoryId: Number(form.categoryId),
         locationId: Number(form.locationId),
+        notes: form.notes || null,
+        imageUrl: form.imageUrl || null,
+        status: form.status,
+        requiresApproval: form.requiresApproval,
       };
 
       await updateResource(Number(id), payload);
+
       alert("Updated successfully ✅");
       router.push("/resources");
     } catch (err: any) {
@@ -91,8 +107,9 @@ export default function EditResourcePage() {
           <input name="resourceCode" value={form.resourceCode} onChange={handleChange} placeholder="Code" style={styles.input} />
 
           <input name="description" value={form.description} onChange={handleChange} placeholder="Description" style={styles.input} />
-          <input name="capacity" value={form.capacity} onChange={handleChange} placeholder="Capacity" style={styles.input} />
+          <input name="capacity" type="number" value={form.capacity} onChange={handleChange} placeholder="Capacity" style={styles.input} />
 
+          {/* CATEGORY */}
           <select name="categoryId" value={form.categoryId} onChange={handleChange} style={styles.input}>
             <option value="">Select Category</option>
             {categories.map((c: any) => (
@@ -100,6 +117,7 @@ export default function EditResourcePage() {
             ))}
           </select>
 
+          {/* LOCATION */}
           <select name="locationId" value={form.locationId} onChange={handleChange} style={styles.input}>
             <option value="">Select Location</option>
             {locations.map((l: any) => (
@@ -109,39 +127,49 @@ export default function EditResourcePage() {
 
           <input name="notes" value={form.notes} onChange={handleChange} placeholder="Notes" style={styles.input} />
           <input name="imageUrl" value={form.imageUrl} onChange={handleChange} placeholder="Image URL" style={styles.input} />
+
+          {/* STATUS */}
+          <select name="status" value={form.status} onChange={handleChange} style={styles.input}>
+            <option value="ACTIVE">ACTIVE</option>
+            <option value="INACTIVE">INACTIVE</option>
+          </select>
+
+          {/* APPROVAL */}
+          <label style={styles.checkbox}>
+            <input
+              type="checkbox"
+              name="requiresApproval"
+              checked={form.requiresApproval}
+              onChange={handleChange}
+            />
+            Requires Approval
+          </label>
         </div>
 
         {/* IMAGE PREVIEW */}
         {form.imageUrl && (
-          <div style={{ marginTop: "20px" }}>
-            <p style={{ fontSize: "14px", marginBottom: "5px" }}>Preview:</p>
+          <div style={{ marginTop: "15px" }}>
             <img
               src={form.imageUrl}
               alt="preview"
               style={styles.image}
               onError={(e) => {
-                (e.target as HTMLImageElement).src = "https://via.placeholder.com/150";
+                (e.target as HTMLImageElement).src =
+                  "https://via.placeholder.com/150";
               }}
             />
           </div>
         )}
 
-        {/* BUTTONS */}
-        <div style={styles.actions}>
-          <button onClick={handleUpdate} style={styles.updateBtn}>
-            💾 Update
-          </button>
-
-          <button onClick={() => router.push("/resources")} style={styles.cancelBtn}>
-            Cancel
-          </button>
+        <div style={styles.buttonRow}>
+          <button onClick={handleUpdate} style={styles.updateBtn}>💾 Update</button>
+          <button onClick={() => router.push("/resources")} style={styles.cancelBtn}>Cancel</button>
         </div>
       </div>
     </div>
   );
 }
 
-/* 🎨 STYLES */
 const styles: any = {
   container: {
     display: "flex",
@@ -149,11 +177,11 @@ const styles: any = {
     padding: "40px",
   },
   card: {
-    width: "800px",
+    width: "850px",
     background: "#fff",
-    padding: "25px",
-    borderRadius: "12px",
-    boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+    padding: "30px",
+    borderRadius: "14px",
+    boxShadow: "0 6px 25px rgba(0,0,0,0.1)",
   },
   title: {
     marginBottom: "20px",
@@ -165,35 +193,40 @@ const styles: any = {
     gap: "15px",
   },
   input: {
-    padding: "10px",
+    padding: "12px",
     borderRadius: "8px",
     border: "1px solid #ccc",
     fontSize: "14px",
   },
-  image: {
-    width: "150px",
-    height: "100px",
-    objectFit: "cover",
-    borderRadius: "8px",
+  checkbox: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
   },
-  actions: {
+  buttonRow: {
     marginTop: "25px",
     display: "flex",
     gap: "10px",
   },
   updateBtn: {
-    background: "#2563eb",
+    background: "#f59e0b",
     color: "#fff",
     padding: "10px 20px",
-    borderRadius: "8px",
     border: "none",
+    borderRadius: "8px",
     cursor: "pointer",
   },
   cancelBtn: {
     background: "#e5e7eb",
     padding: "10px 20px",
-    borderRadius: "8px",
     border: "none",
+    borderRadius: "8px",
     cursor: "pointer",
+  },
+  image: {
+    width: "180px",
+    height: "110px",
+    objectFit: "cover",
+    borderRadius: "8px",
   },
 };
