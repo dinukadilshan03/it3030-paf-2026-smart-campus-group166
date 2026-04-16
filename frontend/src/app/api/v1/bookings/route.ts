@@ -65,3 +65,52 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+
+    console.log("Creating booking with body:", body);
+
+    const response = await serverApiFetch("/api/v1/bookings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const responseText = await response.text();
+    console.log("Create booking response:", {
+      status: response.status,
+      statusText: response.statusText,
+      body: responseText,
+    });
+
+    if (!response.ok) {
+      let message = `API Error: ${response.status} ${response.statusText}`;
+      try {
+        const error = JSON.parse(responseText) as ApiErrorResponse;
+        if (error.message) message = error.message;
+      } catch { /* use responseText as fallback */ }
+      return NextResponse.json({ message }, { status: response.status });
+    }
+
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch {
+      responseData = { message: "Booking created successfully" };
+    }
+
+    return NextResponse.json(responseData, { status: 201 });
+  } catch (error) {
+    console.error("Error creating booking:", error);
+    return NextResponse.json(
+      {
+        message: error instanceof Error ? error.message : "Failed to create booking",
+      },
+      { status: 500 }
+    );
+  }
+}
