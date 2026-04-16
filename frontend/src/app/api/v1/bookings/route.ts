@@ -1,4 +1,4 @@
-import { serverApiFetch } from "@/lib/api/server";
+import { getApiBaseUrl } from "@/lib/config/env";
 import type { BookingFilters, BookingSummaryResponse, ApiErrorResponse } from "@/lib/bookings/types";
 import { NextResponse } from "next/server";
 
@@ -43,7 +43,19 @@ export async function GET(request: Request) {
     const queryString = params.toString();
     const url = `/api/v1/bookings${queryString ? `?${queryString}` : ""}`;
 
-    const response = await serverApiFetch(url);
+    // Extract auth headers from incoming request
+    const cookie = request.headers.get("cookie");
+    const authorization = request.headers.get("authorization");
+
+    const response = await fetch(`${getApiBaseUrl()}${url}`, {
+      headers: {
+        Accept: "application/json",
+        ...(cookie ? { Cookie: cookie } : {}),
+        ...(authorization ? { Authorization: authorization } : {}),
+      },
+      cache: "no-store",
+      redirect: "manual",
+    });
 
     if (!response.ok) {
       let message = `API Error: ${response.status} ${response.statusText}`;
@@ -61,6 +73,64 @@ export async function GET(request: Request) {
     console.error("Error fetching bookings:", error);
     return NextResponse.json(
       { message: error instanceof Error ? error.message : "Failed to fetch bookings" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+
+    console.log("Creating booking with body:", body);
+
+    // Extract auth headers from incoming request
+    const cookie = request.headers.get("cookie");
+    const authorization = request.headers.get("authorization");
+
+    const response = await fetch(`${getApiBaseUrl()}/api/v1/bookings`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(cookie ? { Cookie: cookie } : {}),
+        ...(authorization ? { Authorization: authorization } : {}),
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+      redirect: "manual",
+    });
+
+    const responseText = await response.text();
+    console.log("Create booking response:", {
+      status: response.status,
+      statusText: response.statusText,
+      body: responseText,
+    });
+
+    if (!response.ok) {
+      let message = `API Error: ${response.status} ${response.statusText}`;
+      try {
+        const error = JSON.parse(responseText) as ApiErrorResponse;
+        if (error.message) message = error.message;
+      } catch { /* use responseText as fallback */ }
+      return NextResponse.json({ message }, { status: response.status });
+    }
+
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch {
+      responseData = { message: "Booking created successfully" };
+    }
+
+    return NextResponse.json(responseData, { status: 201 });
+  } catch (error) {
+    console.error("Error creating booking:", error);
+    return NextResponse.json(
+      {
+        message: error instanceof Error ? error.message : "Failed to create booking",
+      },
       { status: 500 }
     );
   }

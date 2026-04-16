@@ -1,8 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CreateBookingRequest } from "@/lib/bookings/types";
 import { createBookingClient } from "@/lib/bookings/client";
+import { getResources } from "@/lib/resources/api";
+
+interface Resource {
+  id: number;
+  name: string;
+  resourceCode: string;
+  description?: string;
+  capacity?: number;
+}
 
 interface CreateBookingFormProps {
   onSuccess?: (message: string) => void;
@@ -12,6 +21,9 @@ interface CreateBookingFormProps {
 
 export function CreateBookingForm({ onSuccess, onError, onSubmit }: CreateBookingFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingResources, setIsLoadingResources] = useState(true);
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [resourceSearch, setResourceSearch] = useState("");
   const [formData, setFormData] = useState({
     resourceId: 0,
     bookingDate: "",
@@ -21,6 +33,31 @@ export function CreateBookingForm({ onSuccess, onError, onSubmit }: CreateBookin
     expectedAttendees: undefined,
     requestNotes: "",
   });
+
+  // Fetch resources on mount
+  useEffect(() => {
+    const fetchResources = async () => {
+      setIsLoadingResources(true);
+      try {
+        const data = await getResources();
+        setResources(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Failed to load resources:", err);
+        setResources([]);
+      } finally {
+        setIsLoadingResources(false);
+      }
+    };
+
+    fetchResources();
+  }, []);
+
+  // Filter resources based on search
+  const filteredResources = resources.filter(
+    (r) =>
+      r.name.toLowerCase().includes(resourceSearch.toLowerCase()) ||
+      r.resourceCode.toLowerCase().includes(resourceSearch.toLowerCase())
+  );
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -93,18 +130,41 @@ export function CreateBookingForm({ onSuccess, onError, onSubmit }: CreateBookin
         <h2>Create New Booking Request</h2>
 
         <div className="form-group">
-          <label htmlFor="resourceId">
-            Resource ID <span className="required">*</span>
+          <label htmlFor="resourceName">
+            Select Resource <span className="required">*</span>
           </label>
-          <input
-            id="resourceId"
-            type="number"
-            name="resourceId"
-            value={formData.resourceId || ""}
-            onChange={handleChange}
-            placeholder="Enter resource ID"
-            required
-          />
+          {isLoadingResources ? (
+            <p className="loading-text">Loading available resources...</p>
+          ) : (
+            <>
+              <input
+                id="resourceSearch"
+                type="text"
+                placeholder="Search by resource name or code..."
+                value={resourceSearch}
+                onChange={(e) => setResourceSearch(e.target.value)}
+                className="search-input"
+              />
+              <select
+                id="resourceName"
+                name="resourceId"
+                value={formData.resourceId || ""}
+                onChange={handleChange}
+                required
+              >
+                <option value="">-- Select a resource --</option>
+                {filteredResources.map((resource) => (
+                  <option key={resource.id} value={resource.id}>
+                    {resource.name} ({resource.resourceCode})
+                    {resource.capacity ? ` - Capacity: ${resource.capacity}` : ""}
+                  </option>
+                ))}
+              </select>
+              {filteredResources.length === 0 && resourceSearch && (
+                <p className="no-results">No resources found matching "{resourceSearch}"</p>
+              )}
+            </>
+          )}
         </div>
 
         <div className="form-group">
@@ -239,7 +299,8 @@ export function CreateBookingForm({ onSuccess, onError, onSubmit }: CreateBookin
         }
 
         .form-group input,
-        .form-group textarea {
+        .form-group textarea,
+        .form-group select {
           padding: 0.75rem;
           border: 1px solid #ccc;
           border-radius: 4px;
@@ -248,6 +309,8 @@ export function CreateBookingForm({ onSuccess, onError, onSubmit }: CreateBookin
         }
 
         .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
         .form-group textarea:focus {
           outline: none;
           border-color: #0066cc;
@@ -282,6 +345,33 @@ export function CreateBookingForm({ onSuccess, onError, onSubmit }: CreateBookin
         .primary-button:disabled {
           opacity: 0.6;
           cursor: not-allowed;
+        }
+
+        .search-input {
+          margin-bottom: 0.5rem;
+        }
+
+        .form-group select {
+          cursor: pointer;
+          appearance: auto;
+        }
+
+        .form-group .loading-text {
+          color: #666;
+          font-style: italic;
+          padding: 1rem;
+          background: #f9f9f9;
+          border-radius: 4px;
+          margin: 0;
+        }
+
+        .form-group .no-results {
+          color: #dc3545;
+          font-size: 0.9rem;
+          margin: 0.5rem 0 0;
+          padding: 0.5rem;
+          background: #fff5f5;
+          border-radius: 4px;
         }
       `}</style>
     </form>
