@@ -1,127 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  getResources,
-  createResource,
-  updateResource,
-  deleteResource,
-  getCategories,
-  getLocations,
-} from "@/lib/resources/api";
+import { getResources, deleteResource } from "@/lib/resources/api";
+import { useRouter } from "next/navigation";
 
 export default function ResourcePage() {
+  const router = useRouter();
+
   const [resources, setResources] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [locations, setLocations] = useState<any[]>([]);
-  const [editingId, setEditingId] = useState<number | null>(null);
   const [user, setUser] = useState<any>(null);
 
-  const [form, setForm] = useState({
-    name: "",
-    resourceCode: "",
-    description: "",
-    capacity: "",
-    categoryId: "",
-    locationId: "",
-    notes: "",
-    imageUrl: "",
-  });
-
-  // ✅ FIXED: ROLE BASED
   const isAdmin = user?.role === "ADMIN";
 
   useEffect(() => {
-    loadAll();
+    loadResources();
 
     fetch("http://localhost:8080/api/v1/auth/me", {
       credentials: "include",
     })
       .then((res) => res.json())
-      .then((data) => {
-        console.log("USER:", data); // debug
-        setUser(data);
-      });
+      .then((data) => setUser(data));
   }, []);
 
-  const loadAll = async () => {
-    const [res, cat, loc] = await Promise.all([
-      getResources(),
-      getCategories(),
-      getLocations(),
-    ]);
-
+  const loadResources = async () => {
+    const res = await getResources();
     setResources(res || []);
-    setCategories(cat || []);
-    setLocations(loc || []);
-  };
-
-  const handleChange = (e: any) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const handleEdit = (r: any) => {
-    if (!isAdmin) return alert("Access denied ❌");
-
-    setForm({
-      name: r.name,
-      resourceCode: r.resourceCode,
-      description: r.description || "",
-      capacity: r.capacity || "",
-      categoryId: r.categoryId,
-      locationId: r.locationId,
-      notes: r.notes || "",
-      imageUrl: r.imageUrl || "",
-    });
-
-    setEditingId(r.id);
-  };
-
-  const handleSave = async () => {
-    if (!isAdmin) return alert("Only admin can perform this action ❌");
-
-    if (!form.name || !form.resourceCode) {
-      return alert("Name & Code required ❌");
-    }
-
-    const payload = {
-      name: form.name,
-      resourceCode: form.resourceCode,
-      description: form.description,
-      capacity: form.capacity ? Number(form.capacity) : null,
-      status: "ACTIVE",
-      requiresApproval: true,
-      resourceCategoryId: Number(form.categoryId),
-      locationId: Number(form.locationId),
-      notes: form.notes,
-      imageUrl: form.imageUrl,
-    };
-
-    try {
-      if (editingId) {
-        await updateResource(editingId, payload);
-        alert("Updated ✏️");
-      } else {
-        await createResource(payload);
-        alert("Added ✅");
-      }
-
-      setForm({
-        name: "",
-        resourceCode: "",
-        description: "",
-        capacity: "",
-        categoryId: "",
-        locationId: "",
-        notes: "",
-        imageUrl: "",
-      });
-
-      setEditingId(null);
-      loadAll();
-    } catch (err: any) {
-      alert(err.message);
-    }
   };
 
   const handleDelete = async (id: number) => {
@@ -131,75 +34,157 @@ export default function ResourcePage() {
 
     try {
       await deleteResource(id);
-      alert("Deleted 🗑️");
-      loadAll();
+      loadResources();
     } catch (err: any) {
       alert(err.message);
     }
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>Resources</h2>
+    <div style={styles.container}>
+      <div style={styles.header}>
+        <h2 style={styles.title}>📦 Resources</h2>
 
-      {/* ✅ ADMIN ONLY FORM */}
-      {isAdmin && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-          <input name="name" placeholder="Name" value={form.name} onChange={handleChange} />
-          <input name="resourceCode" placeholder="Code" value={form.resourceCode} onChange={handleChange} />
-          <input name="description" placeholder="Description" value={form.description} onChange={handleChange} />
-          <input name="capacity" type="number" placeholder="Capacity" value={form.capacity} onChange={handleChange} />
-
-          <select name="categoryId" value={form.categoryId} onChange={handleChange}>
-            <option value="">Category</option>
-            {categories.map((c: any) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-
-          <select name="locationId" value={form.locationId} onChange={handleChange}>
-            <option value="">Location</option>
-            {locations.map((l: any) => (
-              <option key={l.id} value={l.id}>{l.name}</option>
-            ))}
-          </select>
-
-          <input name="notes" placeholder="Notes" value={form.notes} onChange={handleChange} />
-          <input name="imageUrl" placeholder="Image URL" value={form.imageUrl} onChange={handleChange} />
-
-          <button onClick={handleSave}>
-            {editingId ? "Update" : "Add"}
+        {isAdmin && (
+          <button
+            onClick={() => router.push("/resources/add")}
+            style={styles.addBtn}
+          >
+            ➕ Add Resource
           </button>
+        )}
+      </div>
+
+      {resources.length === 0 ? (
+        <p style={{ marginTop: "20px" }}>No resources found</p>
+      ) : (
+        <div style={styles.grid}>
+          {resources.map((r: any) => (
+            <div key={r.id} style={styles.card}>
+              
+              {/* IMAGE */}
+              {r.imageUrl && (
+                <img
+                  src={r.imageUrl}
+                  alt={r.name}
+                  style={styles.image}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      "https://via.placeholder.com/300x200";
+                  }}
+                />
+              )}
+
+              <div style={styles.cardContent}>
+                <h3 style={styles.name}>
+                  {r.name} ({r.resourceCode})
+                </h3>
+
+                <p><b>ID:</b> {r.id}</p>
+                <p><b>Capacity:</b> {r.capacity ?? "N/A"}</p>
+                <p>
+                  <b>Category:</b> {r.categoryName || "N/A"} ({r.categoryCode || "-"})
+                </p>
+                <p>
+                  <b>Location:</b> {r.locationName || "N/A"} ({r.locationCode || "-"})
+                </p>
+                <p><b>Status:</b> {r.status}</p>
+                <p><b>Approval:</b> {r.requiresApproval ? "Yes" : "No"}</p>
+                <p><b>Description:</b> {r.description || "N/A"}</p>
+                <p><b>Notes:</b> {r.notes || "N/A"}</p>
+
+                {/* ADMIN BUTTONS */}
+                {isAdmin && (
+                  <div style={styles.actions}>
+                    <button
+                      onClick={() => router.push(`/resources/edit/${r.id}`)}
+                      style={styles.editBtn}
+                    >
+                      ✏️ Edit
+                    </button>
+
+                    <button
+                      onClick={() => handleDelete(r.id)}
+                      style={styles.deleteBtn}
+                    >
+                      🗑️ Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
-
-      {/* LIST */}
-      {resources.map((r: any) => (
-        <div key={r.id} style={{ border: "1px solid #ddd", padding: "12px", marginTop: "10px" }}>
-          <h3>{r.name} ({r.resourceCode})</h3>
-
-          <p>Capacity: {r.capacity}</p>
-          <p>Category: {r.categoryName} | Location: {r.locationName}</p>
-
-          {r.imageUrl && (
-            <img
-              src={r.imageUrl}
-              width={120}
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = "https://via.placeholder.com/120";
-              }}
-            />
-          )}
-
-          {/* ✅ ADMIN ONLY BUTTONS */}
-          {isAdmin && (
-            <>
-              <button onClick={() => handleEdit(r)}>Edit ✏️</button>
-              <button onClick={() => handleDelete(r.id)}>Delete 🗑️</button>
-            </>
-          )}
-        </div>
-      ))}
     </div>
   );
 }
+
+/* 🎨 STYLES */
+const styles: any = {
+  container: {
+    padding: "30px",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "20px",
+  },
+  title: {
+    fontSize: "22px",
+    fontWeight: "600",
+  },
+  addBtn: {
+    background: "#2563eb",
+    color: "#fff",
+    padding: "10px 18px",
+    borderRadius: "8px",
+    border: "none",
+    cursor: "pointer",
+    fontWeight: "500",
+  },
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+    gap: "20px",
+  },
+  card: {
+    background: "#fff",
+    borderRadius: "12px",
+    overflow: "hidden",
+    boxShadow: "0 4px 15px rgba(0,0,0,0.08)",
+    transition: "0.2s",
+  },
+  image: {
+    width: "100%",
+    height: "180px",
+    objectFit: "cover",
+  },
+  cardContent: {
+    padding: "15px",
+  },
+  name: {
+    marginBottom: "10px",
+  },
+  actions: {
+    marginTop: "10px",
+    display: "flex",
+    gap: "10px",
+  },
+  editBtn: {
+    background: "#f59e0b",
+    border: "none",
+    padding: "8px 12px",
+    borderRadius: "6px",
+    cursor: "pointer",
+  },
+  deleteBtn: {
+    background: "#ef4444",
+    color: "#fff",
+    border: "none",
+    padding: "8px 12px",
+    borderRadius: "6px",
+    cursor: "pointer",
+  },
+};
