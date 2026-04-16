@@ -5,6 +5,7 @@ import com.smartcampus.backend.common.enums.UserLoginMethod;
 import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.UserStatus;
 import com.smartcampus.backend.modules.auth.dto.CurrentUserResponse;
+import com.smartcampus.backend.modules.profile.dto.ProfileResponse;
 import com.smartcampus.backend.modules.user.dto.UserDetailResponse;
 import com.smartcampus.backend.modules.user.dto.UserSummaryResponse;
 import org.springframework.stereotype.Component;
@@ -67,6 +68,30 @@ public class UserMapper {
 
     public CurrentUserResponse anonymousCurrentUser() {
         return new CurrentUserResponse(false, null, null, null, null, null, false);
+    }
+
+    public ProfileResponse toProfile(
+            User user,
+            RoleCode role,
+            boolean hasLocalCredentials,
+            boolean mustChangePassword,
+            UserLoginMethod loginMethod) {
+        return new ProfileResponse(
+                user.getId(),
+                user.getEmail(),
+                user.getFirstName(),
+                user.getLastName(),
+                resolveDisplayName(user),
+                user.getPhone(),
+                user.getProfileImageUrl(),
+                role,
+                user.getStatus(),
+                user.getCreatedAt(),
+                user.getUpdatedAt(),
+                user.getLastLoginAt(),
+                hasLocalCredentials,
+                mustChangePassword,
+                loginMethod);
     }
 
     public void applyUpdates(User user, String firstName, String lastName, String displayName, String phone, String profileImageUrl) {
