@@ -9,7 +9,7 @@ import { CreateBookingForm } from "./CreateBookingForm";
 interface ReviewAction {
   bookingId: number;
   reason: string;
-  decision: "APPROVE" | "REJECT";
+  decision: "APPROVE" | "REJECT" | "CANCEL";
 }
 
 type TabType = "pending" | "approved" | "rejected" | "cancelled" | "all";
@@ -110,6 +110,15 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
     setShowReviewDialog(true);
   };
 
+  const handleStudentCancelClick = (bookingId: number) => {
+    setPendingAction({
+      bookingId,
+      reason: "",
+      decision: "CANCEL",
+    });
+    setShowReviewDialog(true);
+  };
+
   const handleConfirmReview = async () => {
     if (!pendingAction) return;
 
@@ -117,21 +126,29 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
     setActionInProgress(pendingAction.bookingId);
 
     try {
-      const requestBody: Record<string, unknown> = {
-        decision: pendingAction.decision,
-      };
+      const isCancel = pendingAction.decision === "CANCEL";
+      const endpoint = isCancel ? "cancel" : "review";
+      
+      const requestBody: Record<string, unknown> = {};
+
+      // For review (approve/reject), include decision
+      if (!isCancel) {
+        requestBody.decision = pendingAction.decision;
+      }
 
       // Only add reason if it exists and is not empty
       if (pendingAction.reason && pendingAction.reason.trim()) {
         requestBody.reason = pendingAction.reason;
       }
 
-      console.log("Sending approve/reject request:", { 
+      const url = `/api/v1/bookings/${pendingAction.bookingId}/${endpoint}`;
+      console.log("Sending request:", { 
+        url,
         bookingId: pendingAction.bookingId, 
         body: requestBody 
       });
 
-      const response = await fetch(`/api/v1/bookings/${pendingAction.bookingId}/review`, {
+      const response = await fetch(url, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -140,16 +157,23 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
         body: JSON.stringify(requestBody),
       });
 
-      console.log("Review response status:", response.status);
+      console.log("Response status:", response.status);
 
       if (!response.ok) {
         const errorData = (await response.json().catch(() => ({}))) as { message?: string };
-        console.error("Review error:", errorData);
-        throw new Error(errorData.message || "Failed to review booking");
+        console.error("Error:", errorData);
+        throw new Error(errorData.message || `Failed to ${isCancel ? "cancel" : "review"} booking`);
       }
 
-      const decision = pendingAction.decision === "APPROVE" ? "approved" : "rejected";
-      setSuccessMessage(`Booking ${decision} successfully!`);
+      let message = "";
+      if (isCancel) {
+        message = "Booking cancelled successfully!";
+      } else if (pendingAction.decision === "APPROVE") {
+        message = "Booking approved successfully!";
+      } else {
+        message = "Booking rejected successfully!";
+      }
+      setSuccessMessage(message);
 
       setShowReviewDialog(false);
       setPendingAction(null);
@@ -436,7 +460,7 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
                     <div className="booking-actions">
                       <button
                         className="danger-button"
-                        onClick={() => handleRejectClick(booking.id)}
+                        onClick={() => handleStudentCancelClick(booking.id)}
                         disabled={actionInProgress === booking.id}
                       >
                         {actionInProgress === booking.id ? "Processing..." : "Cancel Booking"}
