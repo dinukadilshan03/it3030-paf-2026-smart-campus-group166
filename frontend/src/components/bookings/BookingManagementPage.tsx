@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { BookingSummaryResponse } from "@/lib/bookings/types";
 import type { CurrentUser } from "@/types/auth";
+import { CreateBookingForm } from "./CreateBookingForm";
 
 interface ReviewAction {
   bookingId: number;
@@ -28,6 +29,9 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
   // State for review dialogs
   const [showReviewDialog, setShowReviewDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState<ReviewAction | null>(null);
+
+  // State for create booking form
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   // Check if user is admin
   const isAdmin = user.role === "ADMIN";
@@ -113,20 +117,34 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
     setActionInProgress(pendingAction.bookingId);
 
     try {
+      const requestBody: Record<string, unknown> = {
+        decision: pendingAction.decision,
+      };
+
+      // Only add reason if it exists and is not empty
+      if (pendingAction.reason && pendingAction.reason.trim()) {
+        requestBody.reason = pendingAction.reason;
+      }
+
+      console.log("Sending approve/reject request:", { 
+        bookingId: pendingAction.bookingId, 
+        body: requestBody 
+      });
+
       const response = await fetch(`/api/v1/bookings/${pendingAction.bookingId}/review`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({
-          decision: pendingAction.decision,
-          reason: pendingAction.reason || undefined,
-        }),
+        body: JSON.stringify(requestBody),
       });
+
+      console.log("Review response status:", response.status);
 
       if (!response.ok) {
         const errorData = (await response.json().catch(() => ({}))) as { message?: string };
+        console.error("Review error:", errorData);
         throw new Error(errorData.message || "Failed to review booking");
       }
 
@@ -142,6 +160,7 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
+      console.error("Error in handleConfirmReview:", err);
       setError(err instanceof Error ? err.message : "Action failed");
     } finally {
       setActionInProgress(null);
@@ -335,6 +354,37 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
         </section>
       ) : (
         <section className="bookings-section">
+          <div className="student-header">
+            <div>
+              <h2>My Bookings</h2>
+              <p>Create and manage your resource bookings</p>
+            </div>
+            <button
+              className="primary-button"
+              onClick={() => setShowCreateForm(!showCreateForm)}
+            >
+              {showCreateForm ? "Hide Form" : "+ Create New Booking"}
+            </button>
+          </div>
+
+          {showCreateForm && (
+            <div className="create-form-container">
+              <CreateBookingForm
+                onSuccess={(message) => {
+                  setSuccessMessage(message);
+                  setShowCreateForm(false);
+                  loadBookings();
+                  setTimeout(() => setSuccessMessage(""), 3000);
+                }}
+                onError={(err) => setError(err)}
+                onSubmit={() => {
+                  setShowCreateForm(false);
+                  loadBookings();
+                }}
+              />
+            </div>
+          )}
+
           {isLoading ? (
             <p className="muted">Loading your bookings...</p>
           ) : bookings.length === 0 ? (
@@ -809,6 +859,39 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
           border: 1px solid #c3e6cb;
         }
 
+        .student-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 2rem;
+          padding: 1.5rem;
+          background: white;
+          border-bottom: 1px solid #e0e0e0;
+          margin-bottom: 1.5rem;
+          border-radius: 8px;
+        }
+
+        .student-header h2 {
+          margin: 0;
+          font-size: 1.5rem;
+          color: #333;
+        }
+
+        .student-header p {
+          margin: 0.5rem 0 0;
+          color: #666;
+          font-size: 0.9rem;
+        }
+
+        .create-form-container {
+          background: white;
+          border: 1px solid #e0e0e0;
+          border-radius: 8px;
+          padding: 2rem;
+          margin-bottom: 2rem;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
         @media (max-width: 768px) {
           .bookings-grid {
             grid-template-columns: 1fr;
@@ -834,6 +917,11 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
 
           .button-row {
             width: 100%;
+          }
+
+          .student-header {
+            flex-direction: column;
+            align-items: flex-start;
           }
         }
       `}</style>
