@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public record CreateTicketRequest(
+        Long reporterUserId,
         Long resourceId,
         Long locationId,
         @NotNull(message = "Ticket category is required") Long ticketCategoryId,
@@ -14,7 +15,7 @@ public record CreateTicketRequest(
                 @Size(max = 200, message = "Title must be at most 200 characters")
                 String title,
         @NotBlank(message = "Description is required") String description,
-        TicketPriority priority,
+        @NotNull(message = "Priority is required") TicketPriority priority,
         @Size(max = 160, message = "Preferred contact name must be at most 160 characters")
                 String preferredContactName,
         @Email(message = "Preferred contact email must be valid") String preferredContactEmail,

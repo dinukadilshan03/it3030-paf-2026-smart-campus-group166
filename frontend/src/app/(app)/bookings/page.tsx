@@ -2,7 +2,7 @@ import { BookingManagementPage } from "@/components/bookings/BookingManagementPa
 import { requireRole } from "@/lib/auth/session";
 
 export default async function BookingsPage() {
-  const user = await requireRole(["ADMIN"]);
+  const user = await requireRole(["STUDENT", "ADMIN"]);
 
   return <BookingManagementPage user={user} />;
 }

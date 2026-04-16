@@ -88,10 +88,10 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
             from Ticket t
             join fetch t.ticketCategory tc
             join fetch t.reporterUser ru
-            join fetch t.assignedStaffUser asu
+            left join fetch t.assignedStaffUser asu
             left join fetch t.resource r
             left join fetch t.location l
-            where asu.id = :assignedStaffUserId
+            where (asu.id = :staffUserId or ru.id = :staffUserId)
               and (:status is null or t.status = :status)
               and (:priority is null or t.priority = :priority)
               and (:ticketCategoryId is null or tc.id = :ticketCategoryId)
@@ -103,8 +103,8 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
               )
             order by t.createdAt desc
             """)
-    List<Ticket> searchForAssignedStaff(
-            @Param("assignedStaffUserId") Long assignedStaffUserId,
+    List<Ticket> searchForStaffScope(
+            @Param("staffUserId") Long staffUserId,
             @Param("status") TicketStatus status,
             @Param("priority") TicketPriority priority,
             @Param("ticketCategoryId") Long ticketCategoryId,

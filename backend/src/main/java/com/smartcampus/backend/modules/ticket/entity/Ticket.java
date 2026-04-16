@@ -91,8 +91,14 @@ public class Ticket extends AuditableEntity {
     @Column(name = "rejection_reason")
     private String rejectionReason;
 
+    @Column(name = "first_responded_at")
+    private LocalDateTime firstRespondedAt;
+
     @Column(name = "resolved_at")
     private LocalDateTime resolvedAt;
+
+    @Column(name = "rejected_at")
+    private LocalDateTime rejectedAt;
 
     @Column(name = "closed_at")
     private LocalDateTime closedAt;
