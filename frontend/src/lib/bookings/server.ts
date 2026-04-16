@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-
+import type { BookingFilters } from "@/lib/bookings/types";
 import { getApiBaseUrl } from "@/lib/config/env";
 
 function withDefaultHeaders(
