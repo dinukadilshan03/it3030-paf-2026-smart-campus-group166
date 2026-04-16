@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from "@/lib/config/env";
+import { serverApiFetch } from "@/lib/api/server";
 import type { BookingFilters, BookingSummaryResponse, ApiErrorResponse } from "@/lib/bookings/types";
 import { NextResponse } from "next/server";
 
@@ -43,19 +43,7 @@ export async function GET(request: Request) {
     const queryString = params.toString();
     const url = `/api/v1/bookings${queryString ? `?${queryString}` : ""}`;
 
-    // Extract auth headers from incoming request
-    const cookie = request.headers.get("cookie");
-    const authorization = request.headers.get("authorization");
-
-    const response = await fetch(`${getApiBaseUrl()}${url}`, {
-      headers: {
-        Accept: "application/json",
-        ...(cookie ? { Cookie: cookie } : {}),
-        ...(authorization ? { Authorization: authorization } : {}),
-      },
-      cache: "no-store",
-      redirect: "manual",
-    });
+    const response = await serverApiFetch(url);
 
     if (!response.ok) {
       let message = `API Error: ${response.status} ${response.statusText}`;
@@ -84,21 +72,12 @@ export async function POST(request: Request) {
 
     console.log("Creating booking with body:", body);
 
-    // Extract auth headers from incoming request
-    const cookie = request.headers.get("cookie");
-    const authorization = request.headers.get("authorization");
-
-    const response = await fetch(`${getApiBaseUrl()}/api/v1/bookings`, {
+    const response = await serverApiFetch("/api/v1/bookings", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Accept: "application/json",
-        ...(cookie ? { Cookie: cookie } : {}),
-        ...(authorization ? { Authorization: authorization } : {}),
       },
       body: JSON.stringify(body),
-      cache: "no-store",
-      redirect: "manual",
     });
 
     const responseText = await response.text();
