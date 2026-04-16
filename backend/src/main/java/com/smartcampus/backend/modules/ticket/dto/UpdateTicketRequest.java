@@ -6,8 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-public record CreateTicketRequest(
-        Long reporterUserId,
+public record UpdateTicketRequest(
         Long resourceId,
         Long locationId,
         @NotNull(message = "Ticket category is required") Long ticketCategoryId,

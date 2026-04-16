@@ -21,4 +21,6 @@ public record TicketSummaryResponse(
         String title,
         TicketPriority priority,
         TicketStatus status,
-        LocalDateTime createdAt) {}
+        LocalDateTime createdAt,
+        LocalDateTime firstRespondedAt,
+        LocalDateTime resolvedAt) {}

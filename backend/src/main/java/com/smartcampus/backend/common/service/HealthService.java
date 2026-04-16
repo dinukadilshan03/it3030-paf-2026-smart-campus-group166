@@ -18,7 +18,11 @@ public class HealthService {
     private String supabaseUrl;
 
     public HealthResponse getHealth() {
-        boolean supabaseConfigured = supabaseUrl != null && !supabaseUrl.isBlank();
+        boolean supabaseConfigured =
+                supabaseUrl != null
+                        && !supabaseUrl.isBlank()
+                        && !supabaseUrl.contains("<")
+                        && supabaseUrl.startsWith("http");
         String databaseStatus = canConnect() ? "UP" : "DOWN";
         String overallStatus = "UP".equals(databaseStatus) ? "UP" : "DEGRADED";
 

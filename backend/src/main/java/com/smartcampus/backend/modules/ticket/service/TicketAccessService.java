@@ -30,8 +30,11 @@ public class TicketAccessService {
             return;
         }
         if (roleCode == RoleCode.STAFF
-                && ticket.getAssignedStaffUser() != null
-                && ticket.getAssignedStaffUser().getId().equals(membership.getUser().getId())) {
+                && ((ticket.getAssignedStaffUser() != null
+                                && ticket.getAssignedStaffUser()
+                                        .getId()
+                                        .equals(membership.getUser().getId()))
+                        || ticket.getReporterUser().getId().equals(membership.getUser().getId()))) {
             return;
         }
         throw new AccessDeniedException("You do not have permission to access this ticket");

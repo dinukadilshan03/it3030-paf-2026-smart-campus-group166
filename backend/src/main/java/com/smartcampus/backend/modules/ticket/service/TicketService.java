@@ -17,6 +17,7 @@ import com.smartcampus.backend.modules.ticket.dto.TicketAssignmentResponse;
 import com.smartcampus.backend.modules.ticket.dto.TicketDetailResponse;
 import com.smartcampus.backend.modules.ticket.dto.TicketSummaryResponse;
 import com.smartcampus.backend.modules.ticket.dto.UpdateTicketAssignmentRequest;
+import com.smartcampus.backend.modules.ticket.dto.UpdateTicketRequest;
 import com.smartcampus.backend.modules.ticket.dto.UpdateTicketStatusRequest;
 import com.smartcampus.backend.modules.ticket.entity.Ticket;
 import com.smartcampus.backend.modules.ticket.entity.TicketAssignment;
@@ -44,11 +45,13 @@ public class TicketService {
     private final TicketAssignmentRepository ticketAssignmentRepository;
     private final TicketCategoryService ticketCategoryService;
     private final TicketCommentService ticketCommentService;
+    private final TicketAttachmentService ticketAttachmentService;
     private final ResourceService resourceService;
     private final LocationService locationService;
     private final TicketAccessService ticketAccessService;
     private final UserRepository userRepository;
     private final UserRoleRepository userRoleRepository;
+    private final TicketSlaService ticketSlaService;
     private final TicketMapper ticketMapper;
 
     @Transactional(readOnly = true)
@@ -59,7 +62,7 @@ public class TicketService {
                 switch (membership.getRole().getCode()) {
                     case ADMIN -> ticketRepository.searchAll(
                             status, priority, ticketCategoryId, normalizeSearch(search));
-                    case STAFF -> ticketRepository.searchForAssignedStaff(
+                    case STAFF -> ticketRepository.searchForStaffScope(
                             membership.getUser().getId(),
                             status,
                             priority,
@@ -93,25 +96,21 @@ public class TicketService {
     @Transactional
     public TicketDetailResponse create(CreateTicketRequest request) {
         UserRole membership = ticketAccessService.getRequiredCurrentMembership();
-        TicketCategory category = ticketCategoryService.getManagedCategory(request.ticketCategoryId());
-        if (!Boolean.TRUE.equals(category.getIsActive())) {
-            throw new IllegalArgumentException("Ticket category must be active");
-        }
-
-        Resource resource =
-                request.resourceId() == null ? null : resourceService.getManagedResource(request.resourceId());
+        User reporter = resolveReporterForCreate(membership, request.reporterUserId());
+        TicketCategory category = getActiveCategory(request.ticketCategoryId());
+        Resource resource = resolveResource(request.resourceId());
         Location location = resolveConsistentLocation(resource, request.locationId());
 
         Ticket ticket =
                 Ticket.builder()
                         .ticketNumber(generateTicketNumber())
-                        .reporterUser(membership.getUser())
+                        .reporterUser(reporter)
                         .resource(resource)
                         .location(location)
                         .ticketCategory(category)
                         .title(request.title().trim())
                         .description(request.description().trim())
-                        .priority(request.priority() == null ? TicketPriority.MEDIUM : request.priority())
+                        .priority(request.priority())
                         .status(TicketStatus.OPEN)
                         .preferredContactName(normalizeOptionalText(request.preferredContactName()))
                         .preferredContactEmail(normalizeOptionalText(request.preferredContactEmail()))
@@ -123,6 +122,42 @@ public class TicketService {
     }
 
     @Transactional
+    public TicketDetailResponse updateTicket(Long id, UpdateTicketRequest request) {
+        UserRole membership = ticketAccessService.getRequiredCurrentMembership();
+        Ticket ticket = getManagedTicket(id);
+        validateTicketEditPermission(membership, ticket);
+
+        TicketCategory category = getActiveCategory(request.ticketCategoryId());
+        Resource resource = resolveResource(request.resourceId());
+        Location location = resolveConsistentLocation(resource, request.locationId());
+
+        ticket.setResource(resource);
+        ticket.setLocation(location);
+        ticket.setTicketCategory(category);
+        ticket.setTitle(request.title().trim());
+        ticket.setDescription(request.description().trim());
+        ticket.setPriority(request.priority());
+        ticket.setPreferredContactName(normalizeOptionalText(request.preferredContactName()));
+        ticket.setPreferredContactEmail(normalizeOptionalText(request.preferredContactEmail()));
+        ticket.setPreferredContactPhone(normalizeOptionalText(request.preferredContactPhone()));
+
+        ticketRepository.save(ticket);
+        ticketCommentService.createSystemStatusNote(ticket, "Ticket details updated", membership.getUser());
+
+        return getTicketById(id);
+    }
+
+    @Transactional
+    public void deleteTicket(Long id) {
+        UserRole membership = ticketAccessService.getRequiredCurrentMembership();
+        Ticket ticket = getManagedTicket(id);
+        validateTicketDeletionPermission(membership, ticket);
+
+        ticketAttachmentService.deleteAllForTicket(ticket);
+        ticketRepository.delete(ticket);
+    }
+
+    @Transactional
     public TicketDetailResponse updateAssignment(Long id, UpdateTicketAssignmentRequest request) {
         UserRole membership = ticketAccessService.getRequiredCurrentMembership();
         if (membership.getRole().getCode() != RoleCode.ADMIN) {
@@ -130,6 +165,10 @@ public class TicketService {
         }
 
         Ticket ticket = getManagedTicket(id);
+        if (ticket.getStatus() == TicketStatus.CLOSED || ticket.getStatus() == TicketStatus.REJECTED) {
+            throw new IllegalArgumentException("Closed or rejected tickets cannot be assigned");
+        }
+
         User assignedUser = validateAssignedStaff(request.assignedStaffUserId());
         TicketAssignment activeAssignment = ticketAssignmentRepository.findActiveByTicketId(id).orElse(null);
 
@@ -144,6 +183,7 @@ public class TicketService {
         }
 
         ticket.setAssignedStaffUser(assignedUser);
+        ticketSlaService.markFirstResponseIfNeeded(ticket);
         ticketRepository.save(ticket);
 
         TicketAssignment newAssignment =
@@ -164,49 +204,6 @@ public class TicketService {
                                 + " to "
                                 + resolveDisplayName(assignedUser);
         ticketCommentService.createSystemStatusNote(ticket, noteBody, membership.getUser());
-
-        return getTicketById(id);
-    }
-
-    @Transactional
-    public TicketDetailResponse updateStatus(Long id, UpdateTicketStatusRequest request) {
-        UserRole membership = ticketAccessService.getRequiredCurrentMembership();
-        Ticket ticket = getManagedTicket(id);
-        validateStatusPermission(membership, ticket, request.status());
-        validateStatusTransition(ticket.getStatus(), request.status());
-
-        switch (request.status()) {
-            case IN_PROGRESS -> ticket.setRejectionReason(null);
-            case RESOLVED -> {
-                if (request.resolutionSummary() == null || request.resolutionSummary().isBlank()) {
-                    throw new IllegalArgumentException("Resolution summary is required when resolving a ticket");
-                }
-                ticket.setResolutionSummary(request.resolutionSummary().trim());
-                ticket.setResolvedAt(LocalDateTime.now());
-                ticket.setRejectionReason(null);
-                ticket.setClosedAt(null);
-            }
-            case CLOSED -> ticket.setClosedAt(LocalDateTime.now());
-            case REJECTED -> {
-                if (request.rejectionReason() == null || request.rejectionReason().isBlank()) {
-                    throw new IllegalArgumentException("Rejection reason is required when rejecting a ticket");
-                }
-                ticket.setRejectionReason(request.rejectionReason().trim());
-                ticket.setResolutionSummary(null);
-                ticket.setResolvedAt(null);
-                ticket.setClosedAt(null);
-            }
-            case OPEN -> {
-            }
-        }
-
-        ticket.setStatus(request.status());
-        ticketRepository.save(ticket);
-
-        ticketCommentService.createSystemStatusNote(
-                ticket,
-                "Ticket status changed to " + request.status().name().replace('_', ' '),
-                membership.getUser());
 
         return getTicketById(id);
     }
@@ -236,6 +233,33 @@ public class TicketService {
         return location;
     }
 
+    private Resource resolveResource(Long resourceId) {
+        return resourceId == null ? null : resourceService.getManagedResource(resourceId);
+    }
+
+    private TicketCategory getActiveCategory(Long categoryId) {
+        TicketCategory category = ticketCategoryService.getManagedCategory(categoryId);
+        if (!Boolean.TRUE.equals(category.getIsActive())) {
+            throw new IllegalArgumentException("Ticket category must be active");
+        }
+        return category;
+    }
+
+    private User resolveReporterForCreate(UserRole membership, Long reporterUserId) {
+        if (membership.getRole().getCode() == RoleCode.ADMIN) {
+            if (reporterUserId == null) {
+                throw new IllegalArgumentException("Reporter selection is required for admin-created tickets");
+            }
+            return validateReporterUser(reporterUserId);
+        }
+
+        if (reporterUserId != null && !reporterUserId.equals(membership.getUser().getId())) {
+            throw new AccessDeniedException("You cannot create tickets on behalf of another user");
+        }
+
+        return membership.getUser();
+    }
+
     private User validateAssignedStaff(Long userId) {
         User user =
                 userRepository
@@ -255,9 +279,56 @@ public class TicketService {
         return user;
     }
 
-    private void validateStatusPermission(UserRole membership, Ticket ticket, TicketStatus targetStatus) {
+    private User validateReporterUser(Long userId) {
+        User user =
+                userRepository
+                        .findById(userId)
+                        .orElseThrow(() -> new ResourceNotFoundException("User not found for id: " + userId));
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new IllegalArgumentException("Reported user must be active");
+        }
+
+        UserRole activeRole =
+                userRoleRepository
+                        .findActiveByUserId(userId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Active role not found for user id: " + userId));
+        if (activeRole.getRole().getCode() != RoleCode.STUDENT
+                && activeRole.getRole().getCode() != RoleCode.STAFF) {
+            throw new IllegalArgumentException("Reporter must have an active STUDENT or STAFF role");
+        }
+        return user;
+    }
+
+    private void validateTicketEditPermission(UserRole membership, Ticket ticket) {
         if (membership.getRole().getCode() == RoleCode.ADMIN) {
             return;
+        }
+        if (ticket.getReporterUser().getId().equals(membership.getUser().getId())
+                && ticket.getStatus() == TicketStatus.OPEN) {
+            return;
+        }
+        throw new AccessDeniedException("Only admins or the reporter of an open ticket can edit it");
+    }
+
+    private void validateTicketDeletionPermission(UserRole membership, Ticket ticket) {
+        if (ticket.getStatus() != TicketStatus.OPEN) {
+            throw new IllegalArgumentException("Only open tickets can be withdrawn or deleted");
+        }
+        if (membership.getRole().getCode() == RoleCode.ADMIN) {
+            return;
+        }
+        if (ticket.getReporterUser().getId().equals(membership.getUser().getId())) {
+            return;
+        }
+        throw new AccessDeniedException("Only admins or the original reporter can withdraw this ticket");
+    }
+
+    private void validateStatusPermission(UserRole membership, Ticket ticket, TicketStatus targetStatus) {
+        if (membership.getRole().getCode() == RoleCode.ADMIN) {
+            if (targetStatus == TicketStatus.REJECTED || targetStatus == TicketStatus.CLOSED) {
+                return;
+            }
+            throw new AccessDeniedException("Admins can only reject tickets or close resolved work");
         }
         if (membership.getRole().getCode() != RoleCode.STAFF
                 || ticket.getAssignedStaffUser() == null
@@ -267,6 +338,63 @@ public class TicketService {
         if (targetStatus == TicketStatus.REJECTED || targetStatus == TicketStatus.CLOSED) {
             throw new AccessDeniedException("Only admins can reject or close tickets");
         }
+    }
+
+    @Transactional
+    public TicketDetailResponse updateStatus(Long id, UpdateTicketStatusRequest request) {
+        UserRole membership = ticketAccessService.getRequiredCurrentMembership();
+        Ticket ticket = getManagedTicket(id);
+        validateStatusPermission(membership, ticket, request.status());
+        validateStatusTransition(ticket.getStatus(), request.status());
+        TicketAssignment activeAssignment = ticketAssignmentRepository.findActiveByTicketId(id).orElse(null);
+
+        switch (request.status()) {
+            case IN_PROGRESS -> {
+                ticket.setRejectionReason(null);
+                ticket.setRejectedAt(null);
+            }
+            case RESOLVED -> {
+                if (request.resolutionSummary() == null || request.resolutionSummary().isBlank()) {
+                    throw new IllegalArgumentException("Resolution summary is required when resolving a ticket");
+                }
+                ticket.setResolutionSummary(request.resolutionSummary().trim());
+                ticket.setResolvedAt(LocalDateTime.now());
+                ticket.setRejectionReason(null);
+                ticket.setRejectedAt(null);
+                ticket.setClosedAt(null);
+            }
+            case CLOSED -> ticket.setClosedAt(LocalDateTime.now());
+            case REJECTED -> {
+                if (request.rejectionReason() == null || request.rejectionReason().isBlank()) {
+                    throw new IllegalArgumentException("Rejection reason is required when rejecting a ticket");
+                }
+                ticket.setRejectionReason(request.rejectionReason().trim());
+                ticket.setRejectedAt(LocalDateTime.now());
+                ticket.setResolutionSummary(null);
+                ticket.setResolvedAt(null);
+                ticket.setClosedAt(null);
+            }
+            case OPEN -> {
+            }
+        }
+
+        if (activeAssignment != null
+                && (request.status() == TicketStatus.CLOSED || request.status() == TicketStatus.REJECTED)) {
+            activeAssignment.setIsActive(false);
+            activeAssignment.setUnassignedAt(LocalDateTime.now());
+            ticketAssignmentRepository.save(activeAssignment);
+        }
+
+        ticketSlaService.markFirstResponseIfNeeded(ticket);
+        ticket.setStatus(request.status());
+        ticketRepository.save(ticket);
+
+        ticketCommentService.createSystemStatusNote(
+                ticket,
+                "Ticket status changed to " + request.status().name().replace('_', ' '),
+                membership.getUser());
+
+        return getTicketById(id);
     }
 
     private void validateStatusTransition(TicketStatus currentStatus, TicketStatus nextStatus) {
