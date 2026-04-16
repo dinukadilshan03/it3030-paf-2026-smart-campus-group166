@@ -1,5 +1,7 @@
 export type BookingStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
 
+export type BookingReviewDecision = "APPROVE" | "REJECT";
+
 export type BookingSummaryResponse = {
   id: number;
   resourceId: number;
@@ -42,6 +44,16 @@ export type BookingDetailResponse = {
   cancellationReason: string | null;
   createdAt: string; // ISO datetime string
   updatedAt: string; // ISO datetime string
+};
+
+export type CreateBookingRequest = {
+  resourceId: number;
+  bookingDate: string;
+  startTime: string;
+  endTime: string;
+  purpose?: string | null;
+  expectedAttendees?: number | null;
+  requestNotes?: string | null;
 };
 
 export type ReviewBookingRequest = {

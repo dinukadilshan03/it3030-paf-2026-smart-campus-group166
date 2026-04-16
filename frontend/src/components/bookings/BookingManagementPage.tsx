@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import type { BookingSummaryResponse, BookingStatus } from "@/lib/bookings/types";
+import type { BookingSummaryResponse } from "@/lib/bookings/types";
 import type { CurrentUser } from "@/types/auth";
+import { CreateBookingForm } from "./CreateBookingForm";
 
 interface ReviewAction {
   bookingId: number;
@@ -28,6 +29,12 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
   // State for review dialogs
   const [showReviewDialog, setShowReviewDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState<ReviewAction | null>(null);
+
+  // State for create booking form
+  const [showCreateForm, setShowCreateForm] = useState(false);
+
+  // Check if user is admin
+  const isAdmin = user.role === "ADMIN";
 
   // Filter bookings by status
   const filteredBookings = useMemo(() => {
@@ -110,20 +117,34 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
     setActionInProgress(pendingAction.bookingId);
 
     try {
+      const requestBody: Record<string, unknown> = {
+        decision: pendingAction.decision,
+      };
+
+      // Only add reason if it exists and is not empty
+      if (pendingAction.reason && pendingAction.reason.trim()) {
+        requestBody.reason = pendingAction.reason;
+      }
+
+      console.log("Sending approve/reject request:", { 
+        bookingId: pendingAction.bookingId, 
+        body: requestBody 
+      });
+
       const response = await fetch(`/api/v1/bookings/${pendingAction.bookingId}/review`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({
-          decision: pendingAction.decision,
-          reason: pendingAction.reason || undefined,
-        }),
+        body: JSON.stringify(requestBody),
       });
+
+      console.log("Review response status:", response.status);
 
       if (!response.ok) {
         const errorData = (await response.json().catch(() => ({}))) as { message?: string };
+        console.error("Review error:", errorData);
         throw new Error(errorData.message || "Failed to review booking");
       }
 
@@ -139,6 +160,7 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
+      console.error("Error in handleConfirmReview:", err);
       setError(err instanceof Error ? err.message : "Action failed");
     } finally {
       setActionInProgress(null);
@@ -172,8 +194,8 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
     <div className="admin-bookings-page">
       <header className="admin-topbar">
         <div>
-          <span className="eyebrow">Admin</span>
-          <h1>Booking Management</h1>
+          <span className="eyebrow">{isAdmin ? "Admin" : "Student"}</span>
+          <h1>{isAdmin ? "Booking Management" : "My Bookings"}</h1>
           <p>Signed in as {user.displayName} ({user.role})</p>
         </div>
         <div className="button-row">
@@ -193,140 +215,240 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
       {error && <div className="status-banner error">{error}</div>}
       {successMessage && <div className="status-banner success">{successMessage}</div>}
 
-      <section className="stat-row">
-        <div className="stat-card">
-          <p className="stat-label">Total Bookings</p>
-          <p className="stat-value">{stats.total}</p>
-        </div>
-        <div className="stat-card">
-          <p className="stat-label">Pending</p>
-          <p className="stat-value pending">{stats.pending}</p>
-        </div>
-        <div className="stat-card">
-          <p className="stat-label">Approved</p>
-          <p className="stat-value approved">{stats.approved}</p>
-        </div>
-        <div className="stat-card">
-          <p className="stat-label">Rejected</p>
-          <p className="stat-value rejected">{stats.rejected}</p>
-        </div>
-        <div className="stat-card">
-          <p className="stat-label">Cancelled</p>
-          <p className="stat-value cancelled">{stats.cancelled}</p>
-        </div>
-      </section>
+      {isAdmin && (
+        <>
+          <section className="stat-row">
+            <div className="stat-card">
+              <p className="stat-label">Total Bookings</p>
+              <p className="stat-value">{stats.total}</p>
+            </div>
+            <div className="stat-card">
+              <p className="stat-label">Pending</p>
+              <p className="stat-value pending">{stats.pending}</p>
+            </div>
+            <div className="stat-card">
+              <p className="stat-label">Approved</p>
+              <p className="stat-value approved">{stats.approved}</p>
+            </div>
+            <div className="stat-card">
+              <p className="stat-label">Rejected</p>
+              <p className="stat-value rejected">{stats.rejected}</p>
+            </div>
+            <div className="stat-card">
+              <p className="stat-label">Cancelled</p>
+              <p className="stat-value cancelled">{stats.cancelled}</p>
+            </div>
+          </section>
 
-      {/* Tab Navigation */}
-      <div className="tabs-container">
-        <button
-          className={`tab-button ${activeTab === "pending" ? "active" : ""}`}
-          onClick={() => setActiveTab("pending")}
-        >
-          Pending ({stats.pending})
-        </button>
-        <button
-          className={`tab-button ${activeTab === "approved" ? "active" : ""}`}
-          onClick={() => setActiveTab("approved")}
-        >
-          Approved ({stats.approved})
-        </button>
-        <button
-          className={`tab-button ${activeTab === "rejected" ? "active" : ""}`}
-          onClick={() => setActiveTab("rejected")}
-        >
-          Rejected ({stats.rejected})
-        </button>
-        <button
-          className={`tab-button ${activeTab === "cancelled" ? "active" : ""}`}
-          onClick={() => setActiveTab("cancelled")}
-        >
-          Cancelled ({stats.cancelled})
-        </button>
-        <button
-          className={`tab-button ${activeTab === "all" ? "active" : ""}`}
-          onClick={() => setActiveTab("all")}
-        >
-          All ({stats.total})
-        </button>
-      </div>
+          <div className="tabs-container">
+            <button
+              className={`tab-button ${activeTab === "pending" ? "active" : ""}`}
+              onClick={() => setActiveTab("pending")}
+            >
+              Pending ({stats.pending})
+            </button>
+            <button
+              className={`tab-button ${activeTab === "approved" ? "active" : ""}`}
+              onClick={() => setActiveTab("approved")}
+            >
+              Approved ({stats.approved})
+            </button>
+            <button
+              className={`tab-button ${activeTab === "rejected" ? "active" : ""}`}
+              onClick={() => setActiveTab("rejected")}
+            >
+              Rejected ({stats.rejected})
+            </button>
+            <button
+              className={`tab-button ${activeTab === "cancelled" ? "active" : ""}`}
+              onClick={() => setActiveTab("cancelled")}
+            >
+              Cancelled ({stats.cancelled})
+            </button>
+            <button
+              className={`tab-button ${activeTab === "all" ? "active" : ""}`}
+              onClick={() => setActiveTab("all")}
+            >
+              All ({stats.total})
+            </button>
+          </div>
+        </>
+      )}
 
-      {/* Bookings List */}
-      <section className="bookings-section">
-        {isLoading ? (
-          <p className="muted">Loading bookings...</p>
-        ) : filteredBookings.length === 0 ? (
-          <p className="muted">No {activeTab !== "all" ? activeTab : ""} bookings found.</p>
-        ) : (
-          <div className="bookings-grid">
-            {filteredBookings.map((booking) => (
-              <div key={booking.id} className="booking-card panel">
-                <div className="booking-header">
-                  <div>
-                    <h3>
-                      <strong>{booking.resourceName}</strong>
-                    </h3>
-                    <p className="booking-meta">Code: {booking.resourceCode}</p>
-                  </div>
-                  <span className={`status-badge status-${booking.status.toLowerCase()}`}>
-                    {booking.status}
-                  </span>
-                </div>
-
-                <div className="booking-details">
-                  <div className="detail-row">
-                    <span className="label">Requester:</span>
-                    <span className="value">{booking.requesterDisplayName}</span>
-                  </div>
-
-                  <div className="detail-row">
-                    <span className="label">Booking Date:</span>
-                    <span className="value">{booking.bookingDate}</span>
-                  </div>
-
-                  <div className="detail-row">
-                    <span className="label">Time:</span>
-                    <span className="value">
-                      {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
+      {isAdmin ? (
+        <section className="bookings-section">
+          {isLoading ? (
+            <p className="muted">Loading bookings...</p>
+          ) : filteredBookings.length === 0 ? (
+            <p className="muted">No {activeTab !== "all" ? activeTab : ""} bookings found.</p>
+          ) : (
+            <div className="bookings-grid">
+              {filteredBookings.map((booking) => (
+                <div key={booking.id} className="booking-card panel">
+                  <div className="booking-header">
+                    <div>
+                      <h3>
+                        <strong>{booking.resourceName}</strong>
+                      </h3>
+                      <p className="booking-meta">Code: {booking.resourceCode}</p>
+                    </div>
+                    <span className={`status-badge status-${booking.status.toLowerCase()}`}>
+                      {booking.status}
                     </span>
                   </div>
 
-                  {booking.expectedAttendees && (
+                  <div className="booking-details">
                     <div className="detail-row">
-                      <span className="label">Expected Attendees:</span>
-                      <span className="value">{booking.expectedAttendees}</span>
+                      <span className="label">Requester:</span>
+                      <span className="value">{booking.requesterDisplayName}</span>
+                    </div>
+
+                    <div className="detail-row">
+                      <span className="label">Booking Date:</span>
+                      <span className="value">{booking.bookingDate}</span>
+                    </div>
+
+                    <div className="detail-row">
+                      <span className="label">Time:</span>
+                      <span className="value">
+                        {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
+                      </span>
+                    </div>
+
+                    {booking.expectedAttendees && (
+                      <div className="detail-row">
+                        <span className="label">Expected Attendees:</span>
+                        <span className="value">{booking.expectedAttendees}</span>
+                      </div>
+                    )}
+
+                    <div className="detail-row">
+                      <span className="label">Created:</span>
+                      <span className="value">{formatDateTime(booking.createdAt)}</span>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons - Only for Pending */}
+                  {activeTab === "pending" && (
+                    <div className="booking-actions">
+                      <button
+                        className="primary-button"
+                        onClick={() => handleApproveClick(booking.id)}
+                        disabled={actionInProgress === booking.id}
+                      >
+                        {actionInProgress === booking.id ? "Processing..." : "Approve"}
+                      </button>
+                      <button
+                        className="danger-button"
+                        onClick={() => handleRejectClick(booking.id)}
+                        disabled={actionInProgress === booking.id}
+                      >
+                        {actionInProgress === booking.id ? "Processing..." : "Reject"}
+                      </button>
                     </div>
                   )}
-
-                  <div className="detail-row">
-                    <span className="label">Created:</span>
-                    <span className="value">{formatDateTime(booking.createdAt)}</span>
-                  </div>
                 </div>
-
-                {/* Action Buttons - Only for Pending */}
-                {activeTab === "pending" && (
-                  <div className="booking-actions">
-                    <button
-                      className="primary-button"
-                      onClick={() => handleApproveClick(booking.id)}
-                      disabled={actionInProgress === booking.id}
-                    >
-                      {actionInProgress === booking.id ? "Processing..." : "Approve"}
-                    </button>
-                    <button
-                      className="danger-button"
-                      onClick={() => handleRejectClick(booking.id)}
-                      disabled={actionInProgress === booking.id}
-                    >
-                      {actionInProgress === booking.id ? "Processing..." : "Reject"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
+          )}
+        </section>
+      ) : (
+        <section className="bookings-section">
+          <div className="student-header">
+            <div>
+              <h2>My Bookings</h2>
+              <p>Create and manage your resource bookings</p>
+            </div>
+            <button
+              className="primary-button"
+              onClick={() => setShowCreateForm(!showCreateForm)}
+            >
+              {showCreateForm ? "Hide Form" : "+ Create New Booking"}
+            </button>
           </div>
-        )}
-      </section>
+
+          {showCreateForm && (
+            <div className="create-form-container">
+              <CreateBookingForm
+                onSuccess={(message) => {
+                  setSuccessMessage(message);
+                  setShowCreateForm(false);
+                  loadBookings();
+                  setTimeout(() => setSuccessMessage(""), 3000);
+                }}
+                onError={(err) => setError(err)}
+                onSubmit={() => {
+                  setShowCreateForm(false);
+                  loadBookings();
+                }}
+              />
+            </div>
+          )}
+
+          {isLoading ? (
+            <p className="muted">Loading your bookings...</p>
+          ) : bookings.length === 0 ? (
+            <p className="muted">You haven't created any bookings yet.</p>
+          ) : (
+            <div className="bookings-grid">
+              {bookings.map((booking) => (
+                <div key={booking.id} className="booking-card panel">
+                  <div className="booking-header">
+                    <div>
+                      <h3>
+                        <strong>{booking.resourceName}</strong>
+                      </h3>
+                      <p className="booking-meta">Code: {booking.resourceCode}</p>
+                    </div>
+                    <span className={`status-badge status-${booking.status.toLowerCase()}`}>
+                      {booking.status}
+                    </span>
+                  </div>
+
+                  <div className="booking-details">
+                    <div className="detail-row">
+                      <span className="label">Booking Date:</span>
+                      <span className="value">{booking.bookingDate}</span>
+                    </div>
+
+                    <div className="detail-row">
+                      <span className="label">Time:</span>
+                      <span className="value">
+                        {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
+                      </span>
+                    </div>
+
+                    {booking.expectedAttendees && (
+                      <div className="detail-row">
+                        <span className="label">Expected Attendees:</span>
+                        <span className="value">{booking.expectedAttendees}</span>
+                      </div>
+                    )}
+
+                    <div className="detail-row">
+                      <span className="label">Created:</span>
+                      <span className="value">{formatDateTime(booking.createdAt)}</span>
+                    </div>
+                  </div>
+
+                  {/* Action Button - Only for Pending or Approved */}
+                  {(booking.status === "PENDING" || booking.status === "APPROVED") && (
+                    <div className="booking-actions">
+                      <button
+                        className="danger-button"
+                        onClick={() => handleRejectClick(booking.id)}
+                        disabled={actionInProgress === booking.id}
+                      >
+                        {actionInProgress === booking.id ? "Processing..." : "Cancel Booking"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Review Confirmation Dialog */}
       {showReviewDialog && pendingAction && (
@@ -737,6 +859,39 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
           border: 1px solid #c3e6cb;
         }
 
+        .student-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 2rem;
+          padding: 1.5rem;
+          background: white;
+          border-bottom: 1px solid #e0e0e0;
+          margin-bottom: 1.5rem;
+          border-radius: 8px;
+        }
+
+        .student-header h2 {
+          margin: 0;
+          font-size: 1.5rem;
+          color: #333;
+        }
+
+        .student-header p {
+          margin: 0.5rem 0 0;
+          color: #666;
+          font-size: 0.9rem;
+        }
+
+        .create-form-container {
+          background: white;
+          border: 1px solid #e0e0e0;
+          border-radius: 8px;
+          padding: 2rem;
+          margin-bottom: 2rem;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
         @media (max-width: 768px) {
           .bookings-grid {
             grid-template-columns: 1fr;
@@ -762,6 +917,11 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
 
           .button-row {
             width: 100%;
+          }
+
+          .student-header {
+            flex-direction: column;
+            align-items: flex-start;
           }
         }
       `}</style>

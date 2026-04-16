@@ -6,6 +6,13 @@ import { useRouter } from "next/navigation";
 import { clientApiFetch } from "@/lib/api/client";
 import type { AuthApiError } from "@/types/auth";
 
+type ChangePasswordFormProps = {
+  redirectOnSuccess?: string | null;
+  successMessage?: string;
+  submitLabel?: string;
+  onSuccess?: () => void | Promise<void>;
+};
+
 function mapChangePasswordError(code?: AuthApiError["code"]) {
   switch (code) {
     case "invalid_credentials":
@@ -17,10 +24,16 @@ function mapChangePasswordError(code?: AuthApiError["code"]) {
   }
 }
 
-export function ChangePasswordForm() {
+export function ChangePasswordForm({
+  redirectOnSuccess = "/dashboard",
+  successMessage = "Password updated successfully.",
+  submitLabel = "Save new password",
+  onSuccess,
+}: ChangePasswordFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
   const handleSubmit = (formData: FormData) => {
     const currentPassword = String(formData.get("currentPassword") ?? "");
@@ -34,6 +47,7 @@ export function ChangePasswordForm() {
 
     startTransition(async () => {
       setErrorMessage(null);
+      setSuccessNotice(null);
 
       try {
         const response = await clientApiFetch("/api/v1/auth/change-password", {
@@ -50,8 +64,15 @@ export function ChangePasswordForm() {
           return;
         }
 
-        router.replace("/dashboard");
-        router.refresh();
+        await onSuccess?.();
+
+        if (redirectOnSuccess) {
+          router.replace(redirectOnSuccess);
+          router.refresh();
+          return;
+        }
+
+        setSuccessNotice(successMessage);
       } catch {
         setErrorMessage("We could not update your password right now. Please try again.");
       }
@@ -110,12 +131,18 @@ export function ChangePasswordForm() {
         </p>
       ) : null}
 
+      {successNotice ? (
+        <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-7 text-emerald-800">
+          {successNotice}
+        </p>
+      ) : null}
+
       <button
         type="submit"
         disabled={isPending}
         className="inline-flex w-full items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
       >
-        {isPending ? "Updating password..." : "Save new password"}
+        {isPending ? "Updating password..." : submitLabel}
       </button>
     </form>
   );
