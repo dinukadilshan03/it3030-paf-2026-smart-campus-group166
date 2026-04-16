@@ -34,7 +34,6 @@ export default function ResourcePage() {
 
     try {
       await deleteResource(id);
-      alert("Deleted 🗑️");
       loadResources();
     } catch (err: any) {
       alert(err.message);
@@ -42,75 +41,150 @@ export default function ResourcePage() {
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>Resources</h2>
+    <div style={styles.container}>
+      <div style={styles.header}>
+        <h2 style={styles.title}>📦 Resources</h2>
 
-      {/* ✅ ADMIN ADD BUTTON */}
-      {isAdmin && (
-        <button
-          onClick={() => router.push("/resources/add")}
-          style={{ marginBottom: "15px" }}
-        >
-          ➕ Add Resource
-        </button>
-      )}
-
-      {/* LIST */}
-      {resources.length === 0 ? (
-        <p>No resources found</p>
-      ) : (
-        resources.map((r: any) => (
-          <div
-            key={r.id}
-            style={{
-              border: "1px solid #ddd",
-              padding: "15px",
-              marginBottom: "12px",
-              borderRadius: "8px",
-            }}
+        {isAdmin && (
+          <button
+            onClick={() => router.push("/resources/add")}
+            style={styles.addBtn}
           >
-            <h3>{r.name} ({r.resourceCode})</h3>
+            ➕ Add Resource
+          </button>
+        )}
+      </div>
 
-            <p><b>Capacity:</b> {r.capacity}</p>
-            <p>
-              <b>Category:</b> {r.categoryName || "N/A"} |
-              <b> Location:</b> {r.locationName || "N/A"}
-            </p>
+      {resources.length === 0 ? (
+        <p style={{ marginTop: "20px" }}>No resources found</p>
+      ) : (
+        <div style={styles.grid}>
+          {resources.map((r: any) => (
+            <div key={r.id} style={styles.card}>
+              
+              {/* IMAGE */}
+              {r.imageUrl && (
+                <img
+                  src={r.imageUrl}
+                  alt={r.name}
+                  style={styles.image}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      "https://via.placeholder.com/300x200";
+                  }}
+                />
+              )}
 
-            {/* IMAGE */}
-            {r.imageUrl && (
-              <img
-                src={r.imageUrl}
-                alt={r.name}
-                style={{
-                  width: "120px",
-                  height: "80px",
-                  objectFit: "cover",
-                  borderRadius: "6px",
-                }}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src =
-                    "https://via.placeholder.com/120";
-                }}
-              />
-            )}
+              <div style={styles.cardContent}>
+                <h3 style={styles.name}>
+                  {r.name} ({r.resourceCode})
+                </h3>
 
-            <br />
+                <p><b>ID:</b> {r.id}</p>
+                <p><b>Capacity:</b> {r.capacity ?? "N/A"}</p>
+                <p>
+                  <b>Category:</b> {r.categoryName || "N/A"} ({r.categoryCode || "-"})
+                </p>
+                <p>
+                  <b>Location:</b> {r.locationName || "N/A"} ({r.locationCode || "-"})
+                </p>
+                <p><b>Status:</b> {r.status}</p>
+                <p><b>Approval:</b> {r.requiresApproval ? "Yes" : "No"}</p>
+                <p><b>Description:</b> {r.description || "N/A"}</p>
+                <p><b>Notes:</b> {r.notes || "N/A"}</p>
 
-            {/* ADMIN ACTIONS */}
-            {isAdmin && (
-              <>
-                <button onClick={() => router.push(`/resources/edit/${r.id}`)}>
-                  Edit ✏️
-                </button>
-                <button onClick={() => handleDelete(r.id)}>
-                  Delete 🗑️
-                </button>
-              </>
-            )}
-          </div>
-        ))
+                {/* ADMIN BUTTONS */}
+                {isAdmin && (
+                  <div style={styles.actions}>
+                    <button
+                      onClick={() => router.push(`/resources/edit/${r.id}`)}
+                      style={styles.editBtn}
+                    >
+                      ✏️ Edit
+                    </button>
+
+                    <button
+                      onClick={() => handleDelete(r.id)}
+                      style={styles.deleteBtn}
+                    >
+                      🗑️ Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
 }
+
+/* 🎨 STYLES */
+const styles: any = {
+  container: {
+    padding: "30px",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "20px",
+  },
+  title: {
+    fontSize: "22px",
+    fontWeight: "600",
+  },
+  addBtn: {
+    background: "#2563eb",
+    color: "#fff",
+    padding: "10px 18px",
+    borderRadius: "8px",
+    border: "none",
+    cursor: "pointer",
+    fontWeight: "500",
+  },
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+    gap: "20px",
+  },
+  card: {
+    background: "#fff",
+    borderRadius: "12px",
+    overflow: "hidden",
+    boxShadow: "0 4px 15px rgba(0,0,0,0.08)",
+    transition: "0.2s",
+  },
+  image: {
+    width: "100%",
+    height: "180px",
+    objectFit: "cover",
+  },
+  cardContent: {
+    padding: "15px",
+  },
+  name: {
+    marginBottom: "10px",
+  },
+  actions: {
+    marginTop: "10px",
+    display: "flex",
+    gap: "10px",
+  },
+  editBtn: {
+    background: "#f59e0b",
+    border: "none",
+    padding: "8px 12px",
+    borderRadius: "6px",
+    cursor: "pointer",
+  },
+  deleteBtn: {
+    background: "#ef4444",
+    color: "#fff",
+    border: "none",
+    padding: "8px 12px",
+    borderRadius: "6px",
+    cursor: "pointer",
+  },
+};

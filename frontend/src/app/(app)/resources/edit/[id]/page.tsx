@@ -65,14 +65,14 @@ export default function EditResourcePage() {
   };
 
   const handleUpdate = async () => {
-    const payload = {
-      ...form,
-      capacity: form.capacity ? Number(form.capacity) : null,
-      resourceCategoryId: Number(form.categoryId),
-      locationId: Number(form.locationId),
-    };
-
     try {
+      const payload = {
+        ...form,
+        capacity: form.capacity ? Number(form.capacity) : null,
+        resourceCategoryId: Number(form.categoryId),
+        locationId: Number(form.locationId),
+      };
+
       await updateResource(Number(id), payload);
       alert("Updated successfully ✅");
       router.push("/resources");
@@ -82,35 +82,118 @@ export default function EditResourcePage() {
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>Edit Resource</h2>
+    <div style={styles.container}>
+      <div style={styles.card}>
+        <h2 style={styles.title}>✏️ Edit Resource</h2>
 
-      <input name="name" value={form.name} onChange={handleChange} placeholder="Name" />
-      <input name="resourceCode" value={form.resourceCode} onChange={handleChange} placeholder="Code" />
-      <input name="description" value={form.description} onChange={handleChange} placeholder="Description" />
-      <input name="capacity" value={form.capacity} onChange={handleChange} placeholder="Capacity" />
+        <div style={styles.grid}>
+          <input name="name" value={form.name} onChange={handleChange} placeholder="Name" style={styles.input} />
+          <input name="resourceCode" value={form.resourceCode} onChange={handleChange} placeholder="Code" style={styles.input} />
 
-      <select name="categoryId" value={form.categoryId} onChange={handleChange}>
-        <option value="">Category</option>
-        {categories.map((c: any) => (
-          <option key={c.id} value={c.id}>{c.name}</option>
-        ))}
-      </select>
+          <input name="description" value={form.description} onChange={handleChange} placeholder="Description" style={styles.input} />
+          <input name="capacity" value={form.capacity} onChange={handleChange} placeholder="Capacity" style={styles.input} />
 
-      <select name="locationId" value={form.locationId} onChange={handleChange}>
-        <option value="">Location</option>
-        {locations.map((l: any) => (
-          <option key={l.id} value={l.id}>{l.name}</option>
-        ))}
-      </select>
+          <select name="categoryId" value={form.categoryId} onChange={handleChange} style={styles.input}>
+            <option value="">Select Category</option>
+            {categories.map((c: any) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
 
-      <input name="notes" value={form.notes} onChange={handleChange} placeholder="Notes" />
-      <input name="imageUrl" value={form.imageUrl} onChange={handleChange} placeholder="Image URL" />
+          <select name="locationId" value={form.locationId} onChange={handleChange} style={styles.input}>
+            <option value="">Select Location</option>
+            {locations.map((l: any) => (
+              <option key={l.id} value={l.id}>{l.name}</option>
+            ))}
+          </select>
 
-      <br /><br />
+          <input name="notes" value={form.notes} onChange={handleChange} placeholder="Notes" style={styles.input} />
+          <input name="imageUrl" value={form.imageUrl} onChange={handleChange} placeholder="Image URL" style={styles.input} />
+        </div>
 
-      <button onClick={handleUpdate}>Update</button>
-      <button onClick={() => router.push("/resources")}>Cancel</button>
+        {/* IMAGE PREVIEW */}
+        {form.imageUrl && (
+          <div style={{ marginTop: "20px" }}>
+            <p style={{ fontSize: "14px", marginBottom: "5px" }}>Preview:</p>
+            <img
+              src={form.imageUrl}
+              alt="preview"
+              style={styles.image}
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = "https://via.placeholder.com/150";
+              }}
+            />
+          </div>
+        )}
+
+        {/* BUTTONS */}
+        <div style={styles.actions}>
+          <button onClick={handleUpdate} style={styles.updateBtn}>
+            💾 Update
+          </button>
+
+          <button onClick={() => router.push("/resources")} style={styles.cancelBtn}>
+            Cancel
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
+
+/* 🎨 STYLES */
+const styles: any = {
+  container: {
+    display: "flex",
+    justifyContent: "center",
+    padding: "40px",
+  },
+  card: {
+    width: "800px",
+    background: "#fff",
+    padding: "25px",
+    borderRadius: "12px",
+    boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+  },
+  title: {
+    marginBottom: "20px",
+    fontWeight: "600",
+  },
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "15px",
+  },
+  input: {
+    padding: "10px",
+    borderRadius: "8px",
+    border: "1px solid #ccc",
+    fontSize: "14px",
+  },
+  image: {
+    width: "150px",
+    height: "100px",
+    objectFit: "cover",
+    borderRadius: "8px",
+  },
+  actions: {
+    marginTop: "25px",
+    display: "flex",
+    gap: "10px",
+  },
+  updateBtn: {
+    background: "#2563eb",
+    color: "#fff",
+    padding: "10px 20px",
+    borderRadius: "8px",
+    border: "none",
+    cursor: "pointer",
+  },
+  cancelBtn: {
+    background: "#e5e7eb",
+    padding: "10px 20px",
+    borderRadius: "8px",
+    border: "none",
+    cursor: "pointer",
+  },
+};
