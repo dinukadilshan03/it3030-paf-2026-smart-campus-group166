@@ -55,7 +55,7 @@ export function StatusUpdateDialog({
       open={open}
       onClose={onClose}
       title="Advance ticket lifecycle"
-      description="The backend enforces valid transitions. Staff can move assigned tickets into progress and resolve them. Admins can also reject or close tickets when appropriate."
+      description="The backend enforces valid transitions. Staff move assigned tickets into progress and resolve them, while admins reject invalid requests or close resolved work."
       widthClassName="max-w-2xl"
     >
       <form

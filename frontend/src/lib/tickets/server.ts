@@ -1,4 +1,5 @@
 import { serverApiFetch } from "@/lib/api/server";
+import { listUsersServer } from "@/lib/users/server";
 import { buildTicketQuery, throwTicketApiError } from "@/lib/tickets/shared";
 import type {
   TicketAttachment,
@@ -69,4 +70,20 @@ export async function listAssignableStaffServer() {
   const response = await serverApiFetch("/api/v1/users?role=STAFF&status=ACTIVE");
   if (!response.ok) await throwTicketApiError(response);
   return ((await response.json()) as AdminUserSummary[]) ?? [];
+}
+
+export async function listTicketReporterUsersServer() {
+  const [students, staff] = await Promise.all([
+    listUsersServer({ role: "STUDENT", status: "ACTIVE" }),
+    listUsersServer({ role: "STAFF", status: "ACTIVE" }),
+  ]);
+
+  const byId = new Map<number, AdminUserSummary>();
+  [...students, ...staff].forEach((user) => {
+    byId.set(user.id, user);
+  });
+
+  return Array.from(byId.values()).sort((left, right) =>
+    left.displayName.localeCompare(right.displayName),
+  );
 }

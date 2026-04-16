@@ -6,6 +6,7 @@ import com.smartcampus.backend.modules.ticket.dto.CreateTicketRequest;
 import com.smartcampus.backend.modules.ticket.dto.TicketDetailResponse;
 import com.smartcampus.backend.modules.ticket.dto.TicketSummaryResponse;
 import com.smartcampus.backend.modules.ticket.dto.UpdateTicketAssignmentRequest;
+import com.smartcampus.backend.modules.ticket.dto.UpdateTicketRequest;
 import com.smartcampus.backend.modules.ticket.dto.UpdateTicketStatusRequest;
 import com.smartcampus.backend.modules.ticket.service.TicketService;
 import jakarta.validation.Valid;
@@ -17,11 +18,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.DeleteMapping;
 
 @RestController
 @RequestMapping("/api/v1/tickets")
@@ -51,6 +54,20 @@ public class TicketController {
     @ResponseStatus(HttpStatus.CREATED)
     public TicketDetailResponse createTicket(@Valid @RequestBody CreateTicketRequest request) {
         return ticketService.create(request);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('STUDENT', 'STAFF', 'ADMIN')")
+    public TicketDetailResponse updateTicket(
+            @PathVariable Long id, @Valid @RequestBody UpdateTicketRequest request) {
+        return ticketService.updateTicket(id, request);
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('STUDENT', 'STAFF', 'ADMIN')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteTicket(@PathVariable Long id) {
+        ticketService.deleteTicket(id);
     }
 
     @PatchMapping("/{id}/assignment")

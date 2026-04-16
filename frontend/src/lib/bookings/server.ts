@@ -11,13 +11,13 @@ import type {
 function buildBookingParams(filters: BookingFilters = {}): URLSearchParams {
   const params = new URLSearchParams();
   
-  if (filters.status && filters.status !== "") {
+  if (filters.status) {
     params.append("status", filters.status);
   }
-  if (filters.resourceId && filters.resourceId !== "") {
+  if (filters.resourceId) {
     params.append("resourceId", String(filters.resourceId));
   }
-  if (filters.requesterUserId && filters.requesterUserId !== "") {
+  if (filters.requesterUserId) {
     params.append("requesterUserId", String(filters.requesterUserId));
   }
   if (filters.bookingDate) {

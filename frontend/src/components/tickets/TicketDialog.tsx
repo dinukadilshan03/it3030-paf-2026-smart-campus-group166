@@ -49,7 +49,7 @@ export function TicketDialog({
             className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-lg text-slate-500 transition hover:border-slate-300 hover:text-slate-900"
             aria-label="Close dialog"
           >
-            ×
+            x
           </button>
         </header>
 

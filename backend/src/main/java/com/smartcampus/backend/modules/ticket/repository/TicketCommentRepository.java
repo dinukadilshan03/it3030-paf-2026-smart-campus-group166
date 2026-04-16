@@ -29,4 +29,6 @@ public interface TicketCommentRepository extends JpaRepository<TicketComment, Lo
             """)
     Optional<TicketComment> findByIdAndTicketId(
             @Param("commentId") Long commentId, @Param("ticketId") Long ticketId);
+
+    boolean existsByParentComment_Id(Long parentCommentId);
 }

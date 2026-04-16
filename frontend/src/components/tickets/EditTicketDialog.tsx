@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-import { TicketAttachmentDraftCard } from "@/components/tickets/TicketAttachmentDraftCard";
 import { TicketDialog } from "@/components/tickets/TicketDialog";
 import {
   getActiveTicketCategories,
@@ -11,79 +10,68 @@ import {
   TicketApiError,
   toIdNumber,
 } from "@/lib/tickets/shared";
-import { validateCreateTicketForm } from "@/lib/tickets/validation";
+import { validateUpdateTicketForm } from "@/lib/tickets/validation";
 import type {
-  CreateTicketFormValues,
-  CreateTicketSubmission,
-  TicketAttachmentDraft,
   TicketCategorySummary,
+  TicketDetail,
   TicketLocationOption,
   TicketPriority,
   TicketResourceOption,
+  UpdateTicketRequest,
 } from "@/lib/tickets/types";
-import type { AdminUserSummary } from "@/lib/users/types";
-import type { RoleCode } from "@/types/auth";
 
-type CreateTicketFormProps = {
+type EditTicketDialogProps = {
   open: boolean;
   busy?: boolean;
-  currentRole: RoleCode;
+  ticket: TicketDetail | null;
   categories: TicketCategorySummary[];
   locations: TicketLocationOption[];
   resources: TicketResourceOption[];
-  reporterUsers: AdminUserSummary[];
   onClose: () => void;
-  onSubmit: (submission: CreateTicketSubmission) => Promise<void>;
+  onSubmit: (payload: UpdateTicketRequest) => Promise<void>;
 };
 
-async function toAttachmentDraft(file: File): Promise<TicketAttachmentDraft> {
-  const previewUrl = await new Promise<string | null>((resolve) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
-    reader.onerror = () => resolve(null);
-    reader.readAsDataURL(file);
-  });
+type TicketEditFormValues = {
+  reporterUserId: string;
+  resourceId: string;
+  locationId: string;
+  ticketCategoryId: string;
+  title: string;
+  description: string;
+  priority: TicketPriority;
+  preferredContactName: string;
+  preferredContactEmail: string;
+  preferredContactPhone: string;
+};
 
+function getInitialValues(ticket: TicketDetail | null): TicketEditFormValues {
   return {
-    id: crypto.randomUUID(),
-    file,
-    previewUrl,
-    fileName: file.name,
-    mimeType: file.type,
-    fileSize: file.size,
-  };
-}
-
-function getInitialValues(): CreateTicketFormValues {
-  return {
-    reporterUserId: "",
-    resourceId: "",
-    locationId: "",
-    ticketCategoryId: "",
-    title: "",
-    description: "",
-    priority: "MEDIUM",
-    preferredContactName: "",
-    preferredContactEmail: "",
-    preferredContactPhone: "",
-    attachments: [],
+    reporterUserId: ticket?.reporterUserId ? String(ticket.reporterUserId) : "",
+    resourceId: ticket?.resourceId ? String(ticket.resourceId) : "",
+    locationId: ticket?.locationId ? String(ticket.locationId) : "",
+    ticketCategoryId: ticket?.ticketCategoryId ? String(ticket.ticketCategoryId) : "",
+    title: ticket?.title ?? "",
+    description: ticket?.description ?? "",
+    priority: ticket?.priority ?? "MEDIUM",
+    preferredContactName: ticket?.preferredContactName ?? "",
+    preferredContactEmail: ticket?.preferredContactEmail ?? "",
+    preferredContactPhone: ticket?.preferredContactPhone ?? "",
   };
 }
 
 const PRIORITY_OPTIONS: TicketPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
-export function CreateTicketForm({
+export function EditTicketDialog({
   open,
   busy = false,
-  currentRole,
+  ticket,
   categories,
   locations,
   resources,
-  reporterUsers,
   onClose,
   onSubmit,
-}: CreateTicketFormProps) {
-  const [values, setValues] = useState<CreateTicketFormValues>(getInitialValues());
+}: EditTicketDialogProps) {
+  const [values, setValues] = useState<TicketEditFormValues>(getInitialValues(ticket));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -91,7 +79,6 @@ export function CreateTicketForm({
   const filteredResources = values.locationId
     ? resources.filter((resource) => resource.locationId === Number(values.locationId))
     : resources;
-
   const inputClassName =
     "rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:bg-white";
 
@@ -99,8 +86,8 @@ export function CreateTicketForm({
     <TicketDialog
       open={open}
       onClose={onClose}
-      title="Report a new issue"
-      description="Create a maintenance or incident ticket against a resource or a location, then attach up to 3 evidence images."
+      title="Edit ticket details"
+      description="Open tickets can be corrected by the reporter, and admins can adjust ticket details at any point in the workflow."
     >
       <form
         className="space-y-6"
@@ -108,9 +95,7 @@ export function CreateTicketForm({
           event.preventDefault();
           setFormError(null);
 
-          const validationErrors = validateCreateTicketForm(values, resources, {
-            requireReporterSelection: currentRole === "ADMIN",
-          });
+          const validationErrors = validateUpdateTicketForm(values, resources);
           if (Object.keys(validationErrors).length > 0) {
             setErrors(validationErrors);
             return;
@@ -118,62 +103,31 @@ export function CreateTicketForm({
 
           try {
             setErrors({});
-
-            const submission: CreateTicketSubmission = {
-              request: {
-                reporterUserId:
-                  currentRole === "ADMIN" ? toIdNumber(values.reporterUserId) : undefined,
-                resourceId: toIdNumber(values.resourceId),
-                locationId: toIdNumber(values.locationId),
-                ticketCategoryId: Number(values.ticketCategoryId),
-                title: values.title.trim(),
-                description: values.description.trim(),
-                priority: values.priority,
-                preferredContactName: values.preferredContactName.trim() || undefined,
-                preferredContactEmail: values.preferredContactEmail.trim() || undefined,
-                preferredContactPhone: values.preferredContactPhone.trim() || undefined,
-              },
-              attachments: values.attachments
-                .filter((attachment) => attachment.file)
-                .map((attachment) => ({
-                  file: attachment.file as File,
-                })),
-            };
-
-            await onSubmit(submission);
+            await onSubmit({
+              resourceId: toIdNumber(values.resourceId),
+              locationId: toIdNumber(values.locationId),
+              ticketCategoryId: Number(values.ticketCategoryId),
+              title: values.title.trim(),
+              description: values.description.trim(),
+              priority: values.priority,
+              preferredContactName: values.preferredContactName.trim() || undefined,
+              preferredContactEmail: values.preferredContactEmail.trim() || undefined,
+              preferredContactPhone: values.preferredContactPhone.trim() || undefined,
+            });
             onClose();
           } catch (error) {
             if (error instanceof TicketApiError) {
               setErrors(error.validationErrors);
             }
-            setFormError(error instanceof Error ? error.message : "Ticket creation failed.");
+            setFormError(error instanceof Error ? error.message : "Ticket update failed.");
           }
         }}
       >
-        {currentRole === "ADMIN" ? (
-          <label className="grid gap-2 text-sm font-medium text-slate-700">
-            Reported by
-            <select
-              value={values.reporterUserId}
-              onChange={(event) =>
-                setValues((current) => ({
-                  ...current,
-                  reporterUserId: event.target.value,
-                }))
-              }
-              className={inputClassName}
-            >
-              <option value="">Choose the reporter</option>
-              {reporterUsers.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.displayName} / {user.role ?? "USER"} / {user.email}
-                </option>
-              ))}
-            </select>
-            {errors.reporterUserId ? (
-              <span className="text-xs text-rose-600">{errors.reporterUserId}</span>
-            ) : null}
-          </label>
+        {ticket ? (
+          <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-600">
+            <p className="font-semibold text-slate-900">{ticket.ticketNumber}</p>
+            <p>{ticket.title}</p>
+          </div>
         ) : null}
 
         <section className="grid gap-4 md:grid-cols-2">
@@ -263,8 +217,7 @@ export function CreateTicketForm({
           <div>
             <p className="text-sm font-semibold text-slate-900">Incident scope</p>
             <p className="mt-2 text-sm leading-7 text-slate-600">
-              Choose a location for area-level incidents, or pick a specific resource. When a
-              resource is selected, its location is locked in automatically.
+              Keep the ticket tied to a specific room, area, or campus resource.
             </p>
           </div>
 
@@ -284,7 +237,9 @@ export function CreateTicketForm({
                     ...current,
                     locationId: nextLocationId,
                     resourceId:
-                      selectedResource && nextLocationId && selectedResource.locationId !== Number(nextLocationId)
+                      selectedResource &&
+                      nextLocationId &&
+                      selectedResource.locationId !== Number(nextLocationId)
                         ? ""
                         : current.resourceId,
                   }));
@@ -389,104 +344,6 @@ export function CreateTicketForm({
           </label>
         </section>
 
-        <section className="rounded-[1.4rem] border border-slate-200 bg-slate-50/70 p-5">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-slate-900">Evidence images</p>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
-                Add up to three images that show the issue clearly. Format and file details are
-                filled in automatically.
-              </p>
-            </div>
-            <span className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700">
-              {values.attachments.length}/3 selected
-            </span>
-          </div>
-
-          {errors.attachments ? (
-            <p className="mt-3 text-xs text-rose-600">{errors.attachments}</p>
-          ) : null}
-
-          <div className="mt-5 space-y-5">
-            <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-[1.25rem] border border-dashed border-slate-300 bg-white px-5 py-8 text-center transition hover:border-teal-300 hover:bg-teal-50/40">
-              <span className="inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
-                Choose images
-              </span>
-              <span className="text-sm leading-7 text-slate-600">
-                JPG, PNG, WEBP, or GIF up to 5 MB each
-              </span>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                multiple
-                className="hidden"
-                disabled={busy || values.attachments.length >= 3}
-                onChange={async (event) => {
-                  const files = Array.from(event.target.files ?? []);
-                  event.target.value = "";
-
-                  if (files.length === 0) {
-                    return;
-                  }
-
-                  const availableSlots = Math.max(0, 3 - values.attachments.length);
-                  const nextFiles = files.slice(0, availableSlots);
-                  const nextDrafts = await Promise.all(nextFiles.map((file) => toAttachmentDraft(file)));
-
-                  setValues((current) => ({
-                    ...current,
-                    attachments: [...current.attachments, ...nextDrafts],
-                  }));
-
-                  setErrors((current) => {
-                    const nextErrors = { ...current };
-                    if (files.length > availableSlots) {
-                      nextErrors.attachments = "Only up to 3 image attachments are allowed.";
-                    } else {
-                      delete nextErrors.attachments;
-                    }
-                    return nextErrors;
-                  });
-                }}
-              />
-            </label>
-
-            {values.attachments.length === 0 ? (
-              <div className="rounded-[1.2rem] border border-dashed border-slate-300 bg-white px-4 py-5 text-sm leading-7 text-slate-600">
-                No evidence images added yet.
-              </div>
-            ) : null}
-
-            <div className="grid gap-4 xl:grid-cols-2">
-              {values.attachments.map((attachment, index) => {
-              const attachmentErrors: Record<string, string> = {};
-              Object.entries(errors).forEach(([key, message]) => {
-                const prefix = `attachments.${index}.`;
-                if (key.startsWith(prefix)) {
-                  attachmentErrors[key.slice(prefix.length)] = message;
-                }
-              });
-
-              return (
-                <TicketAttachmentDraftCard
-                  key={attachment.id}
-                  draft={attachment}
-                  errors={attachmentErrors}
-                  onRemove={() =>
-                    setValues((current) => ({
-                      ...current,
-                      attachments: current.attachments.filter(
-                        (currentAttachment) => currentAttachment.id !== attachment.id,
-                      ),
-                    }))
-                  }
-                />
-              );
-              })}
-            </div>
-          </div>
-        </section>
-
         {formError ? (
           <p className="rounded-[1.2rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             {formError}
@@ -499,7 +356,7 @@ export function CreateTicketForm({
             disabled={busy}
             className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {busy ? "Creating ticket..." : "Create ticket"}
+            {busy ? "Saving changes..." : "Save changes"}
           </button>
           <button
             type="button"

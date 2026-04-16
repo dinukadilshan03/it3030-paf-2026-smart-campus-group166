@@ -1,14 +1,23 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import {
+  canCurrentUserDeleteTicket,
+  canCurrentUserEditTicket,
   canCurrentUserUpdateStatus,
   formatDateTime,
+  getFirstResponseTimerState,
+  getResolutionTimerState,
+  getSlaTargetLabel,
+  getTicketProgressLabel,
   toTicketTitleCase,
 } from "@/lib/tickets/shared";
 import type {
-  CreateTicketAttachmentRequest,
   CreateTicketCommentRequest,
   TicketBundle,
+  TicketAttachmentUpload,
+  UpdateTicketCommentRequest,
 } from "@/lib/tickets/types";
 import type { CurrentUser } from "@/types/auth";
 import { TicketAttachmentPanel } from "@/components/tickets/TicketAttachmentPanel";
@@ -21,24 +30,68 @@ type TicketDetailPanelProps = {
   ticketBundle: TicketBundle | null;
   detailLoading?: boolean;
   busy?: boolean;
+  onOpenEdit: () => void;
   onOpenAssignment: () => void;
   onOpenStatus: () => void;
+  onDeleteTicket: () => Promise<void>;
   onCreateComment: (payload: CreateTicketCommentRequest) => Promise<void>;
-  onCreateAttachment: (payload: CreateTicketAttachmentRequest) => Promise<void>;
+  onUpdateComment: (commentId: number, payload: UpdateTicketCommentRequest) => Promise<void>;
+  onDeleteComment: (commentId: number) => Promise<void>;
+  onCreateAttachment: (payload: TicketAttachmentUpload) => Promise<void>;
   onDeleteAttachment: (attachmentId: number) => Promise<void>;
 };
+
+const WORKFLOW_STEPS = [
+  {
+    status: "OPEN",
+    label: "Open",
+    description: "Submitted by the student and waiting for operational action.",
+  },
+  {
+    status: "IN_PROGRESS",
+    label: "In progress",
+    description: "Assigned staff are actively working on the issue.",
+  },
+  {
+    status: "RESOLVED",
+    label: "Resolved",
+    description: "Staff captured the fix and handed the ticket back for closure.",
+  },
+  {
+    status: "CLOSED",
+    label: "Closed",
+    description: "Admin review is complete and the ticket is fully closed out.",
+  },
+] as const;
+
+const TIMER_TONE_CLASS = {
+  neutral: "border-slate-200 bg-slate-50 text-slate-700",
+  success: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  danger: "border-rose-200 bg-rose-50 text-rose-700",
+} as const;
 
 export function TicketDetailPanel({
   currentUser,
   ticketBundle,
   detailLoading = false,
   busy = false,
+  onOpenEdit,
   onOpenAssignment,
   onOpenStatus,
+  onDeleteTicket,
   onCreateComment,
+  onUpdateComment,
+  onDeleteComment,
   onCreateAttachment,
   onDeleteAttachment,
 }: TicketDetailPanelProps) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNowMs(Date.now()), 30000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   if (!ticketBundle) {
     return (
       <section className="rounded-[1.75rem] border border-white/70 bg-white/85 p-8 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur">
@@ -49,8 +102,8 @@ export function TicketDetailPanel({
           Select a ticket to inspect the workflow
         </h2>
         <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">
-          The detail area shows incident context, staff ownership, workflow history, comments, and
-          attachment metadata once you choose a ticket from the queue.
+          The detail area shows incident context, assignment, process tracking, service timers,
+          comments, and evidence images once you choose a ticket from the queue.
         </p>
       </section>
     );
@@ -58,10 +111,24 @@ export function TicketDetailPanel({
 
   const { detail, comments, attachments } = ticketBundle;
   const canAssign = currentUser.role === "ADMIN";
+  const canEdit =
+    currentUser.role != null &&
+    currentUser.id != null &&
+    canCurrentUserEditTicket(currentUser.role, currentUser.id, detail);
+  const canDelete =
+    currentUser.role != null &&
+    currentUser.id != null &&
+    canCurrentUserDeleteTicket(currentUser.role, currentUser.id, detail);
   const canUpdate =
     currentUser.role != null &&
     currentUser.id != null &&
     canCurrentUserUpdateStatus(currentUser.role, currentUser.id, detail);
+  const firstResponseState = getFirstResponseTimerState(detail, nowMs);
+  const resolutionState = getResolutionTimerState(detail, nowMs);
+  const workflowStepIndex =
+    detail.status === "REJECTED"
+      ? 0
+      : WORKFLOW_STEPS.findIndex((step) => step.status === detail.status);
 
   return (
     <section className="space-y-6">
@@ -76,6 +143,9 @@ export function TicketDetailPanel({
             </h2>
             <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">
               {detail.description}
+            </p>
+            <p className="mt-4 text-sm font-medium text-slate-700">
+              {getTicketProgressLabel(detail)}
             </p>
           </div>
 
@@ -92,6 +162,16 @@ export function TicketDetailPanel({
         ) : null}
 
         <div className="mt-6 flex flex-wrap gap-3">
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={onOpenEdit}
+              disabled={busy}
+              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Edit ticket
+            </button>
+          ) : null}
           {canAssign ? (
             <button
               type="button"
@@ -112,6 +192,25 @@ export function TicketDetailPanel({
               Update status
             </button>
           ) : null}
+          {canDelete ? (
+            <button
+              type="button"
+              onClick={async () => {
+                const confirmationMessage =
+                  currentUser.role === "ADMIN"
+                    ? "Delete this open ticket from the queue?"
+                    : "Withdraw this open ticket?";
+                if (!window.confirm(confirmationMessage)) {
+                  return;
+                }
+                await onDeleteTicket();
+              }}
+              disabled={busy}
+              className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-white px-5 py-3 text-sm font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {currentUser.role === "ADMIN" ? "Delete ticket" : "Withdraw ticket"}
+            </button>
+          ) : null}
         </div>
       </section>
 
@@ -127,11 +226,37 @@ export function TicketDetailPanel({
             </div>
             <div>
               <dt className="font-semibold text-slate-900">Resource</dt>
-              <dd>{detail.resourceName ? `${detail.resourceName} (${detail.resourceCode})` : "No specific resource"}</dd>
+              <dd>
+                {detail.resourceName
+                  ? detail.resourceCode
+                    ? `${detail.resourceName} (${detail.resourceCode})`
+                    : detail.resourceName
+                  : "No specific resource"}
+              </dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-slate-900">Resource type</dt>
+              <dd>{detail.resourceCategoryName || "Not provided"}</dd>
             </div>
             <div>
               <dt className="font-semibold text-slate-900">Location</dt>
               <dd>{detail.locationName || "Not provided"}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-slate-900">Building</dt>
+              <dd>{detail.locationBuilding || "Not provided"}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-slate-900">Floor</dt>
+              <dd>{detail.locationFloor || "Not provided"}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-slate-900">Room</dt>
+              <dd>{detail.locationRoomIdentifier || "Not provided"}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-slate-900">Location notes</dt>
+              <dd>{detail.locationDescription || "Not provided"}</dd>
             </div>
             <div>
               <dt className="font-semibold text-slate-900">Created</dt>
@@ -178,6 +303,91 @@ export function TicketDetailPanel({
 
         <article className="rounded-[1.5rem] border border-white/70 bg-white/85 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Process tracker
+          </p>
+          <div className="mt-5 space-y-4">
+            {WORKFLOW_STEPS.map((step, index) => {
+              const isCompleted = detail.status !== "REJECTED" && index < workflowStepIndex;
+              const isCurrent = detail.status !== "REJECTED" && index === workflowStepIndex;
+
+              return (
+                <div
+                  key={step.status}
+                  className={`rounded-[1.2rem] border p-4 ${
+                    isCurrent
+                      ? "border-teal-200 bg-teal-50/70"
+                      : isCompleted
+                        ? "border-emerald-200 bg-emerald-50/70"
+                        : "border-slate-200 bg-slate-50/70"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-950">{step.label}</p>
+                      <p className="mt-1 text-sm leading-7 text-slate-600">{step.description}</p>
+                    </div>
+                    <span
+                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
+                        isCurrent
+                          ? "bg-teal-100 text-teal-800"
+                          : isCompleted
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-slate-200 text-slate-700"
+                      }`}
+                    >
+                      {isCurrent ? "Current" : isCompleted ? "Done" : "Pending"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+
+            {detail.status === "REJECTED" ? (
+              <div className="rounded-[1.2rem] border border-rose-200 bg-rose-50 p-4 text-sm leading-7 text-rose-700">
+                <p className="font-semibold">Rejected by admin</p>
+                <p>{detail.rejectionReason || "A rejection reason has not been recorded yet."}</p>
+              </div>
+            ) : null}
+          </div>
+        </article>
+
+        <article className="rounded-[1.5rem] border border-white/70 bg-white/85 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Service timers
+          </p>
+          <div className="mt-5 grid gap-4">
+            <div
+              className={`rounded-[1.2rem] border p-4 ${
+                TIMER_TONE_CLASS[firstResponseState.tone]
+              }`}
+            >
+              <p className="text-sm font-semibold">Time to first response</p>
+              <p className="mt-2 text-xl font-semibold tracking-tight">{firstResponseState.label}</p>
+              <p className="mt-2 text-sm">
+                Target: {getSlaTargetLabel(detail.priority, "firstResponse")}
+              </p>
+              <p className="mt-1 text-sm">
+                First response recorded: {formatDateTime(detail.firstRespondedAt)}
+              </p>
+            </div>
+
+            <div
+              className={`rounded-[1.2rem] border p-4 ${
+                TIMER_TONE_CLASS[resolutionState.tone]
+              }`}
+            >
+              <p className="text-sm font-semibold">Time to resolution</p>
+              <p className="mt-2 text-xl font-semibold tracking-tight">{resolutionState.label}</p>
+              <p className="mt-2 text-sm">
+                Target: {getSlaTargetLabel(detail.priority, "resolution")}
+              </p>
+              <p className="mt-1 text-sm">Resolved at: {formatDateTime(detail.resolvedAt)}</p>
+            </div>
+          </div>
+        </article>
+
+        <article className="rounded-[1.5rem] border border-white/70 bg-white/85 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
             Assignment history
           </p>
           <div className="mt-5 space-y-4">
@@ -216,7 +426,9 @@ export function TicketDetailPanel({
                   </p>
                 ) : null}
                 {assignment.assignmentNote ? (
-                  <p className="mt-2 text-sm leading-7 text-slate-700">{assignment.assignmentNote}</p>
+                  <p className="mt-2 text-sm leading-7 text-slate-700">
+                    {assignment.assignmentNote}
+                  </p>
                 ) : null}
               </div>
             ))}
@@ -225,7 +437,7 @@ export function TicketDetailPanel({
 
         <article className="rounded-[1.5rem] border border-white/70 bg-white/85 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-            Lifecycle
+            Lifecycle notes
           </p>
           <dl className="mt-5 grid gap-4 text-sm leading-7 text-slate-600">
             <div>
@@ -241,8 +453,16 @@ export function TicketDetailPanel({
               <dd>{detail.rejectionReason || "Not rejected"}</dd>
             </div>
             <div>
+              <dt className="font-semibold text-slate-900">First response at</dt>
+              <dd>{formatDateTime(detail.firstRespondedAt)}</dd>
+            </div>
+            <div>
               <dt className="font-semibold text-slate-900">Resolved at</dt>
               <dd>{formatDateTime(detail.resolvedAt)}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-slate-900">Rejected at</dt>
+              <dd>{formatDateTime(detail.rejectedAt)}</dd>
             </div>
             <div>
               <dt className="font-semibold text-slate-900">Closed at</dt>
@@ -259,6 +479,8 @@ export function TicketDetailPanel({
         comments={comments}
         busy={busy}
         onSubmit={onCreateComment}
+        onUpdate={onUpdateComment}
+        onDelete={onDeleteComment}
       />
 
       <TicketAttachmentPanel

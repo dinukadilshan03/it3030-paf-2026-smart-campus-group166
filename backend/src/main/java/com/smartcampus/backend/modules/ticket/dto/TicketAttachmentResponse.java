@@ -6,6 +6,7 @@ public record TicketAttachmentResponse(
         Long id,
         Long uploadedByUserId,
         String uploadedByDisplayName,
+        String title,
         String fileName,
         String storageBucket,
         String storagePath,

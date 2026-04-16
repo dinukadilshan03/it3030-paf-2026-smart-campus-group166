@@ -2,42 +2,54 @@
 
 import type { RoleCode } from "@/types/auth";
 
-import { describeTicketScope, formatDateTime } from "@/lib/tickets/shared";
+import {
+  describeTicketScope,
+  formatDateTime,
+  getTicketProgressLabel,
+} from "@/lib/tickets/shared";
 import type { TicketSummary } from "@/lib/tickets/types";
 import { TicketPriorityBadge } from "@/components/tickets/TicketPriorityBadge";
 import { TicketStatusBadge } from "@/components/tickets/TicketStatusBadge";
 
 type TicketListProps = {
   role: RoleCode;
+  currentUserId: number | null;
   tickets: TicketSummary[];
   selectedTicketId: number | null;
   busy?: boolean;
   onSelect: (ticketId: number) => void;
 };
 
-function TicketSupplementalText(role: RoleCode, ticket: TicketSummary) {
+function TicketSupplementalText(role: RoleCode, currentUserId: number | null, ticket: TicketSummary) {
   switch (role) {
     case "ADMIN":
       return (
         <div className="space-y-1 text-sm text-slate-600">
           <p>Reporter: {ticket.reporterDisplayName}</p>
-          <p>
-            Assignee: {ticket.assignedStaffDisplayName ?? "Not assigned"}
-          </p>
+          <p>Assignee: {ticket.assignedStaffDisplayName ?? "Not assigned"}</p>
         </div>
       );
     case "STAFF":
       return (
         <div className="space-y-1 text-sm text-slate-600">
-          <p>Reporter: {ticket.reporterDisplayName}</p>
-          <p>Assigned to you</p>
+          {ticket.assignedStaffUserId === currentUserId ? (
+            <>
+              <p>Reporter: {ticket.reporterDisplayName}</p>
+              <p>Assigned to you for action</p>
+            </>
+          ) : (
+            <>
+              <p>Reported by you</p>
+              <p>Assignee: {ticket.assignedStaffDisplayName ?? "Not assigned"}</p>
+            </>
+          )}
         </div>
       );
     case "STUDENT":
       return (
         <div className="space-y-1 text-sm text-slate-600">
           <p>Handled by: {ticket.assignedStaffDisplayName ?? "Awaiting assignment"}</p>
-          <p>Created: {formatDateTime(ticket.createdAt)}</p>
+          <p>Track comments and status changes below.</p>
         </div>
       );
   }
@@ -45,6 +57,7 @@ function TicketSupplementalText(role: RoleCode, ticket: TicketSummary) {
 
 export function TicketList({
   role,
+  currentUserId,
   tickets,
   selectedTicketId,
   busy = false,
@@ -103,13 +116,14 @@ export function TicketList({
               <div className="mt-4 space-y-1 text-sm text-slate-600">
                 <p>
                   {ticket.resourceName
-                    ? `${ticket.resourceName}${ticket.locationName ? ` · ${ticket.locationName}` : ""}`
+                    ? `${ticket.resourceName}${ticket.locationName ? ` / ${ticket.locationName}` : ""}`
                     : ticket.locationName || "Location pending"}
                 </p>
                 <p>Raised {formatDateTime(ticket.createdAt)}</p>
+                <p>{getTicketProgressLabel(ticket)}</p>
               </div>
 
-              <div className="mt-4">{TicketSupplementalText(role, ticket)}</div>
+              <div className="mt-4">{TicketSupplementalText(role, currentUserId, ticket)}</div>
             </button>
           );
         })}

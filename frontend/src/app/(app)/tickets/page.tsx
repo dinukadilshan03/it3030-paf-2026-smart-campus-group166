@@ -5,6 +5,7 @@ import {
   listAssignableStaffServer,
   listTicketCategoriesServer,
   listTicketLocationsServer,
+  listTicketReporterUsersServer,
   listTicketResourcesServer,
   listTicketsServer,
 } from "@/lib/tickets/server";
@@ -12,12 +13,13 @@ import {
 export default async function TicketsPage() {
   const currentUser = await requireRole(["STUDENT", "STAFF", "ADMIN"]);
 
-  const [tickets, categories, locations, resources, activeStaffUsers] = await Promise.all([
+  const [tickets, categories, locations, resources, activeStaffUsers, reporterUsers] = await Promise.all([
     listTicketsServer(),
     listTicketCategoriesServer(),
     listTicketLocationsServer(),
     listTicketResourcesServer(),
     currentUser.role === "ADMIN" ? listAssignableStaffServer() : Promise.resolve([]),
+    currentUser.role === "ADMIN" ? listTicketReporterUsersServer() : Promise.resolve([]),
   ]);
 
   const initialSelectedBundle =
@@ -31,6 +33,7 @@ export default async function TicketsPage() {
       initialLocations={locations}
       initialResources={resources}
       initialStaffUsers={activeStaffUsers}
+      initialReporterUsers={reporterUsers}
       initialSelectedBundle={initialSelectedBundle}
     />
   );

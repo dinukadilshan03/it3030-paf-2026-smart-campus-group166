@@ -12,12 +12,78 @@ import type {
 } from "@/lib/tickets/types";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const ATTACHMENT_MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_ATTACHMENT_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
 
 export function validateCreateTicketForm(
   values: CreateTicketFormValues,
   resources: TicketResourceOption[],
+  options: { requireReporterSelection?: boolean } = {},
+) {
+  const errors = validateTicketDetailsForm(values, resources, options);
+
+  if (values.attachments.length > 3) {
+    errors.attachments = "Only up to 3 image attachments are allowed.";
+  }
+
+  values.attachments.forEach((attachment, index) => {
+    const prefix = `attachments.${index}`;
+    const attachmentErrors = validateAttachmentDraft(attachment);
+    Object.entries(attachmentErrors).forEach(([field, message]) => {
+      errors[`${prefix}.${field}`] = message;
+    });
+  });
+
+  return errors;
+}
+
+export function validateUpdateTicketForm(
+  values: Pick<
+    CreateTicketFormValues,
+    | "reporterUserId"
+    | "resourceId"
+    | "locationId"
+    | "ticketCategoryId"
+    | "title"
+    | "description"
+    | "priority"
+    | "preferredContactName"
+    | "preferredContactEmail"
+    | "preferredContactPhone"
+  >,
+  resources: TicketResourceOption[],
+  options: { requireReporterSelection?: boolean } = {},
+) {
+  return validateTicketDetailsForm(values, resources, options);
+}
+
+function validateTicketDetailsForm(
+  values: Pick<
+    CreateTicketFormValues,
+    | "reporterUserId"
+    | "resourceId"
+    | "locationId"
+    | "ticketCategoryId"
+    | "title"
+    | "description"
+    | "priority"
+    | "preferredContactName"
+    | "preferredContactEmail"
+    | "preferredContactPhone"
+  >,
+  resources: TicketResourceOption[],
+  options: { requireReporterSelection?: boolean } = {},
 ) {
   const errors: Record<string, string> = {};
+
+  if (options.requireReporterSelection && !values.reporterUserId.trim()) {
+    errors.reporterUserId = "Choose who is reporting this issue.";
+  }
 
   if (!values.ticketCategoryId.trim()) {
     errors.ticketCategoryId = "Choose a ticket category.";
@@ -64,18 +130,6 @@ export function validateCreateTicketForm(
   ) {
     errors.locationId = "The selected resource belongs to a different location.";
   }
-
-  if (values.attachments.length > 3) {
-    errors.attachments = "Only up to 3 attachment metadata entries are allowed.";
-  }
-
-  values.attachments.forEach((attachment, index) => {
-    const prefix = `attachments.${index}`;
-    const attachmentErrors = validateAttachmentDraft(attachment);
-    Object.entries(attachmentErrors).forEach(([field, message]) => {
-      errors[`${prefix}.${field}`] = message;
-    });
-  });
 
   return errors;
 }
@@ -125,37 +179,27 @@ export function validateCommentForm(values: TicketCommentFormValues, role: RoleC
 export function validateAttachmentDraft(values: TicketAttachmentDraft) {
   const errors: Record<string, string> = {};
 
+  if (!values.file) {
+    errors.file = "Choose an image to upload.";
+    return errors;
+  }
+
   if (!values.fileName.trim()) {
-    errors.fileName = "File name is required.";
+    errors.file = "The selected image is missing a file name.";
   }
 
-  if (!values.storageBucket.trim()) {
-    errors.storageBucket = "Storage bucket is required.";
-  } else if (values.storageBucket.trim().length > 100) {
-    errors.storageBucket = "Storage bucket must be 100 characters or fewer.";
+  if (!ALLOWED_ATTACHMENT_MIME_TYPES.has(values.file.type)) {
+    errors.file = "Only JPG, PNG, WEBP, and GIF images are allowed.";
   }
 
-  if (!values.storagePath.trim()) {
-    errors.storagePath = "Storage path is required.";
-  } else if (values.storagePath.trim().length > 500) {
-    errors.storagePath = "Storage path must be 500 characters or fewer.";
+  if (!Number.isFinite(values.file.size) || values.file.size <= 0) {
+    errors.file = "The selected image is empty.";
+  } else if (values.file.size > ATTACHMENT_MAX_FILE_SIZE_BYTES) {
+    errors.file = "Each image must be 5 MB or smaller.";
   }
 
   if (values.mimeType.trim().length > 120) {
-    errors.mimeType = "MIME type must be 120 characters or fewer.";
-  }
-
-  if (!values.fileSize.trim()) {
-    errors.fileSize = "File size is required.";
-  } else {
-    const parsed = Number(values.fileSize);
-    if (!Number.isFinite(parsed) || parsed < 0) {
-      errors.fileSize = "File size must be a non-negative number.";
-    }
-  }
-
-  if (values.attachmentType.trim().length > 50) {
-    errors.attachmentType = "Attachment type must be 50 characters or fewer.";
+    errors.file = "The selected image format is not supported.";
   }
 
   return errors;

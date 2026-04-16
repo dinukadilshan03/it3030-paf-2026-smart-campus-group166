@@ -25,6 +25,8 @@ export type TicketSummary = {
   priority: TicketPriority;
   status: TicketStatus;
   createdAt: string;
+  firstRespondedAt: string | null;
+  resolvedAt: string | null;
 };
 
 export type TicketAssignment = {
@@ -50,8 +52,13 @@ export type TicketDetail = {
   resourceId: number | null;
   resourceCode: string | null;
   resourceName: string | null;
+  resourceCategoryName: string | null;
   locationId: number | null;
   locationName: string | null;
+  locationBuilding: string | null;
+  locationFloor: string | null;
+  locationRoomIdentifier: string | null;
+  locationDescription: string | null;
   ticketCategoryId: number;
   ticketCategoryCode: string;
   ticketCategoryName: string;
@@ -64,7 +71,9 @@ export type TicketDetail = {
   preferredContactPhone: string | null;
   resolutionSummary: string | null;
   rejectionReason: string | null;
+  firstRespondedAt: string | null;
   resolvedAt: string | null;
+  rejectedAt: string | null;
   closedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -88,12 +97,10 @@ export type TicketAttachment = {
   id: number;
   uploadedByUserId: number;
   uploadedByDisplayName: string;
+  title: string;
   fileName: string;
-  storageBucket: string;
-  storagePath: string;
   mimeType: string | null;
   fileSize: number;
-  attachmentType: string | null;
   createdAt: string;
 };
 
@@ -148,6 +155,7 @@ export type TicketFilters = {
 };
 
 export type CreateTicketRequest = {
+  reporterUserId?: number;
   resourceId?: number;
   locationId?: number;
   ticketCategoryId: number;
@@ -161,12 +169,24 @@ export type CreateTicketRequest = {
 
 export type CreateTicketSubmission = {
   request: CreateTicketRequest;
-  attachments: CreateTicketAttachmentRequest[];
+  attachments: TicketAttachmentUpload[];
 };
 
 export type UpdateTicketAssignmentRequest = {
   assignedStaffUserId: number;
   assignmentNote?: string;
+};
+
+export type UpdateTicketRequest = {
+  resourceId?: number;
+  locationId?: number;
+  ticketCategoryId: number;
+  title: string;
+  description: string;
+  priority: TicketPriority;
+  preferredContactName?: string;
+  preferredContactEmail?: string;
+  preferredContactPhone?: string;
 };
 
 export type UpdateTicketStatusRequest = {
@@ -181,13 +201,12 @@ export type CreateTicketCommentRequest = {
   parentCommentId?: number;
 };
 
-export type CreateTicketAttachmentRequest = {
-  fileName: string;
-  storageBucket: string;
-  storagePath: string;
-  mimeType?: string;
-  fileSize: number;
-  attachmentType?: string;
+export type UpdateTicketCommentRequest = {
+  body: string;
+};
+
+export type TicketAttachmentUpload = {
+  file: File;
 };
 
 export type CreateTicketCategoryRequest = {
@@ -212,15 +231,15 @@ export type TicketBundle = {
 
 export type TicketAttachmentDraft = {
   id: string;
+  file: File | null;
+  previewUrl: string | null;
   fileName: string;
-  storageBucket: string;
-  storagePath: string;
   mimeType: string;
-  fileSize: string;
-  attachmentType: string;
+  fileSize: number | null;
 };
 
 export type CreateTicketFormValues = {
+  reporterUserId: string;
   resourceId: string;
   locationId: string;
   ticketCategoryId: string;
@@ -263,6 +282,7 @@ export type TicketWorkspaceBootstrap = {
   locations: TicketLocationOption[];
   resources: TicketResourceOption[];
   activeStaffUsers: AdminUserSummary[];
+  reporterUsers: AdminUserSummary[];
   selectedBundle: TicketBundle | null;
 };
 

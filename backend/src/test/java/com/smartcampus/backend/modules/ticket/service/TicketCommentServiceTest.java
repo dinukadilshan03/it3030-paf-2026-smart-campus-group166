@@ -12,6 +12,7 @@ import com.smartcampus.backend.common.enums.CommentType;
 import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.UserStatus;
 import com.smartcampus.backend.modules.ticket.dto.CreateTicketCommentRequest;
+import com.smartcampus.backend.modules.ticket.dto.UpdateTicketCommentRequest;
 import com.smartcampus.backend.modules.ticket.entity.Ticket;
 import com.smartcampus.backend.modules.ticket.entity.TicketCategory;
 import com.smartcampus.backend.modules.ticket.entity.TicketComment;
@@ -32,13 +33,15 @@ class TicketCommentServiceTest {
 
     @Mock private TicketCommentRepository ticketCommentRepository;
     @Mock private TicketAccessService ticketAccessService;
+    @Mock private TicketSlaService ticketSlaService;
 
     private TicketCommentService ticketCommentService;
 
     @BeforeEach
     void setUp() {
         ticketCommentService =
-                new TicketCommentService(ticketCommentRepository, ticketAccessService, new TicketMapper());
+                new TicketCommentService(
+                        ticketCommentRepository, ticketAccessService, ticketSlaService, new TicketMapper());
     }
 
     @Test
@@ -113,6 +116,72 @@ class TicketCommentServiceTest {
                                                 "Status", CommentType.STATUS_NOTE, null)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("system-generated");
+    }
+
+    @Test
+    void staffReplyMarksFirstResponse() {
+        User staff = buildUser(5L, "staff@example.com", "Staff");
+        User reporter = buildUser(6L, "reporter3@example.com", "Reporter 3");
+        UserRole membership = buildMembership(staff, RoleCode.STAFF);
+        Ticket ticket = buildTicket(103L, reporter);
+        ticket.setAssignedStaffUser(staff);
+
+        when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
+        when(ticketCommentRepository.save(org.mockito.ArgumentMatchers.any(TicketComment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ticketCommentService.addComment(
+                ticket, new CreateTicketCommentRequest("Looking into this now.", CommentType.PUBLIC_REPLY, null));
+
+        org.mockito.Mockito.verify(ticketSlaService).markFirstResponseIfNeeded(103L);
+    }
+
+    @Test
+    void authorCanUpdateOwnComment() {
+        User reporter = buildUser(7L, "reporter4@example.com", "Reporter 4");
+        UserRole membership = buildMembership(reporter, RoleCode.STUDENT);
+        Ticket ticket = buildTicket(104L, reporter);
+        TicketComment comment =
+                TicketComment.builder()
+                        .id(10L)
+                        .ticket(ticket)
+                        .authorUser(reporter)
+                        .body("Old body")
+                        .commentType(CommentType.PUBLIC_REPLY)
+                        .build();
+
+        when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
+        when(ticketCommentRepository.findByIdAndTicketId(10L, 104L)).thenReturn(Optional.of(comment));
+        when(ticketCommentRepository.save(comment)).thenReturn(comment);
+
+        var response = ticketCommentService.updateComment(ticket, 10L, new UpdateTicketCommentRequest("New body"));
+
+        assertThat(response.body()).isEqualTo("New body");
+        assertThat(comment.getIsEdited()).isTrue();
+        assertThat(comment.getEditedAt()).isNotNull();
+    }
+
+    @Test
+    void deletingCommentWithRepliesIsRejected() {
+        User reporter = buildUser(8L, "reporter5@example.com", "Reporter 5");
+        UserRole membership = buildMembership(reporter, RoleCode.STUDENT);
+        Ticket ticket = buildTicket(105L, reporter);
+        TicketComment comment =
+                TicketComment.builder()
+                        .id(11L)
+                        .ticket(ticket)
+                        .authorUser(reporter)
+                        .body("Body")
+                        .commentType(CommentType.PUBLIC_REPLY)
+                        .build();
+
+        when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
+        when(ticketCommentRepository.findByIdAndTicketId(11L, 105L)).thenReturn(Optional.of(comment));
+        when(ticketCommentRepository.existsByParentComment_Id(11L)).thenReturn(true);
+
+        assertThatThrownBy(() -> ticketCommentService.deleteComment(ticket, 11L))
+                .isInstanceOf(com.smartcampus.backend.common.exception.ResourceConflictException.class)
+                .hasMessageContaining("cannot be deleted");
     }
 
     private User buildUser(Long id, String email, String displayName) {

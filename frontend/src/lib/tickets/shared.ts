@@ -1,9 +1,11 @@
+import { getApiBaseUrl } from "@/lib/config/env";
 import type { AdminUserSummary } from "@/lib/users/types";
 import type { RoleCode } from "@/types/auth";
 
 import type {
   ApiErrorResponse,
   TicketCategorySummary,
+  TicketComment,
   TicketDetail,
   TicketFilters,
   TicketLocationOption,
@@ -29,7 +31,30 @@ export const DEFAULT_TICKET_FILTERS: Required<TicketFilters> = {
   search: "",
 };
 
+type TicketSlaRecord = {
+  createdAt: string;
+  priority: TicketPriority;
+  status: TicketStatus;
+  firstRespondedAt?: string | null;
+  resolvedAt?: string | null;
+};
+
+export type TicketSlaTimerState = {
+  label: string;
+  tone: "neutral" | "success" | "danger";
+};
+
 const MATCH_ALL_SEARCH_TOKEN = "%";
+
+const TICKET_SLA_TARGETS: Record<
+  TicketPriority,
+  { firstResponseMinutes: number; resolutionMinutes: number }
+> = {
+  LOW: { firstResponseMinutes: 8 * 60, resolutionMinutes: 72 * 60 },
+  MEDIUM: { firstResponseMinutes: 4 * 60, resolutionMinutes: 48 * 60 },
+  HIGH: { firstResponseMinutes: 2 * 60, resolutionMinutes: 24 * 60 },
+  URGENT: { firstResponseMinutes: 60, resolutionMinutes: 8 * 60 },
+};
 
 export class TicketApiError extends Error {
   status: number;
@@ -120,13 +145,24 @@ export function formatFileSize(bytes: number | null | undefined) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+export function getTicketAttachmentContentUrl(ticketId: number, attachmentId: number) {
+  return `${getApiBaseUrl()}/api/v1/tickets/${ticketId}/attachments/${attachmentId}/content`;
+}
+
+export function getTicketAttachmentFormatLabel(mimeType: string | null | undefined, fileName: string) {
+  if (mimeType) {
+    return mimeType.replace("image/", "").toUpperCase();
+  }
+
+  const extension = fileName.split(".").pop()?.trim();
+  return extension ? extension.toUpperCase() : "Image";
+}
+
 export function getAllowedStatusTargets(role: RoleCode, currentStatus: TicketStatus) {
   if (role === "ADMIN") {
     switch (currentStatus) {
       case "OPEN":
-        return ["IN_PROGRESS", "REJECTED"] as TicketStatus[];
-      case "IN_PROGRESS":
-        return ["RESOLVED"] as TicketStatus[];
+        return ["REJECTED"] as TicketStatus[];
       case "RESOLVED":
         return ["CLOSED"] as TicketStatus[];
       default:
@@ -156,12 +192,48 @@ export function canCurrentUserManageAttachments(
   return role === "ADMIN" || ticket.reporterUserId === currentUserId;
 }
 
+export function canCurrentUserEditTicket(
+  role: RoleCode,
+  currentUserId: number,
+  ticket: TicketDetail,
+) {
+  if (role === "ADMIN") {
+    return true;
+  }
+
+  return ticket.reporterUserId === currentUserId && ticket.status === "OPEN";
+}
+
+export function canCurrentUserDeleteTicket(
+  role: RoleCode,
+  currentUserId: number,
+  ticket: TicketDetail,
+) {
+  if (ticket.status !== "OPEN") {
+    return false;
+  }
+
+  return role === "ADMIN" || ticket.reporterUserId === currentUserId;
+}
+
 export function canCurrentUserAddInternalNote(
   role: RoleCode,
   currentUserId: number,
   ticket: TicketDetail,
 ) {
   return role === "ADMIN" || (role === "STAFF" && ticket.assignedStaffUserId === currentUserId);
+}
+
+export function canCurrentUserManageComment(
+  role: RoleCode,
+  currentUserId: number,
+  comment: TicketComment,
+) {
+  if (comment.commentType === "STATUS_NOTE") {
+    return false;
+  }
+
+  return role === "ADMIN" || comment.authorUserId === currentUserId;
 }
 
 export function canCurrentUserUpdateStatus(
@@ -186,11 +258,11 @@ export function canCurrentUserUpdateStatus(
 export function describeTicketScope(role: RoleCode) {
   switch (role) {
     case "ADMIN":
-      return "All campus maintenance and incident tickets";
+      return "All maintenance and incident tickets";
     case "STAFF":
-      return "Tickets currently assigned to you";
+      return "Tickets assigned to you and issues you reported";
     case "STUDENT":
-      return "Your reported maintenance and incident tickets";
+      return "Tickets you reported and can track to completion";
   }
 }
 
@@ -198,12 +270,12 @@ export function getLocationLabel(location: TicketLocationOption) {
   const parts = [location.name, location.building, location.floor, location.roomIdentifier].filter(
     Boolean,
   );
-  return parts.join(" · ");
+  return parts.join(" / ");
 }
 
 export function getResourceLabel(resource: TicketResourceOption) {
   const parts = [resource.name, resource.resourceCode, resource.locationName].filter(Boolean);
-  return parts.join(" · ");
+  return parts.join(" / ");
 }
 
 export function findLocationForResource(
@@ -251,10 +323,145 @@ export function getUnassignedTicketCount(
   ).length;
 }
 
+export function getAwaitingFirstResponseCount(
+  tickets: Array<{ status: TicketStatus; firstRespondedAt: string | null }>,
+) {
+  return tickets.filter(
+    (ticket) => !ticket.firstRespondedAt && !["CLOSED", "REJECTED"].includes(ticket.status),
+  ).length;
+}
+
+export function getSlaRiskTicketCount(tickets: TicketSlaRecord[], nowMs = Date.now()) {
+  return tickets.filter((ticket) => {
+    const firstResponse = getFirstResponseTimerState(ticket, nowMs);
+    const resolution = getResolutionTimerState(ticket, nowMs);
+    return firstResponse.tone === "danger" || resolution.tone === "danger";
+  }).length;
+}
+
+export function getTicketProgressLabel(
+  ticket: Pick<TicketDetail, "status" | "assignedStaffUserId">,
+) {
+  switch (ticket.status) {
+    case "OPEN":
+      return ticket.assignedStaffUserId
+        ? "Assigned and waiting for the first staff update."
+        : "Waiting for admin assignment.";
+    case "IN_PROGRESS":
+      return "Staff work is actively in progress.";
+    case "RESOLVED":
+      return "Resolved by staff and waiting for admin closure.";
+    case "CLOSED":
+      return "Closed after resolution review.";
+    case "REJECTED":
+      return "Rejected by admin review.";
+  }
+}
+
+export function getSlaTargetLabel(
+  priority: TicketPriority,
+  timer: "firstResponse" | "resolution",
+) {
+  const minutes =
+    timer === "firstResponse"
+      ? TICKET_SLA_TARGETS[priority].firstResponseMinutes
+      : TICKET_SLA_TARGETS[priority].resolutionMinutes;
+
+  return formatDurationMs(minutes * 60 * 1000);
+}
+
+export function getFirstResponseTimerState(
+  ticket: TicketSlaRecord,
+  nowMs = Date.now(),
+): TicketSlaTimerState {
+  const createdAtMs = parseDateValue(ticket.createdAt);
+  const firstRespondedAtMs = parseDateValue(ticket.firstRespondedAt);
+  if (createdAtMs == null) {
+    return { label: "Timing unavailable", tone: "neutral" };
+  }
+
+  if (firstRespondedAtMs != null) {
+    return {
+      label: `Responded in ${formatDurationMs(firstRespondedAtMs - createdAtMs)}`,
+      tone: "success",
+    };
+  }
+
+  const remainingMs =
+    TICKET_SLA_TARGETS[ticket.priority].firstResponseMinutes * 60 * 1000 - (nowMs - createdAtMs);
+
+  if (remainingMs >= 0) {
+    return { label: `Due in ${formatDurationMs(remainingMs)}`, tone: "neutral" };
+  }
+
+  return { label: `Overdue by ${formatDurationMs(Math.abs(remainingMs))}`, tone: "danger" };
+}
+
+export function getResolutionTimerState(
+  ticket: TicketSlaRecord,
+  nowMs = Date.now(),
+): TicketSlaTimerState {
+  const createdAtMs = parseDateValue(ticket.createdAt);
+  const resolvedAtMs = parseDateValue(ticket.resolvedAt);
+  if (createdAtMs == null) {
+    return { label: "Timing unavailable", tone: "neutral" };
+  }
+
+  if (resolvedAtMs != null) {
+    return {
+      label: `Resolved in ${formatDurationMs(resolvedAtMs - createdAtMs)}`,
+      tone: "success",
+    };
+  }
+
+  if (ticket.status === "REJECTED") {
+    return { label: "Stopped after admin rejection", tone: "neutral" };
+  }
+
+  const remainingMs =
+    TICKET_SLA_TARGETS[ticket.priority].resolutionMinutes * 60 * 1000 - (nowMs - createdAtMs);
+
+  if (remainingMs >= 0) {
+    return { label: `Due in ${formatDurationMs(remainingMs)}`, tone: "neutral" };
+  }
+
+  return { label: `Overdue by ${formatDurationMs(Math.abs(remainingMs))}`, tone: "danger" };
+}
+
 export function getActiveTicketCategories(categories: TicketCategorySummary[]) {
   return categories.filter((category) => category.isActive);
 }
 
 export function getActiveStaffOptions(users: AdminUserSummary[]) {
   return users.filter((user) => user.status === "ACTIVE");
+}
+
+function parseDateValue(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function formatDurationMs(durationMs: number) {
+  const totalMinutes = Math.max(0, Math.round(durationMs / 60000));
+  if (totalMinutes <= 1) {
+    return "1m";
+  }
+
+  const days = Math.floor(totalMinutes / (24 * 60));
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) {
+    return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+  }
+
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  }
+
+  return `${minutes}m`;
 }

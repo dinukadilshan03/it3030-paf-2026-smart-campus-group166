@@ -42,6 +42,9 @@ public class TicketAttachment {
     @Column(name = "file_name", nullable = false)
     private String fileName;
 
+    @Column(name = "title", nullable = false, length = 160)
+    private String title;
+
     @Column(name = "storage_bucket", nullable = false, length = 100)
     private String storageBucket;
 

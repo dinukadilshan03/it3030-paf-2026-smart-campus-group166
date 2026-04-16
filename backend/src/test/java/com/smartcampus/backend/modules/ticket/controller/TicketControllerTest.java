@@ -57,7 +57,9 @@ class TicketControllerTest {
                         "Broken projector",
                         TicketPriority.HIGH,
                         TicketStatus.OPEN,
-                        LocalDateTime.now());
+                        LocalDateTime.now(),
+                        null,
+                        null);
         when(ticketService.getTickets(TicketStatus.OPEN, TicketPriority.HIGH, 6L, "projector"))
                 .thenReturn(List.of(summary));
 

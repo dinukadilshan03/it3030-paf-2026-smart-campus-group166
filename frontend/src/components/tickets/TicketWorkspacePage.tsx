@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { AssignmentDialog } from "@/components/tickets/AssignmentDialog";
 import { CreateTicketForm } from "@/components/tickets/CreateTicketForm";
+import { EditTicketDialog } from "@/components/tickets/EditTicketDialog";
 import { StatusUpdateDialog } from "@/components/tickets/StatusUpdateDialog";
 import { TicketCategoryManager } from "@/components/tickets/TicketCategoryManager";
 import { TicketDetailPanel } from "@/components/tickets/TicketDetailPanel";
@@ -14,20 +15,26 @@ import {
   createTicketCategoryClient,
   createTicketClient,
   createTicketCommentClient,
+  deleteTicketClient,
+  deleteTicketCommentClient,
   deleteTicketAttachmentClient,
   deleteTicketCategoryClient,
   getTicketBundleClient,
   listTicketCategoriesClient,
   listTicketsClient,
+  updateTicketClient,
+  updateTicketCommentClient,
   updateTicketAssignmentClient,
   updateTicketCategoryClient,
   updateTicketStatusClient,
 } from "@/lib/tickets/client";
 import {
   DEFAULT_TICKET_FILTERS,
+  getAwaitingFirstResponseCount,
   getInProgressTicketCount,
   getOpenTicketCount,
   getResolvedTicketCount,
+  getSlaRiskTicketCount,
   getTicketErrorMessage,
   getUnassignedTicketCount,
   resolveSelectedTicketId,
@@ -42,6 +49,7 @@ import type {
   TicketLocationOption,
   TicketResourceOption,
   TicketSummary,
+  UpdateTicketCommentRequest,
 } from "@/lib/tickets/types";
 import type { CurrentUser } from "@/types/auth";
 import type { AdminUserSummary } from "@/lib/users/types";
@@ -53,6 +61,7 @@ type TicketWorkspacePageProps = {
   initialLocations: TicketLocationOption[];
   initialResources: TicketResourceOption[];
   initialStaffUsers: AdminUserSummary[];
+  initialReporterUsers: AdminUserSummary[];
   initialSelectedBundle: TicketBundle | null;
 };
 
@@ -66,11 +75,11 @@ type FeedbackState =
 function getWorkspaceHeading(role: CurrentUser["role"]) {
   switch (role) {
     case "ADMIN":
-      return "Maintenance operations hub";
+      return "Admin ticket operations";
     case "STAFF":
-      return "Assigned incident workbench";
+      return "Assigned staff workbench";
     case "STUDENT":
-      return "My incident and maintenance tickets";
+      return "Student ticket tracker";
     default:
       return "Ticket workspace";
   }
@@ -79,11 +88,11 @@ function getWorkspaceHeading(role: CurrentUser["role"]) {
 function getWorkspaceDescription(role: CurrentUser["role"]) {
   switch (role) {
     case "ADMIN":
-      return "Review every ticket in the campus queue, assign staff ownership clearly, move incidents through the lifecycle, and keep categories clean for reporting.";
+      return "Review every campus issue report, assign the right staff owner, reject invalid requests when needed, close resolved work, and keep categories clean for reporting.";
     case "STAFF":
-      return "Work through the tickets assigned to you, document progress with clean internal notes, and capture a proper resolution summary before handover.";
+      return "Work the tickets assigned to you, report new campus issues when you spot them, document progress with comments or internal notes, and capture a proper resolution summary before admin closure.";
     case "STUDENT":
-      return "Report faults against a room, lab, or equipment item, then follow the staff conversation and add any clarifications needed to resolve the issue.";
+      return "Report faults against a room, lab, or equipment item, then follow assignment, comments, and service-level timing directly inside the ticket workflow.";
     default:
       return "Manage the maintenance and incident workflow.";
   }
@@ -96,6 +105,7 @@ export function TicketWorkspacePage({
   initialLocations,
   initialResources,
   initialStaffUsers,
+  initialReporterUsers,
   initialSelectedBundle,
 }: TicketWorkspacePageProps) {
   const [tickets, setTickets] = useState(initialTickets);
@@ -118,6 +128,7 @@ export function TicketWorkspacePage({
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   async function syncWorkspace(nextFilters: Required<TicketFilterValues>, preferredTicketId: number | null) {
     const filtersToUse = { ...nextFilters };
@@ -153,6 +164,20 @@ export function TicketWorkspacePage({
   const inProgressCount = getInProgressTicketCount(tickets);
   const resolvedCount = getResolvedTicketCount(tickets);
   const unassignedCount = getUnassignedTicketCount(tickets);
+  const awaitingFirstResponseCount = getAwaitingFirstResponseCount(tickets);
+  const slaRiskCount = getSlaRiskTicketCount(tickets);
+  const focusMetricLabel =
+    currentUser.role === "ADMIN"
+      ? "Unassigned"
+      : currentUser.role === "STAFF"
+        ? "SLA at risk"
+        : "Awaiting first response";
+  const focusMetricValue =
+    currentUser.role === "ADMIN"
+      ? unassignedCount
+      : currentUser.role === "STAFF"
+        ? slaRiskCount
+        : awaitingFirstResponseCount;
 
   return (
     <>
@@ -172,13 +197,15 @@ export function TicketWorkspacePage({
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => setCreateDialogOpen(true)}
-                className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-              >
-                Report issue
-              </button>
+              {currentUser.role ? (
+                <button
+                  type="button"
+                  onClick={() => setCreateDialogOpen(true)}
+                  className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                >
+                  Report issue
+                </button>
+              ) : null}
               {currentUser.role === "ADMIN" ? (
                 <button
                   type="button"
@@ -250,12 +277,8 @@ export function TicketWorkspacePage({
             </p>
           </div>
           <div className="rounded-[1.4rem] border border-white/70 bg-white/85 p-5 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur">
-            <p className="text-sm font-medium text-slate-600">
-              {currentUser.role === "ADMIN" ? "Unassigned" : "Needs attention"}
-            </p>
-            <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-              {currentUser.role === "ADMIN" ? unassignedCount : openCount}
-            </p>
+            <p className="text-sm font-medium text-slate-600">{focusMetricLabel}</p>
+            <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{focusMetricValue}</p>
           </div>
         </section>
 
@@ -300,6 +323,7 @@ export function TicketWorkspacePage({
 
             <TicketList
               role={currentUser.role ?? "STUDENT"}
+              currentUserId={currentUser.id}
               tickets={tickets}
               selectedTicketId={selectedTicketId}
               busy={isListLoading}
@@ -326,8 +350,34 @@ export function TicketWorkspacePage({
             ticketBundle={selectedBundle}
             detailLoading={isDetailLoading}
             busy={isMutating}
+            onOpenEdit={() => setEditDialogOpen(true)}
             onOpenAssignment={() => setAssignmentDialogOpen(true)}
             onOpenStatus={() => setStatusDialogOpen(true)}
+            onDeleteTicket={async () => {
+              if (selectedTicketId == null) return;
+
+              const deletedTicketNumber = selectedBundle?.detail.ticketNumber ?? `Ticket #${selectedTicketId}`;
+              setFeedback(null);
+              setIsMutating(true);
+              try {
+                await deleteTicketClient(selectedTicketId);
+                await syncWorkspace(filters, null);
+                setFeedback({
+                  tone: "success",
+                  message:
+                    currentUser.role === "ADMIN"
+                      ? `${deletedTicketNumber} deleted successfully.`
+                      : `${deletedTicketNumber} withdrawn successfully.`,
+                });
+              } catch (error) {
+                setFeedback({
+                  tone: "error",
+                  message: getTicketErrorMessage(error, "Could not remove the ticket."),
+                });
+              } finally {
+                setIsMutating(false);
+              }
+            }}
             onCreateComment={async (payload: CreateTicketCommentRequest) => {
               if (selectedTicketId == null) return;
 
@@ -348,6 +398,40 @@ export function TicketWorkspacePage({
                 setIsMutating(false);
               }
             }}
+            onUpdateComment={async (commentId: number, payload: UpdateTicketCommentRequest) => {
+              if (selectedTicketId == null) return;
+
+              setIsMutating(true);
+              try {
+                await updateTicketCommentClient(selectedTicketId, commentId, payload);
+                await refreshSelectedBundle(selectedTicketId);
+                setFeedback({
+                  tone: "success",
+                  message: "Comment updated.",
+                });
+              } catch (error) {
+                throw error;
+              } finally {
+                setIsMutating(false);
+              }
+            }}
+            onDeleteComment={async (commentId: number) => {
+              if (selectedTicketId == null) return;
+
+              setIsMutating(true);
+              try {
+                await deleteTicketCommentClient(selectedTicketId, commentId);
+                await refreshSelectedBundle(selectedTicketId);
+                setFeedback({
+                  tone: "success",
+                  message: "Comment deleted.",
+                });
+              } catch (error) {
+                throw error;
+              } finally {
+                setIsMutating(false);
+              }
+            }}
             onCreateAttachment={async (payload) => {
               if (selectedTicketId == null) return;
 
@@ -357,7 +441,7 @@ export function TicketWorkspacePage({
                 await refreshSelectedBundle(selectedTicketId);
                 setFeedback({
                   tone: "success",
-                  message: "Attachment metadata saved.",
+                  message: "Attachment image uploaded.",
                 });
               } catch (error) {
                 throw error;
@@ -375,14 +459,14 @@ export function TicketWorkspacePage({
                 await refreshSelectedBundle(selectedTicketId);
                 setFeedback({
                   tone: "success",
-                  message: "Attachment metadata deleted.",
+                  message: "Attachment image deleted.",
                 });
               } catch (error) {
                 setFeedback({
                   tone: "error",
                   message: getTicketErrorMessage(
                     error,
-                    "Could not delete the attachment metadata.",
+                    "Could not delete the attachment image.",
                   ),
                 });
               } finally {
@@ -398,9 +482,11 @@ export function TicketWorkspacePage({
           key="create-ticket"
           open={createDialogOpen}
           busy={isMutating}
+          currentRole={currentUser.role ?? "STUDENT"}
           categories={categories}
           locations={initialLocations}
           resources={initialResources}
+          reporterUsers={initialReporterUsers}
           onClose={() => setCreateDialogOpen(false)}
           onSubmit={async (submission: CreateTicketSubmission) => {
             setFeedback(null);
@@ -425,7 +511,7 @@ export function TicketWorkspacePage({
                 tone: "success",
                 message:
                   submission.attachments.length > 0
-                    ? `${createdTicket.ticketNumber} created with ${submission.attachments.length} attachment reference(s).`
+                    ? `${createdTicket.ticketNumber} created with ${submission.attachments.length} image attachment(s).`
                     : `${createdTicket.ticketNumber} created successfully.`,
               });
               setCreateDialogOpen(false);
@@ -441,7 +527,7 @@ export function TicketWorkspacePage({
                 setCreateDialogOpen(false);
                 setFeedback({
                   tone: "error",
-                  message: `${createdTicketNumber} was created, but attachment metadata could not be saved: ${getTicketErrorMessage(error, "Unknown error.")}`,
+                  message: `${createdTicketNumber} was created, but one or more images could not be uploaded: ${getTicketErrorMessage(error, "Unknown error.")}`,
                 });
                 return;
               }
@@ -453,6 +539,37 @@ export function TicketWorkspacePage({
                 });
               }
 
+              throw error;
+            } finally {
+              setIsMutating(false);
+            }
+          }}
+        />
+      ) : null}
+
+      {editDialogOpen ? (
+        <EditTicketDialog
+          key={`edit-${selectedBundle?.detail.id ?? "none"}-${selectedBundle?.detail.updatedAt ?? "none"}`}
+          open={editDialogOpen}
+          busy={isMutating}
+          ticket={selectedBundle?.detail ?? null}
+          categories={categories}
+          locations={initialLocations}
+          resources={initialResources}
+          onClose={() => setEditDialogOpen(false)}
+          onSubmit={async (payload) => {
+            if (selectedTicketId == null) return;
+
+            setFeedback(null);
+            setIsMutating(true);
+            try {
+              await updateTicketClient(selectedTicketId, payload);
+              await syncWorkspace(filters, selectedTicketId);
+              setFeedback({
+                tone: "success",
+                message: "Ticket details updated.",
+              });
+            } catch (error) {
               throw error;
             } finally {
               setIsMutating(false);

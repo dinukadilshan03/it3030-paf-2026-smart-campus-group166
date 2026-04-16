@@ -1,11 +1,11 @@
 import { clientApiFetch } from "@/lib/api/client";
 import { buildTicketQuery, throwTicketApiError } from "@/lib/tickets/shared";
 import type {
-  CreateTicketAttachmentRequest,
   CreateTicketCategoryRequest,
   CreateTicketCommentRequest,
   CreateTicketRequest,
   TicketAttachment,
+  TicketAttachmentUpload,
   TicketBundle,
   TicketCategoryDetail,
   TicketCategorySummary,
@@ -13,8 +13,10 @@ import type {
   TicketDetail,
   TicketFilters,
   TicketSummary,
+  UpdateTicketCommentRequest,
   UpdateTicketAssignmentRequest,
   UpdateTicketCategoryRequest,
+  UpdateTicketRequest,
   UpdateTicketStatusRequest,
 } from "@/lib/tickets/types";
 
@@ -60,6 +62,14 @@ export function createTicketClient(payload: CreateTicketRequest) {
   return sendJson<TicketDetail>("/api/v1/tickets", "POST", payload);
 }
 
+export function updateTicketClient(id: number, payload: UpdateTicketRequest) {
+  return sendJson<TicketDetail>(`/api/v1/tickets/${id}`, "PUT", payload);
+}
+
+export function deleteTicketClient(id: number) {
+  return sendJson<void>(`/api/v1/tickets/${id}`, "DELETE");
+}
+
 export function updateTicketAssignmentClient(
   id: number,
   payload: UpdateTicketAssignmentRequest,
@@ -86,6 +96,22 @@ export function createTicketCommentClient(
   return sendJson<TicketComment>(`/api/v1/tickets/${ticketId}/comments`, "POST", payload);
 }
 
+export function updateTicketCommentClient(
+  ticketId: number,
+  commentId: number,
+  payload: UpdateTicketCommentRequest,
+) {
+  return sendJson<TicketComment>(
+    `/api/v1/tickets/${ticketId}/comments/${commentId}`,
+    "PATCH",
+    payload,
+  );
+}
+
+export function deleteTicketCommentClient(ticketId: number, commentId: number) {
+  return sendJson<void>(`/api/v1/tickets/${ticketId}/comments/${commentId}`, "DELETE");
+}
+
 export async function listTicketAttachmentsClient(ticketId: number) {
   const response = await clientApiFetch(`/api/v1/tickets/${ticketId}/attachments`, {
     cache: "no-store",
@@ -96,9 +122,18 @@ export async function listTicketAttachmentsClient(ticketId: number) {
 
 export function createTicketAttachmentClient(
   ticketId: number,
-  payload: CreateTicketAttachmentRequest,
+  payload: TicketAttachmentUpload,
 ) {
-  return sendJson<TicketAttachment>(`/api/v1/tickets/${ticketId}/attachments`, "POST", payload);
+  const formData = new FormData();
+  formData.set("file", payload.file);
+
+  return clientApiFetch(`/api/v1/tickets/${ticketId}/attachments`, {
+    method: "POST",
+    body: formData,
+  }).then(async (response) => {
+    if (!response.ok) await throwTicketApiError(response);
+    return (await response.json()) as TicketAttachment;
+  });
 }
 
 export function deleteTicketAttachmentClient(ticketId: number, attachmentId: number) {
