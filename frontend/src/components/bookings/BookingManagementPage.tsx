@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import type { BookingSummaryResponse } from "@/lib/bookings/types";
 import type { CurrentUser } from "@/types/auth";
 import type { Resource } from "@/lib/resources/types";
@@ -259,26 +258,6 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
 
   return (
     <div className="admin-bookings-page">
-      <header className="admin-topbar">
-        <div>
-          <span className="eyebrow">{isAdmin ? "Admin" : "Student"}</span>
-          <h1>{isAdmin ? "Booking Management" : "My Bookings"}</h1>
-          <p>Signed in as {user.displayName} ({user.role})</p>
-        </div>
-        <div className="button-row">
-          <Link className="secondary-button" href="/dashboard">
-            Dashboard
-          </Link>
-          <button
-            className="secondary-button"
-            onClick={loadBookings}
-            disabled={isLoading}
-          >
-            Refresh
-          </button>
-        </div>
-      </header>
-
       {error && <div className="status-banner error">{error}</div>}
       {successMessage && <div className="status-banner success">{successMessage}</div>}
 
