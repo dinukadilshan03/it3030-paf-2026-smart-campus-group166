@@ -9,6 +9,8 @@ export default function ResourcePage() {
 
   const [resources, setResources] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
+  const [selectedCategory, setSelectedCategory] = useState("");
+const [selectedLocation, setSelectedLocation] = useState("");
 
   // ✅ ADDED SEARCH STATE
   const [search, setSearch] = useState("");
@@ -49,17 +51,28 @@ export default function ResourcePage() {
     }
   };
 
-  // ✅ ADDED FILTER LOGIC
-  const filteredResources = resources.filter((r: any) => {
-    const text = search.toLowerCase();
 
-    return (
-      r.name?.toLowerCase().includes(text) ||
-      r.resourceCode?.toLowerCase().includes(text) ||
-      r.categoryName?.toLowerCase().includes(text) ||
-      r.locationName?.toLowerCase().includes(text)
-    );
-  });
+   const sortedResources = [...resources].sort(
+  (a, b) => a.id - b.id
+);
+  // ✅ ADDED FILTER LOGIC
+  const filteredResources = sortedResources.filter((r: any) => {
+  const text = search.toLowerCase();
+
+  const matchesSearch =
+    r.name?.toLowerCase().includes(text) ||
+    r.resourceCode?.toLowerCase().includes(text) ||
+    r.categoryName?.toLowerCase().includes(text) ||
+    r.locationName?.toLowerCase().includes(text);
+
+  const matchesCategory =
+    selectedCategory === "" || r.categoryName === selectedCategory;
+
+  const matchesLocation =
+    selectedLocation === "" || r.locationName === selectedLocation;
+
+  return matchesSearch && matchesCategory && matchesLocation;
+});
 
   return (
     <div style={styles.container}>
@@ -85,6 +98,35 @@ export default function ResourcePage() {
         onChange={(e) => setSearch(e.target.value)}
         style={styles.search}
       />
+      <div style={styles.filterRow}>
+  {/* CATEGORY FILTER */}
+  <select
+    value={selectedCategory}
+    onChange={(e) => setSelectedCategory(e.target.value)}
+    style={styles.filter}
+  >
+    <option value="">All Categories</option>
+    {[...new Set(resources.map((r: any) => r.categoryName))].map(
+      (cat, i) => (
+        <option key={i} value={cat}>{cat}</option>
+      )
+    )}
+  </select>
+
+  {/* LOCATION FILTER */}
+  <select
+    value={selectedLocation}
+    onChange={(e) => setSelectedLocation(e.target.value)}
+    style={styles.filter}
+  >
+    <option value="">All Locations</option>
+    {[...new Set(resources.map((r: any) => r.locationName))].map(
+      (loc, i) => (
+        <option key={i} value={loc}>{loc}</option>
+      )
+    )}
+  </select>
+</div>
 
       {/* LIST */}
       {filteredResources.length === 0 ? (
@@ -196,6 +238,17 @@ const styles: any = {
     marginBottom: "15px",
   },
 
+  filterRow: {
+  display: "flex",
+  gap: "10px",
+  marginBottom: "15px",
+},
+
+filter: {
+  padding: "10px",
+  borderRadius: "8px",
+  border: "1px solid #ccc",
+},
   grid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
