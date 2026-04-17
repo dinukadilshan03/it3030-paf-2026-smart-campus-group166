@@ -1,4 +1,4 @@
-import { serverApiFetch } from "@/lib/api/server";
+import { getApiBaseUrl } from "@/lib/config/env";
 import type { ApiErrorResponse } from "@/lib/bookings/types";
 import { NextResponse } from "next/server";
 
@@ -25,19 +25,31 @@ export async function PATCH(
       requestBody.reason = body.reason;
     }
 
+    // Extract auth headers from incoming request
+    const cookie = request.headers.get("cookie");
+    const authorization = request.headers.get("authorization");
+
     console.log("[CANCEL] Sending request to backend:", {
       bookingId,
       body: requestBody,
+      hasCookie: !!cookie,
+      hasAuthorization: !!authorization,
     });
 
-    const response = await serverApiFetch(
-      `/api/v1/bookings/${bookingId}/cancel`,
+    // Forward request to backend with auth headers
+    const response = await fetch(
+      `${getApiBaseUrl()}/api/v1/bookings/${bookingId}/cancel`,
       {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          Accept: "application/json",
+          ...(cookie ? { Cookie: cookie } : {}),
+          ...(authorization ? { Authorization: authorization } : {}),
         },
         body: JSON.stringify(requestBody),
+        cache: "no-store",
+        redirect: "manual",
       }
     );
 
