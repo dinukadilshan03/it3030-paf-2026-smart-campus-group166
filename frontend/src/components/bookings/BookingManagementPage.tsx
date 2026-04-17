@@ -8,7 +8,6 @@ import type { Resource } from "@/lib/resources/types";
 import { getResources } from "@/lib/resources/api";
 import { CreateBookingForm } from "./CreateBookingForm";
 import { BookingCalendar } from "./BookingCalendar";
-import styles from "./BookingManagementPage.module.css";
 
 interface ReviewAction {
   bookingId: number;
@@ -20,9 +19,28 @@ type TabType = "pending" | "approved" | "rejected" | "cancelled" | "all";
 
 interface BookingManagementPageProps {
   user: CurrentUser;
+  initialHighlightedBookingId?: number | null;
 }
 
-export function BookingManagementPage({ user }: BookingManagementPageProps) {
+function getTabForStatus(status: BookingSummaryResponse["status"]): TabType {
+  switch (status) {
+    case "PENDING":
+      return "pending";
+    case "APPROVED":
+      return "approved";
+    case "REJECTED":
+      return "rejected";
+    case "CANCELLED":
+      return "cancelled";
+    default:
+      return "all";
+  }
+}
+
+export function BookingManagementPage({
+  user,
+  initialHighlightedBookingId = null,
+}: BookingManagementPageProps) {
   const [bookings, setBookings] = useState<BookingSummaryResponse[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,6 +49,9 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
   const [activeTab, setActiveTab] = useState<TabType>("pending");
   const [actionInProgress, setActionInProgress] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [highlightedBookingId, setHighlightedBookingId] = useState<number | null>(
+    initialHighlightedBookingId,
+  );
 
   // State for review dialogs
   const [showReviewDialog, setShowReviewDialog] = useState(false);
@@ -109,6 +130,35 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
     loadResources();
   }, []);
 
+  useEffect(() => {
+    if (initialHighlightedBookingId == null || bookings.length === 0) {
+      return;
+    }
+
+    const targetBooking = bookings.find((booking) => booking.id === initialHighlightedBookingId);
+    if (!targetBooking) {
+      return;
+    }
+
+    if (isAdmin) {
+      setActiveTab(getTabForStatus(targetBooking.status));
+    }
+    setViewMode("list");
+    setHighlightedBookingId(targetBooking.id);
+
+    const scrollTimer = window.setTimeout(() => {
+      document
+        .getElementById(`booking-card-${targetBooking.id}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 150);
+    const clearTimer = window.setTimeout(() => setHighlightedBookingId(null), 5000);
+
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.clearTimeout(clearTimer);
+    };
+  }, [bookings, initialHighlightedBookingId, isAdmin]);
+
   const handleApproveClick = (bookingId: number) => {
     setPendingAction({
       bookingId,
@@ -145,7 +195,7 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
     try {
       const isCancel = pendingAction.decision === "CANCEL";
       const endpoint = isCancel ? "cancel" : "review";
-      
+
       const requestBody: Record<string, unknown> = {};
 
       // For review (approve/reject), include decision
@@ -159,12 +209,6 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
       }
 
       const url = `/api/v1/bookings/${pendingAction.bookingId}/${endpoint}`;
-      console.log("Sending request:", { 
-        url,
-        bookingId: pendingAction.bookingId, 
-        body: requestBody 
-      });
-
       const response = await fetch(url, {
         method: "PATCH",
         headers: {
@@ -173,12 +217,8 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
         credentials: "include",
         body: JSON.stringify(requestBody),
       });
-
-      console.log("Response status:", response.status);
-
       if (!response.ok) {
         const errorData = (await response.json().catch(() => ({}))) as { message?: string };
-        console.error("Error:", errorData);
         throw new Error(errorData.message || `Failed to ${isCancel ? "cancel" : "review"} booking`);
       }
 
@@ -201,7 +241,6 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
-      console.error("Error in handleConfirmReview:", err);
       setError(err instanceof Error ? err.message : "Action failed");
     } finally {
       setActionInProgress(null);
@@ -335,7 +374,13 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
           ) : (
             <div className="bookings-grid">
               {filteredBookings.map((booking) => (
-                <div key={booking.id} className="booking-card panel">
+                <div
+                  id={`booking-card-${booking.id}`}
+                  key={booking.id}
+                  className={`booking-card panel ${
+                    highlightedBookingId === booking.id ? "booking-highlighted" : ""
+                  }`}
+                >
                   <div className="booking-header">
                     <div>
                       <h3>
@@ -465,7 +510,13 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
           ) : (
             <div className="bookings-grid">
               {bookings.map((booking) => (
-                <div key={booking.id} className="booking-card panel">
+                <div
+                  id={`booking-card-${booking.id}`}
+                  key={booking.id}
+                  className={`booking-card panel ${
+                    highlightedBookingId === booking.id ? "booking-highlighted" : ""
+                  }`}
+                >
                   <div className="booking-header">
                     <div>
                       <h3>
@@ -528,17 +579,28 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
         <div className="modal-overlay" onClick={() => setShowReviewDialog(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h2>
-              {pendingAction.decision === "APPROVE" ? "Approve Booking" : "Reject Booking"}
+              {pendingAction.decision === "APPROVE"
+                ? "Approve Booking"
+                : pendingAction.decision === "REJECT"
+                  ? "Reject Booking"
+                  : "Cancel Booking"}
             </h2>
             <p>
               {pendingAction.decision === "APPROVE"
                 ? "Are you sure you want to approve this booking?"
-                : "Are you sure you want to reject this booking?"}
+                : pendingAction.decision === "REJECT"
+                  ? "Are you sure you want to reject this booking?"
+                  : "Are you sure you want to cancel this booking?"}
             </p>
 
             <div className="field">
               <label>
-                {pendingAction.decision === "APPROVE" ? "Approval" : "Rejection"} Reason (optional)
+                {pendingAction.decision === "APPROVE"
+                  ? "Approval"
+                  : pendingAction.decision === "REJECT"
+                    ? "Rejection"
+                    : "Cancellation"}{" "}
+                Reason (optional)
                 <textarea
                   rows={4}
                   value={pendingAction.reason}
@@ -548,7 +610,9 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
                   placeholder={
                     pendingAction.decision === "APPROVE"
                       ? "Enter approval notes..."
-                      : "Enter rejection reason..."
+                      : pendingAction.decision === "REJECT"
+                        ? "Enter rejection reason..."
+                        : "Enter cancellation reason..."
                   }
                 />
               </label>
@@ -556,10 +620,16 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
 
             <div className="button-row">
               <button
-                className={pendingAction.decision === "APPROVE" ? "primary-button" : "danger-button"}
+                className={
+                  pendingAction.decision === "APPROVE" ? "primary-button" : "danger-button"
+                }
                 onClick={handleConfirmReview}
               >
-                {pendingAction.decision === "APPROVE" ? "Approve" : "Reject"}
+                {pendingAction.decision === "APPROVE"
+                  ? "Approve"
+                  : pendingAction.decision === "REJECT"
+                    ? "Reject"
+                    : "Cancel booking"}
               </button>
               <button
                 className="secondary-button"
@@ -756,6 +826,11 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
           display: flex;
           flex-direction: column;
           gap: 1rem;
+        }
+
+        .booking-highlighted {
+          border-color: #14b8a6;
+          box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.15);
         }
 
         .booking-header {

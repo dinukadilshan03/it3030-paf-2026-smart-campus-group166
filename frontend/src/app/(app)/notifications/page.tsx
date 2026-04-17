@@ -1,15 +1,22 @@
-import { PagePlaceholder } from "@/components/ui/PagePlaceholder";
+import { NotificationCenterPage } from "@/components/notifications/NotificationCenterPage";
 import { requireRole } from "@/lib/auth/session";
+import {
+  getUnreadNotificationCountServer,
+  listNotificationsServer,
+} from "@/lib/notifications/server";
 
 export default async function NotificationsPage() {
-  await requireRole(["ADMIN"]);
+  await requireRole(["STUDENT", "STAFF", "ADMIN"]);
+
+  const [notifications, unreadCount] = await Promise.all([
+    listNotificationsServer(),
+    getUnreadNotificationCountServer(),
+  ]);
 
   return (
-    <PagePlaceholder
-      eyebrow="Future workflow"
-      title="Notifications"
-      description="This placeholder page is in place so the notification experience can be added later without changing the core app shell."
-      audience="Admins"
+    <NotificationCenterPage
+      initialNotifications={notifications}
+      initialUnreadCount={unreadCount.unreadCount}
     />
   );
 }
