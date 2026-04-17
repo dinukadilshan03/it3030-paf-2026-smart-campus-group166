@@ -11,6 +11,7 @@ import com.smartcampus.backend.common.entity.UserRole;
 import com.smartcampus.backend.common.enums.CommentType;
 import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.UserStatus;
+import com.smartcampus.backend.modules.notification.service.NotificationService;
 import com.smartcampus.backend.modules.ticket.dto.CreateTicketCommentRequest;
 import com.smartcampus.backend.modules.ticket.dto.UpdateTicketCommentRequest;
 import com.smartcampus.backend.modules.ticket.entity.Ticket;
@@ -34,6 +35,7 @@ class TicketCommentServiceTest {
     @Mock private TicketCommentRepository ticketCommentRepository;
     @Mock private TicketAccessService ticketAccessService;
     @Mock private TicketSlaService ticketSlaService;
+    @Mock private NotificationService notificationService;
 
     private TicketCommentService ticketCommentService;
 
@@ -41,7 +43,11 @@ class TicketCommentServiceTest {
     void setUp() {
         ticketCommentService =
                 new TicketCommentService(
-                        ticketCommentRepository, ticketAccessService, ticketSlaService, new TicketMapper());
+                        ticketCommentRepository,
+                        ticketAccessService,
+                        ticketSlaService,
+                        new TicketMapper(),
+                        notificationService);
     }
 
     @Test
@@ -134,6 +140,10 @@ class TicketCommentServiceTest {
                 ticket, new CreateTicketCommentRequest("Looking into this now.", CommentType.PUBLIC_REPLY, null));
 
         org.mockito.Mockito.verify(ticketSlaService).markFirstResponseIfNeeded(103L);
+        org.mockito.Mockito.verify(notificationService)
+                .notifyTicketCommentAdded(
+                        org.mockito.ArgumentMatchers.eq(ticket),
+                        org.mockito.ArgumentMatchers.any(TicketComment.class));
     }
 
     @Test
@@ -182,6 +192,21 @@ class TicketCommentServiceTest {
         assertThatThrownBy(() -> ticketCommentService.deleteComment(ticket, 11L))
                 .isInstanceOf(com.smartcampus.backend.common.exception.ResourceConflictException.class)
                 .hasMessageContaining("cannot be deleted");
+    }
+
+    @Test
+    void statusNotesDoNotCreateNotifications() {
+        User admin = buildUser(9L, "admin2@example.com", "Admin 2");
+        Ticket ticket = buildTicket(106L, buildUser(10L, "reporter6@example.com", "Reporter 6"));
+
+        when(ticketCommentRepository.save(org.mockito.ArgumentMatchers.any(TicketComment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ticketCommentService.createSystemStatusNote(ticket, "Ticket status changed to IN_PROGRESS", admin);
+
+        org.mockito.Mockito.verify(notificationService, org.mockito.Mockito.never())
+                .notifyTicketCommentAdded(
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     private User buildUser(Long id, String email, String displayName) {

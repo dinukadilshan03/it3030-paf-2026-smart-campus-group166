@@ -26,6 +26,12 @@ const DASHBOARD_CARDS: Record<RoleCode, DashboardCard[]> = {
       description: "View your account area and the profile scaffold your team can expand later.",
       roles: ["STUDENT"],
     },
+    {
+      title: "Notifications",
+      href: "/notifications",
+      description: "Track booking decisions, ticket updates, and new comments.",
+      roles: ["STUDENT"],
+    },
   ],
   STAFF: [
     {
@@ -44,6 +50,12 @@ const DASHBOARD_CARDS: Record<RoleCode, DashboardCard[]> = {
       title: "Profile",
       href: "/profile",
       description: "Access your personal profile placeholder and future account settings area.",
+      roles: ["STAFF"],
+    },
+    {
+      title: "Notifications",
+      href: "/notifications",
+      description: "Review ticket updates and new comments tied to your work.",
       roles: ["STAFF"],
     },
   ],
@@ -75,7 +87,7 @@ const DASHBOARD_CARDS: Record<RoleCode, DashboardCard[]> = {
     {
       title: "Notifications",
       href: "/notifications",
-      description: "Enter the placeholder space for future notification workflow ownership.",
+      description: "Review booking decisions, ticket updates, and new comments.",
       roles: ["ADMIN"],
     },
     {
