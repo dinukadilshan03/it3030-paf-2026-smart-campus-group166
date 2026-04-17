@@ -8,6 +8,7 @@ import type { Resource } from "@/lib/resources/types";
 import { getResources } from "@/lib/resources/api";
 import { CreateBookingForm } from "./CreateBookingForm";
 import { BookingCalendar } from "./BookingCalendar";
+import { BookingAnalytics } from "./BookingAnalytics";
 import styles from "./BookingManagementPage.module.css";
 
 interface ReviewAction {
@@ -44,6 +45,9 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
     endTime: string;
     resourceId?: number;
   } | null>(null);
+
+  // State for analytics
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   // Check if user is admin
   const isAdmin = user.role === "ADMIN";
@@ -306,33 +310,54 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
           <div className="tabs-container">
             <button
               className={`tab-button ${activeTab === "pending" ? "active" : ""}`}
-              onClick={() => setActiveTab("pending")}
+              onClick={() => {
+                setActiveTab("pending");
+                setShowAnalytics(false);
+              }}
             >
               Pending ({stats.pending})
             </button>
             <button
               className={`tab-button ${activeTab === "approved" ? "active" : ""}`}
-              onClick={() => setActiveTab("approved")}
+              onClick={() => {
+                setActiveTab("approved");
+                setShowAnalytics(false);
+              }}
             >
               Approved ({stats.approved})
             </button>
             <button
               className={`tab-button ${activeTab === "rejected" ? "active" : ""}`}
-              onClick={() => setActiveTab("rejected")}
+              onClick={() => {
+                setActiveTab("rejected");
+                setShowAnalytics(false);
+              }}
             >
               Rejected ({stats.rejected})
             </button>
             <button
               className={`tab-button ${activeTab === "cancelled" ? "active" : ""}`}
-              onClick={() => setActiveTab("cancelled")}
+              onClick={() => {
+                setActiveTab("cancelled");
+                setShowAnalytics(false);
+              }}
             >
               Cancelled ({stats.cancelled})
             </button>
             <button
               className={`tab-button ${activeTab === "all" ? "active" : ""}`}
-              onClick={() => setActiveTab("all")}
+              onClick={() => {
+                setActiveTab("all");
+                setShowAnalytics(false);
+              }}
             >
               All ({stats.total})
+            </button>
+            <button
+              className={`tab-button analytics-tab ${showAnalytics ? "active" : ""}`}
+              onClick={() => setShowAnalytics(!showAnalytics)}
+            >
+              📊 Analytics
             </button>
           </div>
         </>
@@ -340,7 +365,9 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
 
       {isAdmin ? (
         <section className="bookings-section">
-          {isLoading ? (
+          {showAnalytics ? (
+            <BookingAnalytics bookings={bookings} resources={resources} />
+          ) : isLoading ? (
             <p className="muted">Loading bookings...</p>
           ) : filteredBookings.length === 0 ? (
             <p className="muted">No {activeTab !== "all" ? activeTab : ""} bookings found.</p>

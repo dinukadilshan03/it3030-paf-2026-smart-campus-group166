@@ -88,3 +88,16 @@
     flex: 1;
   }
 }
+
+.analyticsTab {
+  font-size: 1rem;
+}
+
+.analyticsTab:hover {
+  background-color: #fef08a;
+}
+
+.analyticsTab.active {
+  background-color: #fbbf24;
+  border-color: #f59e0b;
+}
