@@ -59,7 +59,9 @@ public class TicketMapper {
                 ticket.getTitle(),
                 ticket.getPriority(),
                 ticket.getStatus(),
-                ticket.getCreatedAt());
+                ticket.getCreatedAt(),
+                ticket.getFirstRespondedAt(),
+                ticket.getResolvedAt());
     }
 
     public TicketDetailResponse toDetail(Ticket ticket, List<TicketAssignmentResponse> assignmentHistory) {
@@ -76,8 +78,15 @@ public class TicketMapper {
                 ticket.getResource() == null ? null : ticket.getResource().getId(),
                 ticket.getResource() == null ? null : ticket.getResource().getResourceCode(),
                 ticket.getResource() == null ? null : ticket.getResource().getName(),
+                ticket.getResource() == null || ticket.getResource().getResourceCategory() == null
+                        ? null
+                        : ticket.getResource().getResourceCategory().getName(),
                 ticket.getLocation() == null ? null : ticket.getLocation().getId(),
                 ticket.getLocation() == null ? null : ticket.getLocation().getName(),
+                ticket.getLocation() == null ? null : ticket.getLocation().getBuilding(),
+                ticket.getLocation() == null ? null : ticket.getLocation().getFloor(),
+                ticket.getLocation() == null ? null : ticket.getLocation().getRoomIdentifier(),
+                ticket.getLocation() == null ? null : ticket.getLocation().getDescription(),
                 ticket.getTicketCategory().getId(),
                 ticket.getTicketCategory().getCode(),
                 ticket.getTicketCategory().getName(),
@@ -90,7 +99,9 @@ public class TicketMapper {
                 ticket.getPreferredContactPhone(),
                 ticket.getResolutionSummary(),
                 ticket.getRejectionReason(),
+                ticket.getFirstRespondedAt(),
                 ticket.getResolvedAt(),
+                ticket.getRejectedAt(),
                 ticket.getClosedAt(),
                 ticket.getCreatedAt(),
                 ticket.getUpdatedAt(),
@@ -129,6 +140,7 @@ public class TicketMapper {
                 attachment.getId(),
                 attachment.getUploadedByUser().getId(),
                 resolveDisplayName(attachment.getUploadedByUser()),
+                attachment.getTitle(),
                 attachment.getFileName(),
                 attachment.getStorageBucket(),
                 attachment.getStoragePath(),

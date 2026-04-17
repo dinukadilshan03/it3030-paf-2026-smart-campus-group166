@@ -13,6 +13,18 @@ This is the main handoff note for the current SmartCampus state. It gives the te
 
 The project already has the core backend foundation and the frontend app shell in place.
 
+### Active project roots
+
+- backend work happens in [backend](C:/Users/dinuka/Documents/SmartCampus/backend)
+- frontend work happens in [frontend](C:/Users/dinuka/Documents/SmartCampus/frontend)
+
+### Backend setup source of truth
+
+- the active backend is Supabase-only
+- local Postgres is not part of the supported setup
+- backend environment setup should start from [backend/.env.example](C:/Users/dinuka/Documents/SmartCampus/backend/.env.example)
+- if `DB_CONNECTION_MODE=pooler` times out, switch to `direct` and retry with the direct Supabase JDBC URL
+
 ### Backend already implemented
 
 - auth and session foundation
@@ -199,4 +211,3 @@ If someone needs to understand the overall app flow before building, start with:
 - this file
 - the relevant component handoff doc
 - the `/users` frontend implementation as a reference pattern
-
