@@ -13,6 +13,12 @@ public class AuthRuntimeConfigurationLogger implements ApplicationRunner {
     @Value("${app.frontend-url:http://localhost:3000}")
     private String frontendUrl;
 
+    @Value("${app.database.connection-mode:unknown}")
+    private String connectionMode;
+
+    @Value("${app.database.datasource-target:<not-configured>}")
+    private String datasourceTarget;
+
     @Value("${spring.datasource.url:}")
     private String datasourceUrl;
 
@@ -22,10 +28,18 @@ public class AuthRuntimeConfigurationLogger implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         log.info(
-                "Auth runtime configuration: frontendUrl={}, datasourceTarget={}, googleClientConfigured={}",
+                "Auth runtime configuration: frontendUrl={}, datasourceMode={}, datasourceTarget={}, googleClientConfigured={}",
                 frontendUrl,
-                sanitizeDatasourceUrl(datasourceUrl),
+                connectionMode,
+                resolveDatasourceTarget(),
                 googleClientId != null && !googleClientId.isBlank());
+    }
+
+    private String resolveDatasourceTarget() {
+        if (datasourceTarget != null && !datasourceTarget.isBlank()) {
+            return datasourceTarget;
+        }
+        return sanitizeDatasourceUrl(datasourceUrl);
     }
 
     private String sanitizeDatasourceUrl(String url) {
