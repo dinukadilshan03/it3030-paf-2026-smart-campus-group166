@@ -1,0 +1,5 @@
+org.springframework.boot.env.EnvironmentPostProcessor=\
+com.smartcampus.backend.common.config.SupabaseDatabaseEnvironmentPostProcessor
+
+org.springframework.boot.diagnostics.FailureAnalyzer=\
+com.smartcampus.backend.common.config.SupabaseDatabaseConnectionFailureAnalyzer
