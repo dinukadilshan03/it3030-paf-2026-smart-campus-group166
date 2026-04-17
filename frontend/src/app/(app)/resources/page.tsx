@@ -9,6 +9,7 @@ export default function ResourcePage() {
 
   const [resources, setResources] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
+  const [search, setSearch] = useState("");
 
   const isAdmin = user?.role === "ADMIN";
 
@@ -40,8 +41,21 @@ export default function ResourcePage() {
     }
   };
 
+  // 🔍 FILTER LOGIC
+  const filteredResources = resources.filter((r: any) => {
+    const text = search.toLowerCase();
+
+    return (
+      r.name?.toLowerCase().includes(text) ||
+      r.resourceCode?.toLowerCase().includes(text) ||
+      r.categoryName?.toLowerCase().includes(text) ||
+      r.locationName?.toLowerCase().includes(text)
+    );
+  });
+
   return (
     <div style={styles.container}>
+      {/* HEADER */}
       <div style={styles.header}>
         <h2 style={styles.title}>📦 Resources</h2>
 
@@ -55,65 +69,82 @@ export default function ResourcePage() {
         )}
       </div>
 
-      {resources.length === 0 ? (
+      {/* 🔍 SEARCH BAR */}
+      <input
+        type="text"
+        placeholder="🔍 Search resources by name, code, category..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        style={styles.search}
+      />
+
+      {/* LIST */}
+      {filteredResources.length === 0 ? (
         <p style={{ marginTop: "20px" }}>No resources found</p>
       ) : (
         <div style={styles.grid}>
-          {resources.map((r: any) => (
-            <div key={r.id} style={styles.card}>
-              
-              {/* IMAGE */}
-              {r.imageUrl && (
+          {filteredResources.map((r: any) => {
+            const localImg = localStorage.getItem(
+              "resource_image_" + r.id
+            );
+
+            const imageSrc =
+              localImg ||
+              r.imageUrl ||
+              "https://via.placeholder.com/300x200";
+
+            return (
+              <div key={r.id} style={styles.card}>
+                {/* IMAGE */}
                 <img
-                  src={r.imageUrl}
+                  src={imageSrc}
                   alt={r.name}
                   style={styles.image}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src =
-                      "https://via.placeholder.com/300x200";
-                  }}
                 />
-              )}
 
-              <div style={styles.cardContent}>
-                <h3 style={styles.name}>
-                  {r.name} ({r.resourceCode})
-                </h3>
+                <div style={styles.cardContent}>
+                  <h3 style={styles.name}>
+                    {r.name} ({r.resourceCode})
+                  </h3>
 
-                <p><b>ID:</b> {r.id}</p>
-                <p><b>Capacity:</b> {r.capacity ?? "N/A"}</p>
-                <p>
-                  <b>Category:</b> {r.categoryName || "N/A"} ({r.categoryCode || "-"})
-                </p>
-                <p>
-                  <b>Location:</b> {r.locationName || "N/A"} ({r.locationCode || "-"})
-                </p>
-                <p><b>Status:</b> {r.status}</p>
-                <p><b>Approval:</b> {r.requiresApproval ? "Yes" : "No"}</p>
-                <p><b>Description:</b> {r.description || "N/A"}</p>
-                <p><b>Notes:</b> {r.notes || "N/A"}</p>
+                  <p><b>ID:</b> {r.id}</p>
+                  <p><b>Capacity:</b> {r.capacity ?? "N/A"}</p>
+                  <p>
+                    <b>Category:</b> {r.categoryName || "N/A"}
+                  </p>
+                  <p>
+                    <b>Location:</b> {r.locationName || "N/A"}
+                  </p>
+                  <p><b>Status:</b> {r.status}</p>
+                  <p>
+                    <b>Approval:</b>{" "}
+                    {r.requiresApproval ? "Yes" : "No"}
+                  </p>
 
-                {/* ADMIN BUTTONS */}
-                {isAdmin && (
-                  <div style={styles.actions}>
-                    <button
-                      onClick={() => router.push(`/resources/edit/${r.id}`)}
-                      style={styles.editBtn}
-                    >
-                      ✏️ Edit
-                    </button>
+                  {/* ACTIONS */}
+                  {isAdmin && (
+                    <div style={styles.actions}>
+                      <button
+                        onClick={() =>
+                          router.push(`/resources/edit/${r.id}`)
+                        }
+                        style={styles.editBtn}
+                      >
+                        ✏️ Edit
+                      </button>
 
-                    <button
-                      onClick={() => handleDelete(r.id)}
-                      style={styles.deleteBtn}
-                    >
-                      🗑️ Delete
-                    </button>
-                  </div>
-                )}
+                      <button
+                        onClick={() => handleDelete(r.id)}
+                        style={styles.deleteBtn}
+                      >
+                        🗑️ Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -144,6 +175,14 @@ const styles: any = {
     cursor: "pointer",
     fontWeight: "500",
   },
+  search: {
+    width: "100%",
+    padding: "12px",
+    borderRadius: "10px",
+    border: "1px solid #ddd",
+    marginBottom: "20px",
+    fontSize: "14px",
+  },
   grid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
@@ -154,7 +193,6 @@ const styles: any = {
     borderRadius: "12px",
     overflow: "hidden",
     boxShadow: "0 4px 15px rgba(0,0,0,0.08)",
-    transition: "0.2s",
   },
   image: {
     width: "100%",

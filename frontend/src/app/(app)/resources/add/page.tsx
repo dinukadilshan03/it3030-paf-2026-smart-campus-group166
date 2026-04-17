@@ -5,6 +5,7 @@ import {
   createResource,
   getCategories,
   getLocations,
+  getResources,
 } from "@/lib/resources/api";
 import { useRouter } from "next/navigation";
 
@@ -17,15 +18,16 @@ export default function AddResourcePage() {
   const [form, setForm] = useState({
     name: "",
     resourceCode: "",
-    description: "",
     capacity: "",
     categoryId: "",
     locationId: "",
-    notes: "",
     imageUrl: "",
     status: "ACTIVE",
     requiresApproval: true,
   });
+
+  const [preview, setPreview] = useState("");
+  const [tempImage, setTempImage] = useState("");
 
   useEffect(() => {
     loadData();
@@ -49,26 +51,42 @@ export default function AddResourcePage() {
     });
   };
 
-  const handleSave = async () => {
-    if (!form.name || !form.resourceCode) {
-      return alert("Name & Code are required ❌");
-    }
+  const handleImageUpload = (e: any) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
+    const reader = new FileReader();
+
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      setPreview(base64);
+      setTempImage(base64);
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  const handleSave = async () => {
     try {
       const payload = {
         name: form.name,
         resourceCode: form.resourceCode,
-        description: form.description || null,
         capacity: form.capacity ? Number(form.capacity) : null,
         resourceCategoryId: Number(form.categoryId),
         locationId: Number(form.locationId),
-        notes: form.notes || null,
-        imageUrl: form.imageUrl || null,
+        imageUrl: "",
         status: form.status,
         requiresApproval: form.requiresApproval,
       };
 
       await createResource(payload);
+
+      const resources = await getResources();
+      const latest = resources[resources.length - 1];
+
+      if (tempImage && latest) {
+        localStorage.setItem("resource_image_" + latest.id, tempImage);
+      }
 
       alert("Resource Added ✅");
       router.push("/resources");
@@ -78,72 +96,61 @@ export default function AddResourcePage() {
   };
 
   return (
-    <div style={styles.container}>
+    <div style={styles.page}>
       <div style={styles.card}>
         <h2 style={styles.title}>➕ Add Resource</h2>
 
         <div style={styles.grid}>
-          <input name="name" placeholder="Name *" value={form.name} onChange={handleChange} style={styles.input} />
-          <input name="resourceCode" placeholder="Code *" value={form.resourceCode} onChange={handleChange} style={styles.input} />
+          <input name="name" placeholder="Resource Name" onChange={handleChange} style={styles.input} />
+          <input name="resourceCode" placeholder="Resource Code" onChange={handleChange} style={styles.input} />
 
-          <input name="description" placeholder="Description" value={form.description} onChange={handleChange} style={styles.input} />
-          <input name="capacity" type="number" placeholder="Capacity" value={form.capacity} onChange={handleChange} style={styles.input} />
+          <input name="capacity" type="number" placeholder="Capacity" onChange={handleChange} style={styles.input} />
 
-          {/* CATEGORY */}
-          <select name="categoryId" value={form.categoryId} onChange={handleChange} style={styles.input}>
-            <option value="">Select Category *</option>
+          <select name="categoryId" onChange={handleChange} style={styles.input}>
+            <option value="">Select Category</option>
             {categories.map((c: any) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
 
-          {/* LOCATION */}
-          <select name="locationId" value={form.locationId} onChange={handleChange} style={styles.input}>
-            <option value="">Select Location *</option>
+          <select name="locationId" onChange={handleChange} style={styles.input}>
+            <option value="">Select Location</option>
             {locations.map((l: any) => (
               <option key={l.id} value={l.id}>{l.name}</option>
             ))}
           </select>
 
-          <input name="notes" placeholder="Notes" value={form.notes} onChange={handleChange} style={styles.input} />
-          <input name="imageUrl" placeholder="Image URL" value={form.imageUrl} onChange={handleChange} style={styles.input} />
-
-          {/* STATUS */}
-          <select name="status" value={form.status} onChange={handleChange} style={styles.input}>
+          <select name="status" onChange={handleChange} style={styles.input}>
             <option value="ACTIVE">ACTIVE</option>
-            <option value="INACTIVE">INACTIVE</option>
+            <option value="OUT_OF_SERVICE">OUT OF SERVICE</option>
           </select>
 
-          {/* APPROVAL */}
-          <label style={styles.checkbox}>
-            <input
-              type="checkbox"
-              name="requiresApproval"
-              checked={form.requiresApproval}
-              onChange={handleChange}
-            />
-            Requires Approval
-          </label>
+          <div style={styles.checkbox}>
+            <input type="checkbox" name="requiresApproval" onChange={handleChange} />
+            <span>Requires Approval</span>
+          </div>
+
+          {/* Upload */}
+          <div style={styles.uploadBox}>
+            <input type="file" accept="image/*" onChange={handleImageUpload} />
+          </div>
         </div>
 
-        {/* IMAGE PREVIEW */}
-        {form.imageUrl && (
-          <div style={{ marginTop: "15px" }}>
-            <img
-              src={form.imageUrl}
-              alt="preview"
-              style={styles.image}
-              onError={(e) => {
-                (e.target as HTMLImageElement).src =
-                  "https://via.placeholder.com/150";
-              }}
-            />
+        {/* Preview */}
+        {preview && (
+          <div style={styles.previewBox}>
+            <img src={preview} style={styles.image} />
           </div>
         )}
 
+        {/* Buttons */}
         <div style={styles.buttonRow}>
-          <button onClick={handleSave} style={styles.saveBtn}>💾 Save</button>
-          <button onClick={() => router.push("/resources")} style={styles.cancelBtn}>Cancel</button>
+          <button onClick={handleSave} style={styles.saveBtn}>
+            💾 Save
+          </button>
+          <button onClick={() => router.push("/resources")} style={styles.cancelBtn}>
+            Cancel
+          </button>
         </div>
       </div>
     </div>
@@ -151,20 +158,24 @@ export default function AddResourcePage() {
 }
 
 const styles: any = {
-  container: {
+  page: {
     display: "flex",
     justifyContent: "center",
+    alignItems: "center",
     padding: "40px",
+    background: "#f4f6f9",
+    minHeight: "100vh",
   },
   card: {
-    width: "850px",
+    width: "800px",
     background: "#fff",
-    padding: "30px",
-    borderRadius: "14px",
-    boxShadow: "0 6px 25px rgba(0,0,0,0.1)",
+    padding: "25px",
+    borderRadius: "16px",
+    boxShadow: "0 8px 25px rgba(0,0,0,0.08)",
   },
   title: {
     marginBottom: "20px",
+    fontSize: "22px",
     fontWeight: "600",
   },
   grid: {
@@ -173,41 +184,52 @@ const styles: any = {
     gap: "15px",
   },
   input: {
-    padding: "12px",
+    padding: "10px",
     borderRadius: "8px",
-    border: "1px solid #ccc",
+    border: "1px solid #ddd",
     fontSize: "14px",
   },
   checkbox: {
     display: "flex",
     alignItems: "center",
     gap: "8px",
-    fontSize: "14px",
+  },
+  uploadBox: {
+    gridColumn: "span 2",
+    padding: "10px",
+    border: "2px dashed #ccc",
+    borderRadius: "10px",
+    textAlign: "center",
+  },
+  previewBox: {
+    marginTop: "15px",
+    textAlign: "center",
+  },
+  image: {
+    width: "200px",
+    height: "130px",
+    objectFit: "cover",
+    borderRadius: "10px",
   },
   buttonRow: {
-    marginTop: "25px",
+    marginTop: "20px",
     display: "flex",
     gap: "10px",
+    justifyContent: "flex-end",
   },
   saveBtn: {
-    background: "#16a34a",
+    background: "#2563eb",
     color: "#fff",
     padding: "10px 20px",
-    border: "none",
     borderRadius: "8px",
+    border: "none",
     cursor: "pointer",
   },
   cancelBtn: {
     background: "#e5e7eb",
     padding: "10px 20px",
+    borderRadius: "8px",
     border: "none",
-    borderRadius: "8px",
     cursor: "pointer",
-  },
-  image: {
-    width: "180px",
-    height: "110px",
-    objectFit: "cover",
-    borderRadius: "8px",
   },
 };
