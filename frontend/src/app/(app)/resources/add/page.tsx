@@ -38,8 +38,14 @@ export default function AddResourcePage() {
       getCategories(),
       getLocations(),
     ]);
+
     setCategories(cat || []);
-    setLocations(loc || []);
+
+    const uniqueLocations = Array.from(
+      new Map((loc || []).map((l: any) => [l.name, l])).values()
+    );
+
+    setLocations(uniqueLocations);
   };
 
   const handleChange = (e: any) => {
@@ -85,10 +91,13 @@ export default function AddResourcePage() {
       const latest = resources[resources.length - 1];
 
       if (tempImage && latest) {
-        localStorage.setItem("resource_image_" + latest.id, tempImage);
+        localStorage.setItem(
+          "resource_image_" + latest.id,
+          tempImage
+        );
       }
 
-      alert("Resource Added ✅");
+      alert("Added ✅");
       router.push("/resources");
     } catch (err: any) {
       alert(err.message);
@@ -96,15 +105,32 @@ export default function AddResourcePage() {
   };
 
   return (
-    <div style={styles.page}>
+    <div style={styles.container}>
       <div style={styles.card}>
         <h2 style={styles.title}>➕ Add Resource</h2>
 
         <div style={styles.grid}>
-          <input name="name" placeholder="Resource Name" onChange={handleChange} style={styles.input} />
-          <input name="resourceCode" placeholder="Resource Code" onChange={handleChange} style={styles.input} />
+          <input
+            name="name"
+            placeholder="Resource Name"
+            onChange={handleChange}
+            style={styles.input}
+          />
 
-          <input name="capacity" type="number" placeholder="Capacity" onChange={handleChange} style={styles.input} />
+          <input
+            name="resourceCode"
+            placeholder="Resource Code"
+            onChange={handleChange}
+            style={styles.input}
+          />
+
+          <input
+            name="capacity"
+            type="number"
+            placeholder="Capacity"
+            onChange={handleChange}
+            style={styles.input}
+          />
 
           <select name="categoryId" onChange={handleChange} style={styles.input}>
             <option value="">Select Category</option>
@@ -122,33 +148,39 @@ export default function AddResourcePage() {
 
           <select name="status" onChange={handleChange} style={styles.input}>
             <option value="ACTIVE">ACTIVE</option>
-            <option value="OUT_OF_SERVICE">OUT OF SERVICE</option>
+            <option value="OUT_OF_SERVICE">OUT_OF_SERVICE</option>
           </select>
 
-          <div style={styles.checkbox}>
-            <input type="checkbox" name="requiresApproval" onChange={handleChange} />
-            <span>Requires Approval</span>
+          <div style={styles.checkboxRow}>
+            <input
+              type="checkbox"
+              name="requiresApproval"
+              onChange={handleChange}
+            />
+            <label>Requires Approval</label>
           </div>
 
-          {/* Upload */}
+          {/* FILE UPLOAD */}
           <div style={styles.uploadBox}>
             <input type="file" accept="image/*" onChange={handleImageUpload} />
           </div>
         </div>
 
-        {/* Preview */}
+        {/* IMAGE PREVIEW */}
         {preview && (
-          <div style={styles.previewBox}>
-            <img src={preview} style={styles.image} />
-          </div>
+          <img src={preview} style={styles.image} />
         )}
 
-        {/* Buttons */}
-        <div style={styles.buttonRow}>
+        {/* BUTTONS */}
+        <div style={styles.buttons}>
           <button onClick={handleSave} style={styles.saveBtn}>
             💾 Save
           </button>
-          <button onClick={() => router.push("/resources")} style={styles.cancelBtn}>
+
+          <button
+            onClick={() => router.push("/resources")}
+            style={styles.cancelBtn}
+          >
             Cancel
           </button>
         </div>
@@ -157,77 +189,86 @@ export default function AddResourcePage() {
   );
 }
 
+/* 🎨 MODERN STYLES */
 const styles: any = {
-  page: {
+  container: {
     display: "flex",
     justifyContent: "center",
-    alignItems: "center",
     padding: "40px",
-    background: "#f4f6f9",
+    background: "#f3f4f6",
     minHeight: "100vh",
   },
+
   card: {
-    width: "800px",
-    background: "#fff",
-    padding: "25px",
+    width: "850px",
+    background: "#ffffff",
+    padding: "30px",
     borderRadius: "16px",
     boxShadow: "0 8px 25px rgba(0,0,0,0.08)",
   },
+
   title: {
     marginBottom: "20px",
-    fontSize: "22px",
     fontWeight: "600",
+    fontSize: "22px",
   },
+
   grid: {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
     gap: "15px",
   },
+
   input: {
-    padding: "10px",
-    borderRadius: "8px",
+    padding: "12px",
+    borderRadius: "10px",
     border: "1px solid #ddd",
     fontSize: "14px",
+    outline: "none",
   },
-  checkbox: {
+
+  checkboxRow: {
     display: "flex",
     alignItems: "center",
     gap: "8px",
   },
+
   uploadBox: {
     gridColumn: "span 2",
-    padding: "10px",
     border: "2px dashed #ccc",
+    padding: "15px",
     borderRadius: "10px",
     textAlign: "center",
+    cursor: "pointer",
   },
-  previewBox: {
-    marginTop: "15px",
-    textAlign: "center",
-  },
+
   image: {
-    width: "200px",
-    height: "130px",
+    width: "180px",
+    height: "120px",
     objectFit: "cover",
     borderRadius: "10px",
+    marginTop: "15px",
   },
-  buttonRow: {
+
+  buttons: {
     marginTop: "20px",
     display: "flex",
-    gap: "10px",
-    justifyContent: "flex-end",
+    gap: "12px",
   },
+
   saveBtn: {
     background: "#2563eb",
     color: "#fff",
-    padding: "10px 20px",
+    padding: "10px 22px",
     borderRadius: "8px",
     border: "none",
     cursor: "pointer",
+    fontWeight: "500",
   },
+
   cancelBtn: {
     background: "#e5e7eb",
-    padding: "10px 20px",
+    padding: "10px 22px",
     borderRadius: "8px",
     border: "none",
     cursor: "pointer",

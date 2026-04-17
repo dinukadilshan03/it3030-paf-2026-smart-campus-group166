@@ -30,18 +30,27 @@ export default function EditResourcePage() {
     ]);
 
     setCategories(cat || []);
-    setLocations(loc || []);
+
+    // ✅ REMOVE DUPLICATE LOCATIONS (same as Add page)
+    const uniqueLocations = Array.from(
+      new Map((loc || []).map((l: any) => [l.name, l])).values()
+    );
+    setLocations(uniqueLocations);
 
     const resource = resources.find((r: any) => r.id == id);
 
-    const localImg = localStorage.getItem("resource_image_" + id);
-
     setForm({
-      ...resource,
+      name: resource?.name || "",
+      resourceCode: resource?.resourceCode || "",
+      capacity: resource?.capacity || "",
       categoryId: resource?.categoryId,
       locationId: resource?.locationId,
+      status: resource?.status || "ACTIVE",
+      requiresApproval: resource?.requiresApproval ?? true,
     });
 
+    // Load image (local or backend)
+    const localImg = localStorage.getItem("resource_image_" + id);
     setPreview(localImg || resource?.imageUrl || "");
   };
 
@@ -54,6 +63,7 @@ export default function EditResourcePage() {
     });
   };
 
+  // IMAGE UPLOAD
   const handleImageUpload = (e: any) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -63,6 +73,8 @@ export default function EditResourcePage() {
     reader.onloadend = () => {
       const base64 = reader.result as string;
       setPreview(base64);
+
+      // store locally
       localStorage.setItem("resource_image_" + id, base64);
     };
 
@@ -72,13 +84,10 @@ export default function EditResourcePage() {
   const handleUpdate = async () => {
     try {
       const payload = {
-        name: form.name,
-        resourceCode: form.resourceCode,
+        ...form,
         capacity: form.capacity ? Number(form.capacity) : null,
         resourceCategoryId: Number(form.categoryId),
         locationId: Number(form.locationId),
-        status: form.status,
-        requiresApproval: form.requiresApproval,
         imageUrl: "",
       };
 
@@ -92,134 +101,184 @@ export default function EditResourcePage() {
   };
 
   return (
-    <div style={styles.page}>
+    <div style={styles.container}>
       <div style={styles.card}>
         <h2 style={styles.title}>✏️ Edit Resource</h2>
 
         <div style={styles.grid}>
-          <input name="name" value={form.name || ""} onChange={handleChange} placeholder="Resource Name" style={styles.input} />
-          <input name="resourceCode" value={form.resourceCode || ""} onChange={handleChange} placeholder="Resource Code" style={styles.input} />
+          <input
+            name="name"
+            value={form.name}
+            onChange={handleChange}
+            placeholder="Resource Name"
+            style={styles.input}
+          />
 
-          <input name="capacity" value={form.capacity || ""} onChange={handleChange} placeholder="Capacity" style={styles.input} />
+          <input
+            name="resourceCode"
+            value={form.resourceCode}
+            onChange={handleChange}
+            placeholder="Resource Code"
+            style={styles.input}
+          />
 
-          <select name="categoryId" value={form.categoryId || ""} onChange={handleChange} style={styles.input}>
-            <option value="">Select Category</option>
+          <input
+            name="capacity"
+            value={form.capacity}
+            onChange={handleChange}
+            placeholder="Capacity"
+            style={styles.input}
+          />
+
+          <select
+            name="categoryId"
+            value={form.categoryId}
+            onChange={handleChange}
+            style={styles.input}
+          >
             {categories.map((c: any) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
 
-          <select name="locationId" value={form.locationId || ""} onChange={handleChange} style={styles.input}>
-            <option value="">Select Location</option>
+          <select
+            name="locationId"
+            value={form.locationId}
+            onChange={handleChange}
+            style={styles.input}
+          >
             {locations.map((l: any) => (
               <option key={l.id} value={l.id}>{l.name}</option>
             ))}
           </select>
 
-          <select name="status" value={form.status || "ACTIVE"} onChange={handleChange} style={styles.input}>
+          <select
+            name="status"
+            value={form.status}
+            onChange={handleChange}
+            style={styles.input}
+          >
             <option value="ACTIVE">ACTIVE</option>
-            <option value="OUT_OF_SERVICE">OUT OF SERVICE</option>
+            <option value="OUT_OF_SERVICE">OUT_OF_SERVICE</option>
           </select>
 
-          <div style={styles.checkbox}>
-            <input type="checkbox" name="requiresApproval" checked={form.requiresApproval || false} onChange={handleChange} />
-            <span>Requires Approval</span>
+          <div style={styles.checkboxRow}>
+            <input
+              type="checkbox"
+              name="requiresApproval"
+              checked={form.requiresApproval}
+              onChange={handleChange}
+            />
+            <label>Requires Approval</label>
           </div>
 
+          {/* FILE UPLOAD */}
           <div style={styles.uploadBox}>
             <input type="file" accept="image/*" onChange={handleImageUpload} />
           </div>
         </div>
 
+        {/* IMAGE PREVIEW */}
         {preview && (
-          <div style={styles.previewBox}>
-            <img src={preview} style={styles.image} />
-          </div>
+          <img src={preview} style={styles.image} />
         )}
 
-        <div style={styles.buttonRow}>
-          <button onClick={handleUpdate} style={styles.updateBtn}>💾 Update</button>
-          <button onClick={() => router.push("/resources")} style={styles.cancelBtn}>Cancel</button>
+        {/* BUTTONS */}
+        <div style={styles.buttons}>
+          <button onClick={handleUpdate} style={styles.updateBtn}>
+            💾 Update
+          </button>
+
+          <button
+            onClick={() => router.push("/resources")}
+            style={styles.cancelBtn}
+          >
+            Cancel
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-/* 🔥 PREMIUM STYLES */
+/* 🎨 SAME STYLE AS ADD PAGE */
 const styles: any = {
-  page: {
+  container: {
     display: "flex",
     justifyContent: "center",
-    alignItems: "center",
+    padding: "40px",
+    background: "#f3f4f6",
     minHeight: "100vh",
-    background: "linear-gradient(135deg, #eef2ff, #f8fafc)",
   },
+
   card: {
     width: "850px",
+    background: "#fff",
     padding: "30px",
-    borderRadius: "18px",
-    background: "rgba(255,255,255,0.9)",
-    backdropFilter: "blur(10px)",
-    boxShadow: "0 10px 40px rgba(0,0,0,0.1)",
+    borderRadius: "16px",
+    boxShadow: "0 8px 25px rgba(0,0,0,0.08)",
   },
+
   title: {
-    fontSize: "24px",
     marginBottom: "20px",
-    fontWeight: "700",
+    fontWeight: "600",
+    fontSize: "22px",
   },
+
   grid: {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
-    gap: "16px",
+    gap: "15px",
   },
+
   input: {
     padding: "12px",
     borderRadius: "10px",
     border: "1px solid #ddd",
     fontSize: "14px",
-    transition: "0.2s",
   },
-  checkbox: {
+
+  checkboxRow: {
     display: "flex",
     alignItems: "center",
     gap: "8px",
   },
+
   uploadBox: {
     gridColumn: "span 2",
-    border: "2px dashed #cbd5e1",
+    border: "2px dashed #ccc",
     padding: "15px",
-    borderRadius: "12px",
+    borderRadius: "10px",
     textAlign: "center",
   },
-  previewBox: {
-    marginTop: "20px",
-    textAlign: "center",
-  },
+
   image: {
-    width: "220px",
-    borderRadius: "12px",
-    boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
+    width: "180px",
+    height: "120px",
+    objectFit: "cover",
+    borderRadius: "10px",
+    marginTop: "15px",
   },
-  buttonRow: {
-    marginTop: "25px",
+
+  buttons: {
+    marginTop: "20px",
     display: "flex",
-    justifyContent: "flex-end",
     gap: "12px",
   },
+
   updateBtn: {
-    background: "linear-gradient(135deg, #f59e0b, #f97316)",
+    background: "#f59e0b",
     color: "#fff",
-    padding: "12px 22px",
-    borderRadius: "10px",
+    padding: "10px 22px",
+    borderRadius: "8px",
     border: "none",
     cursor: "pointer",
-    fontWeight: "600",
   },
+
   cancelBtn: {
     background: "#e5e7eb",
-    padding: "12px 22px",
-    borderRadius: "10px",
+    padding: "10px 22px",
+    borderRadius: "8px",
     border: "none",
     cursor: "pointer",
   },

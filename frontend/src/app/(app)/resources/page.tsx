@@ -9,8 +9,16 @@ export default function ResourcePage() {
 
   const [resources, setResources] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
-  const [search, setSearch] = useState("");
 
+  // ✅ ADDED SEARCH STATE
+  const [search, setSearch] = useState("");
+  const getDescription = (r: any) => {
+  if (r.description) return r.description;
+
+  return `${r.categoryName || "Resource"} in ${
+    r.locationName || "Unknown Location"
+  } with capacity ${r.capacity ?? "N/A"}`;
+};
   const isAdmin = user?.role === "ADMIN";
 
   useEffect(() => {
@@ -41,7 +49,7 @@ export default function ResourcePage() {
     }
   };
 
-  // 🔍 FILTER LOGIC
+  // ✅ ADDED FILTER LOGIC
   const filteredResources = resources.filter((r: any) => {
     const text = search.toLowerCase();
 
@@ -69,10 +77,10 @@ export default function ResourcePage() {
         )}
       </div>
 
-      {/* 🔍 SEARCH BAR */}
+      {/* ✅ ADDED SEARCH BAR */}
       <input
         type="text"
-        placeholder="🔍 Search resources by name, code, category..."
+        placeholder="🔍 Search..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         style={styles.search}
@@ -115,6 +123,9 @@ export default function ResourcePage() {
                   <p>
                     <b>Location:</b> {r.locationName || "N/A"}
                   </p>
+                  <p>
+  <b>Description:</b> {getDescription(r)}
+</p>
                   <p><b>Status:</b> {r.status}</p>
                   <p>
                     <b>Approval:</b>{" "}
@@ -175,14 +186,16 @@ const styles: any = {
     cursor: "pointer",
     fontWeight: "500",
   },
+
+  // ✅ ADDED SEARCH STYLE
   search: {
     width: "100%",
-    padding: "12px",
-    borderRadius: "10px",
-    border: "1px solid #ddd",
-    marginBottom: "20px",
-    fontSize: "14px",
+    padding: "10px",
+    borderRadius: "8px",
+    border: "1px solid #ccc",
+    marginBottom: "15px",
   },
+
   grid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
