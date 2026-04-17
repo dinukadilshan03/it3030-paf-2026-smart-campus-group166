@@ -13,21 +13,20 @@ export default function EditResourcePage() {
   const { id } = useParams();
   const router = useRouter();
 
-  const [categories, setCategories] = useState<any[]>([]);
-  const [locations, setLocations] = useState<any[]>([]);
-
+  // ✅ FIX: Proper initial form (VERY IMPORTANT)
   const [form, setForm] = useState({
     name: "",
     resourceCode: "",
-    description: "",
     capacity: "",
     categoryId: "",
     locationId: "",
-    notes: "",
-    imageUrl: "",
     status: "ACTIVE",
     requiresApproval: true,
   });
+
+  const [categories, setCategories] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
+  const [preview, setPreview] = useState("");
 
   useEffect(() => {
     loadData();
@@ -41,27 +40,29 @@ export default function EditResourcePage() {
     ]);
 
     setCategories(cat || []);
-    setLocations(loc || []);
+
+    // ✅ REMOVE DUPLICATES
+    const uniqueLocations = Array.from(
+      new Map((loc || []).map((l: any) => [l.name, l])).values()
+    );
+    setLocations(uniqueLocations);
 
     const resource = resources.find((r: any) => r.id == id);
 
-    if (!resource) {
-      alert("Resource not found ❌");
-      return;
-    }
+    if (!resource) return; // ✅ SAFE GUARD
 
     setForm({
-      name: resource.name,
-      resourceCode: resource.resourceCode,
-      description: resource.description || "",
+      name: resource.name || "",
+      resourceCode: resource.resourceCode || "",
       capacity: resource.capacity || "",
-      categoryId: resource.categoryId,
-      locationId: resource.locationId,
-      notes: resource.notes || "",
-      imageUrl: resource.imageUrl || "",
+      categoryId: resource.categoryId || "",
+      locationId: resource.locationId || "",
       status: resource.status || "ACTIVE",
       requiresApproval: resource.requiresApproval ?? true,
     });
+
+    const localImg = localStorage.getItem("resource_image_" + id);
+    setPreview(localImg || resource.imageUrl || "");
   };
 
   const handleChange = (e: any) => {
@@ -73,19 +74,33 @@ export default function EditResourcePage() {
     });
   };
 
+  // IMAGE UPLOAD
+  const handleImageUpload = (e: any) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      setPreview(base64);
+      localStorage.setItem("resource_image_" + id, base64);
+    };
+
+    reader.readAsDataURL(file);
+  };
+
   const handleUpdate = async () => {
     try {
       const payload = {
         name: form.name,
         resourceCode: form.resourceCode,
-        description: form.description || null,
         capacity: form.capacity ? Number(form.capacity) : null,
         resourceCategoryId: Number(form.categoryId),
         locationId: Number(form.locationId),
-        notes: form.notes || null,
-        imageUrl: form.imageUrl || null,
         status: form.status,
         requiresApproval: form.requiresApproval,
+        imageUrl: "",
       };
 
       await updateResource(Number(id), payload);
@@ -103,130 +118,174 @@ export default function EditResourcePage() {
         <h2 style={styles.title}>✏️ Edit Resource</h2>
 
         <div style={styles.grid}>
-          <input name="name" value={form.name} onChange={handleChange} placeholder="Name" style={styles.input} />
-          <input name="resourceCode" value={form.resourceCode} onChange={handleChange} placeholder="Code" style={styles.input} />
+          <input
+            name="name"
+            value={form.name}
+            onChange={handleChange}
+            placeholder="Resource Name"
+            style={styles.input}
+          />
 
-          <input name="description" value={form.description} onChange={handleChange} placeholder="Description" style={styles.input} />
-          <input name="capacity" type="number" value={form.capacity} onChange={handleChange} placeholder="Capacity" style={styles.input} />
+          <input
+            name="resourceCode"
+            value={form.resourceCode}
+            onChange={handleChange}
+            placeholder="Resource Code"
+            style={styles.input}
+          />
 
-          {/* CATEGORY */}
-          <select name="categoryId" value={form.categoryId} onChange={handleChange} style={styles.input}>
+          <input
+            name="capacity"
+            value={form.capacity}
+            onChange={handleChange}
+            placeholder="Capacity"
+            style={styles.input}
+          />
+
+          <select
+            name="categoryId"
+            value={form.categoryId || ""}
+            onChange={handleChange}
+            style={styles.input}
+          >
             <option value="">Select Category</option>
             {categories.map((c: any) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
 
-          {/* LOCATION */}
-          <select name="locationId" value={form.locationId} onChange={handleChange} style={styles.input}>
+          <select
+            name="locationId"
+            value={form.locationId || ""}
+            onChange={handleChange}
+            style={styles.input}
+          >
             <option value="">Select Location</option>
             {locations.map((l: any) => (
               <option key={l.id} value={l.id}>{l.name}</option>
             ))}
           </select>
 
-          <input name="notes" value={form.notes} onChange={handleChange} placeholder="Notes" style={styles.input} />
-          <input name="imageUrl" value={form.imageUrl} onChange={handleChange} placeholder="Image URL" style={styles.input} />
-
-          {/* STATUS */}
-          <select name="status" value={form.status} onChange={handleChange} style={styles.input}>
+          <select
+            name="status"
+            value={form.status || "ACTIVE"}
+            onChange={handleChange}
+            style={styles.input}
+          >
             <option value="ACTIVE">ACTIVE</option>
-            <option value="INACTIVE">INACTIVE</option>
+            <option value="OUT_OF_SERVICE">OUT_OF_SERVICE</option>
           </select>
 
-          {/* APPROVAL */}
-          <label style={styles.checkbox}>
+          <div style={styles.checkboxRow}>
             <input
               type="checkbox"
               name="requiresApproval"
-              checked={form.requiresApproval}
+              checked={form.requiresApproval ?? false}
               onChange={handleChange}
             />
-            Requires Approval
-          </label>
+            <label>Requires Approval</label>
+          </div>
+
+          <div style={styles.uploadBox}>
+            <input type="file" accept="image/*" onChange={handleImageUpload} />
+          </div>
         </div>
 
-        {/* IMAGE PREVIEW */}
-        {form.imageUrl && (
-          <div style={{ marginTop: "15px" }}>
-            <img
-              src={form.imageUrl}
-              alt="preview"
-              style={styles.image}
-              onError={(e) => {
-                (e.target as HTMLImageElement).src =
-                  "https://via.placeholder.com/150";
-              }}
-            />
-          </div>
-        )}
+        {preview && <img src={preview} style={styles.image} />}
 
-        <div style={styles.buttonRow}>
-          <button onClick={handleUpdate} style={styles.updateBtn}>💾 Update</button>
-          <button onClick={() => router.push("/resources")} style={styles.cancelBtn}>Cancel</button>
+        <div style={styles.buttons}>
+          <button onClick={handleUpdate} style={styles.updateBtn}>
+            💾 Update
+          </button>
+
+          <button
+            onClick={() => router.push("/resources")}
+            style={styles.cancelBtn}
+          >
+            Cancel
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
+/* 🎨 STYLES */
 const styles: any = {
   container: {
     display: "flex",
     justifyContent: "center",
     padding: "40px",
+    background: "#f3f4f6",
+    minHeight: "100vh",
   },
+
   card: {
     width: "850px",
     background: "#fff",
     padding: "30px",
-    borderRadius: "14px",
-    boxShadow: "0 6px 25px rgba(0,0,0,0.1)",
+    borderRadius: "16px",
+    boxShadow: "0 8px 25px rgba(0,0,0,0.08)",
   },
+
   title: {
     marginBottom: "20px",
     fontWeight: "600",
+    fontSize: "22px",
   },
+
   grid: {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
     gap: "15px",
   },
+
   input: {
     padding: "12px",
-    borderRadius: "8px",
-    border: "1px solid #ccc",
-    fontSize: "14px",
+    borderRadius: "10px",
+    border: "1px solid #ddd",
   },
-  checkbox: {
+
+  checkboxRow: {
     display: "flex",
     alignItems: "center",
     gap: "8px",
   },
-  buttonRow: {
-    marginTop: "25px",
-    display: "flex",
-    gap: "10px",
+
+  uploadBox: {
+    gridColumn: "span 2",
+    border: "2px dashed #ccc",
+    padding: "15px",
+    borderRadius: "10px",
+    textAlign: "center",
   },
+
+  image: {
+    width: "180px",
+    height: "120px",
+    objectFit: "cover",
+    borderRadius: "10px",
+    marginTop: "15px",
+  },
+
+  buttons: {
+    marginTop: "20px",
+    display: "flex",
+    gap: "12px",
+  },
+
   updateBtn: {
     background: "#f59e0b",
     color: "#fff",
-    padding: "10px 20px",
-    border: "none",
+    padding: "10px 22px",
     borderRadius: "8px",
-    cursor: "pointer",
+    border: "none",
   },
+
   cancelBtn: {
     background: "#e5e7eb",
-    padding: "10px 20px",
+    padding: "10px 22px",
+    borderRadius: "8px",
     border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-  },
-  image: {
-    width: "180px",
-    height: "110px",
-    objectFit: "cover",
-    borderRadius: "8px",
   },
 };
