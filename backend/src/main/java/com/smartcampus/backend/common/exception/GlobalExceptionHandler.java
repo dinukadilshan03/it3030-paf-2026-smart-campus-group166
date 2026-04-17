@@ -8,17 +8,21 @@ import jakarta.validation.ConstraintViolationException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -72,12 +76,43 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), null);
     }
 
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalState(
+            IllegalStateException ex,
+            HttpServletRequest request) {
+        log.warn("Request failed with illegal state for path={}", request.getRequestURI(), ex);
+        return buildResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), request.getRequestURI(), null);
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleUnreadableMessage(
             HttpMessageNotReadableException ex,
             HttpServletRequest request) {
         return buildResponse(
                 HttpStatus.BAD_REQUEST, "Malformed request payload", request.getRequestURI(), null);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUploadSizeExceeded(
+            MaxUploadSizeExceededException ex,
+            HttpServletRequest request) {
+        return buildResponse(
+                HttpStatus.BAD_REQUEST,
+                "Attachment image must be 5 MB or smaller",
+                request.getRequestURI(),
+                null);
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ErrorResponse> handleMultipartException(
+            MultipartException ex,
+            HttpServletRequest request) {
+        return buildResponse(
+                HttpStatus.BAD_REQUEST,
+                resolveMultipartMessage(ex),
+                request.getRequestURI(),
+                null);
     }
 
     @ExceptionHandler(AuthenticationException.class)
@@ -112,11 +147,30 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleGenericException(
             Exception ex,
             HttpServletRequest request) {
+        log.error("Unexpected server error for path={}", request.getRequestURI(), ex);
         return buildResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "Unexpected server error",
                 request.getRequestURI(),
                 null);
+    }
+
+    private String resolveMultipartMessage(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null) {
+                String normalized = message.toLowerCase();
+                if (normalized.contains("size")
+                        && (normalized.contains("exceed")
+                                || normalized.contains("larger than")
+                                || normalized.contains("too large"))) {
+                    return "Attachment image must be 5 MB or smaller";
+                }
+            }
+            current = current.getCause();
+        }
+        return "Attachment upload request is invalid";
     }
 
     private ResponseEntity<ErrorResponse> buildResponse(
