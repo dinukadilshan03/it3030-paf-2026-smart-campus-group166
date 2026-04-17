@@ -230,77 +230,114 @@ export function BookingAnalytics({ bookings, resources }: BookingAnalyticsProps)
 
       <style jsx>{`
         .booking-analytics {
-          padding: 2rem;
-          background: white;
-          border-radius: 8px;
-          margin-top: 2rem;
+          padding: 2.5rem;
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(91, 76, 243, 0.02) 100%);
+          border-radius: 1rem;
+          margin-top: 2.5rem;
+          border: 1px solid rgba(91, 76, 243, 0.15);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+          backdrop-filter: blur(10px);
         }
 
         .analytics-title {
-          font-size: 1.75rem;
+          font-size: 1.875rem;
           font-weight: 700;
-          color: #1f2937;
-          margin: 0 0 2rem 0;
+          background: linear-gradient(135deg, #5b4cf3 0%, #06b6d4 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          margin: 0 0 2.5rem 0;
+          letter-spacing: -0.5px;
         }
 
         .stats-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-          gap: 1rem;
-          margin-bottom: 2rem;
+          grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+          gap: 1.25rem;
+          margin-bottom: 2.5rem;
         }
 
         .stat-card {
-          padding: 1.25rem;
-          background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-          border-radius: 8px;
-          border: 1px solid #e0e7ff;
+          padding: 1.5rem;
+          background: linear-gradient(135deg, rgba(91, 76, 243, 0.08) 0%, rgba(6, 182, 212, 0.08) 100%);
+          border-radius: 0.875rem;
+          border: 1px solid rgba(91, 76, 243, 0.2);
           text-align: center;
+          transition: all 0.3s ease;
+          box-shadow: 0 2px 8px rgba(91, 76, 243, 0.08);
+        }
+
+        .stat-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 16px rgba(91, 76, 243, 0.15);
+          border-color: rgba(91, 76, 243, 0.3);
         }
 
         .stat-label {
           margin: 0;
-          font-size: 0.875rem;
-          color: #6b7280;
+          font-size: 0.8125rem;
+          color: #475569;
           text-transform: uppercase;
-          letter-spacing: 0.05em;
-          font-weight: 600;
+          letter-spacing: 0.5px;
+          font-weight: 700;
         }
 
         .stat-value {
-          margin: 0.75rem 0 0 0;
-          font-size: 2rem;
-          font-weight: 700;
-          color: #1f2937;
+          margin: 0.875rem 0 0 0;
+          font-size: 2.25rem;
+          font-weight: 800;
+          background: linear-gradient(135deg, #5b4cf3 0%, #06b6d4 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
         }
 
         .stat-value.approval-rate {
-          color: #059669;
+          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
         }
 
         .stat-value.approved {
-          color: #059669;
+          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
         }
 
         .stat-value.pending {
-          color: #d97706;
+          background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
         }
 
         .stat-value.rejected {
-          color: #dc2626;
+          background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
         }
 
         .charts-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
           gap: 2rem;
         }
 
         .chart-card {
-          padding: 1.5rem;
-          background: #f9fafb;
-          border-radius: 8px;
-          border: 1px solid #e5e7eb;
+          padding: 1.75rem;
+          background: rgba(255, 255, 255, 0.9);
+          border-radius: 0.875rem;
+          border: 1px solid rgba(91, 76, 243, 0.15);
+          box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+          transition: all 0.3s ease;
+        }
+
+        .chart-card:hover {
+          border-color: rgba(91, 76, 243, 0.3);
+          box-shadow: 0 4px 16px rgba(91, 76, 243, 0.12);
         }
 
         .chart-card.full-width {
@@ -310,8 +347,10 @@ export function BookingAnalytics({ bookings, resources }: BookingAnalyticsProps)
         .chart-title {
           margin: 0 0 1.5rem 0;
           font-size: 1.125rem;
-          font-weight: 600;
-          color: #374151;
+          font-weight: 700;
+          color: #334155;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
 
         .bar-chart {
@@ -323,13 +362,13 @@ export function BookingAnalytics({ bookings, resources }: BookingAnalyticsProps)
         .bar-item {
           display: flex;
           flex-direction: column;
-          gap: 0.4rem;
+          gap: 0.5rem;
         }
 
         .bar-label {
-          font-size: 0.875rem;
-          font-weight: 500;
-          color: #4b5563;
+          font-size: 0.9rem;
+          font-weight: 700;
+          color: #334155;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
@@ -338,38 +377,48 @@ export function BookingAnalytics({ bookings, resources }: BookingAnalyticsProps)
         .bar-container {
           display: flex;
           align-items: center;
-          gap: 0.75rem;
-          height: 24px;
-          background: #ffffff;
-          border-radius: 4px;
-          padding: 0 0.75rem;
-          border: 1px solid #e5e7eb;
+          gap: 0.875rem;
+          height: 28px;
+          background: rgba(241, 245, 249, 0.8);
+          border-radius: 0.5rem;
+          padding: 0 0.875rem;
+          border: 1px solid rgba(91, 76, 243, 0.1);
         }
 
         .bar {
-          height: 16px;
-          background: linear-gradient(90deg, #3b82f6 0%, #1e40af 100%);
-          border-radius: 3px;
-          transition: width 0.3s ease;
+          height: 20px;
+          background: linear-gradient(90deg, #5b4cf3 0%, #7c63f8 100%);
+          border-radius: 0.375rem;
+          transition: all 0.3s ease;
           min-width: 2px;
+          box-shadow: 0 2px 8px rgba(91, 76, 243, 0.2);
+        }
+
+        .bar:hover {
+          box-shadow: 0 4px 12px rgba(91, 76, 243, 0.3);
         }
 
         .bar.peak-bar {
-          background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
+          background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+          box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
+        }
+
+        .bar.peak-bar:hover {
+          box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
         }
 
         .bar-value {
-          font-size: 0.75rem;
-          font-weight: 600;
-          color: #6b7280;
+          font-size: 0.8125rem;
+          font-weight: 700;
+          color: #475569;
           white-space: nowrap;
         }
 
         .line-chart-container {
-          background: white;
-          border-radius: 6px;
-          padding: 1.5rem 1rem;
-          border: 1px solid #e5e7eb;
+          background: rgba(241, 245, 249, 0.8);
+          border-radius: 0.75rem;
+          padding: 1.75rem 1.25rem;
+          border: 1px solid rgba(91, 76, 243, 0.1);
           overflow-x: auto;
         }
 
@@ -381,8 +430,8 @@ export function BookingAnalytics({ bookings, resources }: BookingAnalyticsProps)
           display: flex;
           align-items: flex-end;
           justify-content: space-between;
-          height: 200px;
-          gap: 4px;
+          height: 220px;
+          gap: 6px;
         }
 
         .chart-point-wrapper {
@@ -391,36 +440,40 @@ export function BookingAnalytics({ bookings, resources }: BookingAnalyticsProps)
           flex-direction: column;
           align-items: center;
           justify-content: flex-end;
-          gap: 0.5rem;
+          gap: 0.75rem;
         }
 
         .chart-point {
           width: 100%;
           background: linear-gradient(180deg, #10b981 0%, #059669 100%);
-          border-radius: 2px 2px 0 0;
+          border-radius: 0.375rem 0.375rem 0 0;
           min-height: 2px;
-          transition: background-color 0.2s ease;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
         }
 
         .chart-point:hover {
           background: linear-gradient(180deg, #34d399 0%, #10b981 100%);
-          opacity: 0.8;
+          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
         }
 
         .chart-label {
-          font-size: 0.7rem;
-          color: #9ca3af;
+          font-size: 0.75rem;
+          color: #94a3b8;
           white-space: nowrap;
           transform: rotate(-45deg);
           transform-origin: center;
-          margin-top: 0.5rem;
+          margin-top: 0.75rem;
+          font-weight: 600;
         }
 
         .no-data {
           text-align: center;
-          color: #9ca3af;
-          padding: 2rem;
+          color: #94a3b8;
+          padding: 3rem 2rem;
           margin: 0;
+          font-size: 0.9375rem;
+          font-weight: 500;
         }
 
         @media (max-width: 1024px) {

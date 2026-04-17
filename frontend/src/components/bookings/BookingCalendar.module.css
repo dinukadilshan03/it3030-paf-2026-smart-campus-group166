@@ -1,20 +1,46 @@
+/* Modern Tech Product Calendar Design */
+:root {
+  --primary: #5b4cf3;
+  --primary-light: #7c63f8;
+  --primary-dark: #4a3bc8;
+  --secondary: #06b6d4;
+  --secondary-light: #22d3ee;
+  --accent: #ff6b35;
+  --accent-light: #ff8455;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --neutral-900: #0f172a;
+  --neutral-800: #1e293b;
+  --neutral-700: #334155;
+  --neutral-600: #475569;
+  --neutral-500: #64748b;
+  --neutral-400: #94a3b8;
+  --neutral-300: #cbd5e1;
+  --neutral-200: #e2e8f0;
+  --neutral-100: #f1f5f9;
+  --neutral-50: #f8fafc;
+}
+
 .calRoot {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
   padding: 1.5rem;
-  background: #f9fafb;
-  border-radius: 0.5rem;
+  background: linear-gradient(135deg, rgba(91, 76, 243, 0.03) 0%, rgba(6, 182, 212, 0.03) 100%);
+  border-radius: 1rem;
 }
 
 .calToolbar {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1rem;
-  background: white;
-  border-radius: 0.5rem;
-  border: 1px solid #e5e7eb;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 0.875rem;
+  border: 1px solid rgba(91, 76, 243, 0.15);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
 }
 
 .calNav {
@@ -25,30 +51,38 @@
 }
 
 .calNav button {
-  padding: 0.5rem 1rem;
-  background: #f3f4f6;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
+  padding: 0.65rem 1.25rem;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  border: none;
+  border-radius: 0.625rem;
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 600;
+  color: white;
+  font-size: 0.875rem;
   transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(91, 76, 243, 0.2);
 }
 
 .calNav button:hover {
-  background: #e5e7eb;
-  border-color: #9ca3af;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(91, 76, 243, 0.3);
 }
 
 .calNav button:active {
-  background: #d1d5db;
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(91, 76, 243, 0.2);
 }
 
 .calTitle {
   flex: 1;
   text-align: center;
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #111827;
+  font-size: 1.25rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.5px;
 }
 
 .viewToggle {
@@ -58,105 +92,121 @@
 }
 
 .viewToggle button {
-  padding: 0.5rem 1rem;
-  background: white;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
+  padding: 0.65rem 1.25rem;
+  background: var(--neutral-100);
+  border: 1px solid var(--neutral-200);
+  border-radius: 0.625rem;
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 600;
+  color: var(--neutral-600);
+  font-size: 0.875rem;
   transition: all 0.2s ease;
 }
 
 .viewToggle button:hover {
-  background: #f9fafb;
+  background: var(--neutral-50);
+  border-color: var(--primary);
+  color: var(--primary);
+  transform: translateY(-1px);
 }
 
 .viewToggle button.active {
-  background: #3b82f6;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
   color: white;
-  border-color: #3b82f6;
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(91, 76, 243, 0.3);
 }
 
 .calGridWrap {
   overflow-x: auto;
-  background: white;
-  border-radius: 0.5rem;
-  border: 1px solid #e5e7eb;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 0.875rem;
+  border: 1px solid var(--neutral-200);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(10px);
 }
 
 .calGrid {
   display: grid;
-  gap: 1px;
-  background: #e5e7eb;
+  gap: 0px;
+  background: var(--neutral-200);
   min-width: max-content;
-  padding: 1px;
+  padding: 0px;
 }
 
 .calGrid.weekly {
-  grid-template-columns: 64px repeat(7, 1fr);
+  grid-template-columns: 80px repeat(7, 1fr);
 }
 
 .calGrid.daily {
-  grid-template-columns: 64px repeat(2, 1fr);
+  grid-template-columns: 80px repeat(2, 1fr);
 }
 
 .calHeaderCell {
   padding: 1rem;
-  background: #f3f4f6;
-  border-bottom: 2px solid #d1d5db;
-  font-weight: 600;
-  font-size: 0.875rem;
+  background: linear-gradient(135deg, rgba(91, 76, 243, 0.08) 0%, rgba(6, 182, 212, 0.08) 100%);
+  border-bottom: 2px solid var(--primary);
+  font-weight: 700;
+  font-size: 0.9375rem;
   text-align: center;
-  color: #374151;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .calHeaderCell.todayCol {
-  background: #dbeafe;
-  border-bottom: 2px solid #3b82f6;
-  color: #1e40af;
+  background: linear-gradient(135deg, var(--secondary) 0%, rgba(6, 182, 212, 0.3) 100%);
+  border-bottom: 2px solid var(--secondary);
+  color: white;
+  font-weight: 700;
+  box-shadow: 0 0 16px rgba(6, 182, 212, 0.2);
 }
 
 .calTimeCell {
   padding: 1rem;
-  background: #f9fafb;
-  border-right: 1px solid #d1d5db;
-  font-weight: 600;
+  background: var(--neutral-50);
+  border-right: 1px solid var(--neutral-200);
+  font-weight: 700;
   font-size: 0.875rem;
   text-align: center;
-  color: #6b7280;
-  min-height: 80px;
+  color: var(--neutral-600);
+  min-height: 100px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .calSlot {
-  padding: 0.5rem;
+  padding: 0.75rem;
   background: white;
-  min-height: 80px;
+  min-height: 100px;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.5rem;
   align-items: flex-start;
   justify-content: flex-start;
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
   overflow-y: auto;
+  border: 1px solid var(--neutral-200);
 }
 
 .calSlot:not(.hasBooking):hover {
-  background: #f0f9ff;
-  box-shadow: inset 0 0 0 1px #93c5fd;
+  background: linear-gradient(135deg, rgba(91, 76, 243, 0.08) 0%, rgba(6, 182, 212, 0.08) 100%);
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary), 0 0 12px rgba(91, 76, 243, 0.1);
 }
 
 .calSlot.hasBooking {
-  background: #fafafa;
+  background: var(--neutral-50);
+  border-color: var(--neutral-200);
 }
 
 .calSlot.hasBooking:hover {
-  background: #f0f9ff;
-  box-shadow: inset 0 0 0 1px #d1d5db;
+  background: linear-gradient(135deg, rgba(91, 76, 243, 0.06) 0%, rgba(6, 182, 212, 0.06) 100%);
+  border-color: var(--primary);
+  box-shadow: 0 0 12px rgba(91, 76, 243, 0.1);
 }
 
 .bookingChip {
@@ -164,16 +214,19 @@
   flex-direction: column;
   gap: 0.25rem;
   align-items: flex-start;
-  padding: 0.375rem;
+  padding: 0.5rem 0.75rem;
   width: 100%;
-  border-radius: 0.375rem;
-  font-size: 0.7rem;
-  line-height: 1.1;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.2;
   color: white;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex-shrink: 0;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border: none;
 }
 
 .bookingChip span {
@@ -185,45 +238,50 @@
 }
 
 .bookingChip span:first-child {
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -0.25px;
 }
 
 .chipTime {
-  font-size: 0.65rem !important;
-  opacity: 0.9;
+  font-size: 0.75rem !important;
+  opacity: 0.95;
+  font-weight: 500;
 }
 
 .bookingChip.pending {
-  background: #f59e0b;
+  background: linear-gradient(135deg, var(--warning) 0%, #fca311 100%);
 }
 
 .bookingChip.approved {
-  background: #10b981;
+  background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
 }
 
 .bookingChip.rejected {
-  background: #ef4444;
+  background: linear-gradient(135deg, var(--error) 0%, #dc2626 100%);
 }
 
 .bookingChip.cancelled {
-  background: #6b7280;
+  background: linear-gradient(135deg, var(--neutral-500) 0%, var(--neutral-600) 100%);
 }
 
 .calLegend {
   display: flex;
-  gap: 2rem;
-  padding: 1rem;
-  background: white;
-  border-radius: 0.5rem;
-  border: 1px solid #e5e7eb;
-  font-size: 0.875rem;
+  gap: 2.5rem;
+  padding: 1.25rem;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 0.875rem;
+  border: 1px solid var(--neutral-200);
+  font-size: 0.9375rem;
   flex-wrap: wrap;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
 }
 
 .calLegend span {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  color: var(--neutral-700);
 }
 
 .dot {
@@ -231,34 +289,41 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .dot.free {
-  background: #f0f9ff;
-  border: 2px solid #93c5fd;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  border: 2px solid white;
 }
 
 .dot.approved {
-  background: #10b981;
+  background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
 }
 
 .dot.pending {
-  background: #f59e0b;
+  background: linear-gradient(135deg, var(--warning) 0%, #fca311 100%);
 }
 
 /* Responsive adjustments */
 @media (max-width: 1024px) {
   .calGrid.weekly {
-    grid-template-columns: 48px repeat(7, 1fr);
+    grid-template-columns: 60px repeat(7, 1fr);
   }
 
   .calSlot {
-    min-height: 64px;
+    min-height: 80px;
+    padding: 0.5rem;
   }
 
   .bookingChip {
-    padding: 0.375rem;
-    font-size: 0.7rem;
+    padding: 0.375rem 0.625rem;
+    font-size: 0.75rem;
+  }
+
+  .calHeaderCell,
+  .calTimeCell {
+    padding: 0.75rem 0.5rem;
   }
 }
 
@@ -269,24 +334,33 @@
   }
 
   .calToolbar {
-    padding: 0.75rem;
-    gap: 0.75rem;
+    padding: 1rem;
+    gap: 1rem;
   }
 
   .calNav {
     flex-direction: column;
   }
 
+  .calNav button {
+    width: 100%;
+  }
+
   .calTitle {
-    font-size: 1rem;
+    font-size: 1.125rem;
   }
 
   .viewToggle {
     justify-content: center;
+    width: 100%;
+  }
+
+  .viewToggle button {
+    flex: 1;
   }
 
   .calGrid.weekly {
-    grid-template-columns: 40px repeat(7, 1fr);
+    grid-template-columns: 50px repeat(7, 1fr);
   }
 
   .calTimeCell {
@@ -297,7 +371,16 @@
 
   .calSlot {
     min-height: 60px;
+    padding: 0.375rem;
+    gap: 0.25rem;
   }
+
+  .calLegend {
+    gap: 1.5rem;
+    padding: 1rem;
+    font-size: 0.875rem;
+  }
+}
 
   .bookingChip {
     padding: 0.25rem;

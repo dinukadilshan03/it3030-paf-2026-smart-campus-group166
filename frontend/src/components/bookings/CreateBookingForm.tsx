@@ -301,31 +301,38 @@ export function CreateBookingForm({
 
       <style jsx>{`
         .create-booking-form {
-          padding: 2rem;
-          background: white;
-          border-radius: 4px;
-          border: 1px solid #e0e0e0;
-          max-width: 600px;
+          padding: 2.5rem;
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(91, 76, 243, 0.02) 100%);
+          border-radius: 1rem;
+          border: 1px solid rgba(91, 76, 243, 0.15);
+          max-width: 700px;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+          backdrop-filter: blur(10px);
         }
 
         .form-section h2 {
-          margin: 0 0 1.5rem;
-          font-size: 1.5rem;
-          color: #333;
+          margin: 0 0 2rem;
+          font-size: 1.75rem;
+          font-weight: 700;
+          background: linear-gradient(135deg, #5b4cf3 0%, #06b6d4 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          letter-spacing: -0.5px;
         }
 
         .form-group {
           display: flex;
           flex-direction: column;
-          gap: 0.5rem;
-          margin-bottom: 1.5rem;
+          gap: 0.625rem;
+          margin-bottom: 1.75rem;
         }
 
         .form-row {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 1rem;
-          margin-bottom: 1.5rem;
+          gap: 1.25rem;
+          margin-bottom: 1.75rem;
         }
 
         .form-row .form-group {
@@ -333,32 +340,45 @@ export function CreateBookingForm({
         }
 
         .form-group label {
-          font-weight: 600;
-          color: #333;
-          font-size: 0.95rem;
+          font-weight: 700;
+          color: #334155;
+          font-size: 0.9375rem;
+          text-transform: uppercase;
+          letter-spacing: 0.25px;
         }
 
         .required {
-          color: #dc3545;
+          color: #ff6b35;
+          font-weight: 700;
         }
 
         .form-group input,
         .form-group textarea,
         .form-group select {
-          padding: 0.75rem;
-          border: 1px solid #ccc;
-          border-radius: 4px;
-          font-size: 0.95rem;
+          padding: 0.875rem 1rem;
+          border: 2px solid #e2e8f0;
+          border-radius: 0.625rem;
+          font-size: 0.9375rem;
           font-family: inherit;
+          background: rgba(255, 255, 255, 0.9);
+          transition: all 0.2s ease;
+          color: #1e293b;
+        }
+
+        .form-group input:hover,
+        .form-group textarea:hover,
+        .form-group select:hover {
+          border-color: rgba(91, 76, 243, 0.3);
+          background: rgba(255, 255, 255, 0.95);
         }
 
         .form-group input:focus,
         .form-group textarea:focus,
         .form-group select:focus {
-        .form-group textarea:focus {
           outline: none;
-          border-color: #0066cc;
-          box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+          border-color: #5b4cf3;
+          background: white;
+          box-shadow: 0 0 0 4px rgba(91, 76, 243, 0.12);
         }
 
         .form-group textarea {
@@ -367,23 +387,32 @@ export function CreateBookingForm({
 
         .form-actions {
           display: flex;
-          gap: 0.5rem;
-          margin-top: 2rem;
+          gap: 1rem;
+          margin-top: 2.5rem;
         }
 
         .primary-button {
-          padding: 0.75rem 1.5rem;
-          background-color: #0066cc;
+          padding: 0.875rem 2rem;
+          background: linear-gradient(135deg, #5b4cf3 0%, #7c63f8 100%);
           color: white;
           border: none;
-          border-radius: 4px;
-          font-weight: 600;
+          border-radius: 0.625rem;
+          font-weight: 700;
+          font-size: 0.95rem;
           cursor: pointer;
           transition: all 0.2s ease;
+          box-shadow: 0 4px 12px rgba(91, 76, 243, 0.3);
+          letter-spacing: 0.25px;
+          flex: 1;
         }
 
         .primary-button:hover:not(:disabled) {
-          background-color: #0052a3;
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(91, 76, 243, 0.4);
+        }
+
+        .primary-button:active:not(:disabled) {
+          transform: translateY(0);
         }
 
         .primary-button:disabled {
@@ -392,7 +421,7 @@ export function CreateBookingForm({
         }
 
         .search-input {
-          margin-bottom: 0.5rem;
+          margin-bottom: 0.75rem;
         }
 
         .form-group select {
@@ -401,21 +430,25 @@ export function CreateBookingForm({
         }
 
         .form-group .loading-text {
-          color: #666;
+          color: #64748b;
           font-style: italic;
-          padding: 1rem;
-          background: #f9f9f9;
-          border-radius: 4px;
+          padding: 1.25rem;
+          background: rgba(91, 76, 243, 0.08);
+          border-radius: 0.625rem;
           margin: 0;
+          border: 1px solid rgba(91, 76, 243, 0.15);
+          font-weight: 500;
         }
 
         .form-group .no-results {
-          color: #dc3545;
-          font-size: 0.9rem;
+          color: #ff6b35;
+          font-size: 0.875rem;
           margin: 0.5rem 0 0;
-          padding: 0.5rem;
-          background: #fff5f5;
-          border-radius: 4px;
+          padding: 0.75rem;
+          background: rgba(255, 107, 53, 0.08);
+          border-radius: 0.5rem;
+          border-left: 3px solid #ff6b35;
+          font-weight: 600;
         }
       `}</style>
     </form>
