@@ -38,6 +38,12 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
 
   // State for create booking form
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [calendarSelection, setCalendarSelection] = useState<{
+    date: string;
+    startTime: string;
+    endTime: string;
+    resourceId?: number;
+  } | null>(null);
 
   // Check if user is admin
   const isAdmin = user.role === "ADMIN";
@@ -215,6 +221,12 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
     resourceId?: number
   ) => {
     // Pre-fill the form with calendar selection
+    setCalendarSelection({
+      date,
+      startTime,
+      endTime,
+      resourceId,
+    });
     setShowCreateForm(true);
   };
 
@@ -427,7 +439,12 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
               </div>
               <button
                 className="primary-button"
-                onClick={() => setShowCreateForm(!showCreateForm)}
+                onClick={() => {
+                  setShowCreateForm(!showCreateForm);
+                  if (showCreateForm) {
+                    setCalendarSelection(null);
+                  }
+                }}
               >
                 {showCreateForm ? "Hide Form" : "+ Create New Booking"}
               </button>
@@ -437,15 +454,21 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
           {showCreateForm && (
             <div className="create-form-container">
               <CreateBookingForm
+                initialDate={calendarSelection?.date}
+                initialStartTime={calendarSelection?.startTime}
+                initialEndTime={calendarSelection?.endTime}
+                initialResourceId={calendarSelection?.resourceId}
                 onSuccess={(message) => {
                   setSuccessMessage(message);
                   setShowCreateForm(false);
+                  setCalendarSelection(null);
                   loadBookings();
                   setTimeout(() => setSuccessMessage(""), 3000);
                 }}
                 onError={(err) => setError(err)}
                 onSubmit={() => {
                   setShowCreateForm(false);
+                  setCalendarSelection(null);
                   loadBookings();
                 }}
               />

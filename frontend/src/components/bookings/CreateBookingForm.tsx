@@ -17,18 +17,30 @@ interface CreateBookingFormProps {
   onSuccess?: (message: string) => void;
   onError?: (error: string) => void;
   onSubmit?: () => void;
+  initialDate?: string;
+  initialStartTime?: string;
+  initialEndTime?: string;
+  initialResourceId?: number;
 }
 
-export function CreateBookingForm({ onSuccess, onError, onSubmit }: CreateBookingFormProps) {
+export function CreateBookingForm({ 
+  onSuccess, 
+  onError, 
+  onSubmit,
+  initialDate,
+  initialStartTime,
+  initialEndTime,
+  initialResourceId 
+}: CreateBookingFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingResources, setIsLoadingResources] = useState(true);
   const [resources, setResources] = useState<Resource[]>([]);
   const [resourceSearch, setResourceSearch] = useState("");
   const [formData, setFormData] = useState({
-    resourceId: 0,
-    bookingDate: "",
-    startTime: "",
-    endTime: "",
+    resourceId: initialResourceId || 0,
+    bookingDate: initialDate || "",
+    startTime: initialStartTime || "",
+    endTime: initialEndTime || "",
     purpose: "",
     expectedAttendees: undefined,
     requestNotes: "",
@@ -51,6 +63,17 @@ export function CreateBookingForm({ onSuccess, onError, onSubmit }: CreateBookin
 
     fetchResources();
   }, []);
+
+  // Update form data when initial values change (e.g., from calendar selection)
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      resourceId: initialResourceId || 0,
+      bookingDate: initialDate || "",
+      startTime: initialStartTime || "",
+      endTime: initialEndTime || "",
+    }));
+  }, [initialDate, initialStartTime, initialEndTime, initialResourceId]);
 
   // Filter resources based on search
   const filteredResources = resources.filter(
