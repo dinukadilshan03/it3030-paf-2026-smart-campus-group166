@@ -109,7 +109,16 @@ export function BookingCalendar({
     return bookingMap.get(`${resourceId}_${date}_${String(startHour).padStart(2, "0")}`);
   }
 
+  function isPastDate(date: string): boolean {
+    const [year, month, day] = date.split("-").map(Number);
+    const selectedDate = new Date(year, month - 1, day);
+    selectedDate.setHours(0, 0, 0, 0);
+    return selectedDate < today;
+  }
+
   function handleSlotClick(date: string, startHour: number, resourceId?: number) {
+    // Prevent booking for past dates
+    if (isPastDate(date)) return;
     if (!onSlotClick) return;
     const startTime = `${String(startHour).padStart(2, "0")}:00`;
     const endTime = `${String(startHour + SLOT_DURATION).padStart(2, "0")}:00`;
@@ -288,6 +297,7 @@ export function BookingCalendar({
                   ? weekDays.map((day, i) => {
                       const dKey = dateKey(day);
                       const isToday = dKey === todayKey;
+                      const isPast = isPastDate(dKey);
                       const slotBookings = resources
                         .map((r) => getBooking(r.id, dKey, startHour))
                         .filter((b): b is BookingSummaryResponse => Boolean(b));
@@ -296,8 +306,12 @@ export function BookingCalendar({
                         <div
                           key={`week-${i}-${startHour}`}
                           style={{ minHeight: "72px" }}
-                          className={`border-b border-r border-slate-100 last:border-r-0 p-1 group transition-colors cursor-pointer ${
-                            isToday ? "hover:bg-indigo-50/50" : "hover:bg-slate-50"
+                          className={`border-b border-r border-slate-100 last:border-r-0 p-1 group transition-colors ${
+                            isPast
+                              ? "bg-slate-50/40 opacity-50 cursor-not-allowed"
+                              : `cursor-pointer ${
+                                  isToday ? "hover:bg-indigo-50/50" : "hover:bg-slate-50"
+                                }`
                           }`}
                           onClick={() => handleSlotClick(dKey, startHour)}
                         >
@@ -322,6 +336,7 @@ export function BookingCalendar({
                     })
                   : resources.map((r) => {
                       const dKey = anchorKey;
+                      const isPast = isPastDate(dKey);
                       const booking = getBooking(r.id, dKey, startHour);
                       const s = booking ? getStatusStyles(booking.status) : null;
 
@@ -329,7 +344,11 @@ export function BookingCalendar({
                         <div
                           key={`day-${r.id}-${startHour}`}
                           style={{ minHeight: "72px" }}
-                          className="border-b border-r border-slate-100 last:border-r-0 p-1.5 group transition-colors cursor-pointer hover:bg-slate-50"
+                          className={`border-b border-r border-slate-100 last:border-r-0 p-1.5 group transition-colors ${
+                            isPast
+                              ? "bg-slate-50/40 opacity-50 cursor-not-allowed"
+                              : "cursor-pointer hover:bg-slate-50"
+                          }`}
                           onClick={() => handleSlotClick(dKey, startHour, r.id)}
                         >
                           {!booking && (

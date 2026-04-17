@@ -75,6 +75,21 @@ export function CreateBookingForm({
     }));
   }, [initialDate, initialStartTime, initialEndTime, initialResourceId]);
 
+  // Helper function to check if a date is in the past
+  const isPastDate = (dateString: string): boolean => {
+    const [year, month, day] = dateString.split("-").map(Number);
+    const selectedDate = new Date(year, month - 1, day);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return selectedDate < today;
+  };
+
+  // Get today's date in YYYY-MM-DD format
+  const getTodayString = (): string => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  };
+
   // Filter resources based on search
   const filteredResources = resources.filter(
     (r) =>
@@ -108,6 +123,11 @@ export function CreateBookingForm({
       // Validate required fields
       if (!formData.resourceId || !formData.bookingDate || !formData.startTime || !formData.endTime) {
         throw new Error("Please fill in all required fields");
+      }
+
+      // Validate booking date is not in the past
+      if (isPastDate(formData.bookingDate)) {
+        throw new Error("Cannot book for past dates. Please select a future date.");
       }
 
       // Prepare the request
@@ -200,6 +220,7 @@ export function CreateBookingForm({
             name="bookingDate"
             value={formData.bookingDate}
             onChange={handleChange}
+            min={getTodayString()}
             required
           />
         </div>
