@@ -4,12 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { BookingSummaryResponse } from "@/lib/bookings/types";
 import type { CurrentUser } from "@/types/auth";
+import type { Resource } from "@/lib/resources/types";
+import { getResources } from "@/lib/resources/api";
 import { CreateBookingForm } from "./CreateBookingForm";
+import { BookingCalendar } from "./BookingCalendar";
+import styles from "./BookingManagementPage.module.css";
 
 interface ReviewAction {
   bookingId: number;
   reason: string;
-  decision: "APPROVE" | "REJECT";
+  decision: "APPROVE" | "REJECT" | "CANCEL";
 }
 
 type TabType = "pending" | "approved" | "rejected" | "cancelled" | "all";
@@ -20,11 +24,13 @@ interface BookingManagementPageProps {
 
 export function BookingManagementPage({ user }: BookingManagementPageProps) {
   const [bookings, setBookings] = useState<BookingSummaryResponse[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [activeTab, setActiveTab] = useState<TabType>("pending");
   const [actionInProgress, setActionInProgress] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
 
   // State for review dialogs
   const [showReviewDialog, setShowReviewDialog] = useState(false);
@@ -88,8 +94,19 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
     }
   };
 
+  const loadResources = async () => {
+    try {
+      const data = await getResources();
+      setResources(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to load resources:", err);
+      setResources([]);
+    }
+  };
+
   useEffect(() => {
     loadBookings();
+    loadResources();
   }, []);
 
   const handleApproveClick = (bookingId: number) => {
@@ -110,6 +127,15 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
     setShowReviewDialog(true);
   };
 
+  const handleStudentCancelClick = (bookingId: number) => {
+    setPendingAction({
+      bookingId,
+      reason: "",
+      decision: "CANCEL",
+    });
+    setShowReviewDialog(true);
+  };
+
   const handleConfirmReview = async () => {
     if (!pendingAction) return;
 
@@ -117,21 +143,29 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
     setActionInProgress(pendingAction.bookingId);
 
     try {
-      const requestBody: Record<string, unknown> = {
-        decision: pendingAction.decision,
-      };
+      const isCancel = pendingAction.decision === "CANCEL";
+      const endpoint = isCancel ? "cancel" : "review";
+      
+      const requestBody: Record<string, unknown> = {};
+
+      // For review (approve/reject), include decision
+      if (!isCancel) {
+        requestBody.decision = pendingAction.decision;
+      }
 
       // Only add reason if it exists and is not empty
       if (pendingAction.reason && pendingAction.reason.trim()) {
         requestBody.reason = pendingAction.reason;
       }
 
-      console.log("Sending approve/reject request:", { 
+      const url = `/api/v1/bookings/${pendingAction.bookingId}/${endpoint}`;
+      console.log("Sending request:", { 
+        url,
         bookingId: pendingAction.bookingId, 
         body: requestBody 
       });
 
-      const response = await fetch(`/api/v1/bookings/${pendingAction.bookingId}/review`, {
+      const response = await fetch(url, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -140,16 +174,23 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
         body: JSON.stringify(requestBody),
       });
 
-      console.log("Review response status:", response.status);
+      console.log("Response status:", response.status);
 
       if (!response.ok) {
         const errorData = (await response.json().catch(() => ({}))) as { message?: string };
-        console.error("Review error:", errorData);
-        throw new Error(errorData.message || "Failed to review booking");
+        console.error("Error:", errorData);
+        throw new Error(errorData.message || `Failed to ${isCancel ? "cancel" : "review"} booking`);
       }
 
-      const decision = pendingAction.decision === "APPROVE" ? "approved" : "rejected";
-      setSuccessMessage(`Booking ${decision} successfully!`);
+      let message = "";
+      if (isCancel) {
+        message = "Booking cancelled successfully!";
+      } else if (pendingAction.decision === "APPROVE") {
+        message = "Booking approved successfully!";
+      } else {
+        message = "Booking rejected successfully!";
+      }
+      setSuccessMessage(message);
 
       setShowReviewDialog(false);
       setPendingAction(null);
@@ -165,6 +206,16 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
     } finally {
       setActionInProgress(null);
     }
+  };
+
+  const handleCalendarSlotClick = (
+    date: string,
+    startTime: string,
+    endTime: string,
+    resourceId?: number
+  ) => {
+    // Pre-fill the form with calendar selection
+    setShowCreateForm(true);
   };
 
   const formatDateTime = (dateString: string) => {
@@ -359,12 +410,28 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
               <h2>My Bookings</h2>
               <p>Create and manage your resource bookings</p>
             </div>
-            <button
-              className="primary-button"
-              onClick={() => setShowCreateForm(!showCreateForm)}
-            >
-              {showCreateForm ? "Hide Form" : "+ Create New Booking"}
-            </button>
+            <div className="student-header-actions">
+              <div className="view-toggle-group">
+                <button
+                  className={`view-toggle-btn ${viewMode === "list" ? "active" : ""}`}
+                  onClick={() => setViewMode("list")}
+                >
+                  List View
+                </button>
+                <button
+                  className={`view-toggle-btn ${viewMode === "calendar" ? "active" : ""}`}
+                  onClick={() => setViewMode("calendar")}
+                >
+                  Calendar View
+                </button>
+              </div>
+              <button
+                className="primary-button"
+                onClick={() => setShowCreateForm(!showCreateForm)}
+              >
+                {showCreateForm ? "Hide Form" : "+ Create New Booking"}
+              </button>
+            </div>
           </div>
 
           {showCreateForm && (
@@ -387,6 +454,12 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
 
           {isLoading ? (
             <p className="muted">Loading your bookings...</p>
+          ) : viewMode === "calendar" ? (
+            <BookingCalendar
+              bookings={bookings}
+              resources={resources}
+              onSlotClick={handleCalendarSlotClick}
+            />
           ) : bookings.length === 0 ? (
             <p className="muted">You haven't created any bookings yet.</p>
           ) : (
@@ -436,7 +509,7 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
                     <div className="booking-actions">
                       <button
                         className="danger-button"
-                        onClick={() => handleRejectClick(booking.id)}
+                        onClick={() => handleStudentCancelClick(booking.id)}
                         disabled={actionInProgress === booking.id}
                       >
                         {actionInProgress === booking.id ? "Processing..." : "Cancel Booking"}
@@ -892,6 +965,44 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
 
+        .student-header-actions {
+          display: flex;
+          gap: 1rem;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+
+        .view-toggle-group {
+          display: flex;
+          gap: 0.5rem;
+          background: #f3f4f6;
+          padding: 0.25rem;
+          border-radius: 0.375rem;
+        }
+
+        .view-toggle-btn {
+          padding: 0.5rem 1rem;
+          border: none;
+          background: transparent;
+          cursor: pointer;
+          font-weight: 500;
+          font-size: 0.875rem;
+          color: #6b7280;
+          border-radius: 0.25rem;
+          transition: all 0.2s ease;
+        }
+
+        .view-toggle-btn:hover {
+          background: rgba(0, 0, 0, 0.05);
+          color: #374151;
+        }
+
+        .view-toggle-btn.active {
+          background: white;
+          color: #1f2937;
+          box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        }
+
         @media (max-width: 768px) {
           .bookings-grid {
             grid-template-columns: 1fr;
@@ -922,6 +1033,23 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
           .student-header {
             flex-direction: column;
             align-items: flex-start;
+          }
+
+          .student-header-actions {
+            width: 100%;
+            flex-direction: column-reverse;
+          }
+
+          .student-header-actions > button {
+            width: 100%;
+          }
+
+          .view-toggle-group {
+            width: 100%;
+          }
+
+          .view-toggle-btn {
+            flex: 1;
           }
         }
       `}</style>

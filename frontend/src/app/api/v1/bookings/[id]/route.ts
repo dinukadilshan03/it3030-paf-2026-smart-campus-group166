@@ -1,4 +1,4 @@
-import { serverApiFetch } from "@/lib/api/server";
+import { getApiBaseUrl } from "@/lib/config/env";
 import type { ApiErrorResponse, BookingSummaryResponse } from "@/lib/bookings/types";
 import { NextResponse } from "next/server";
 
@@ -17,7 +17,19 @@ export async function GET(
       );
     }
 
-    const response = await serverApiFetch(`/api/v1/bookings/${bookingId}`);
+    // Extract auth headers from incoming request
+    const cookie = request.headers.get("cookie");
+    const authorization = request.headers.get("authorization");
+
+    const response = await fetch(`${getApiBaseUrl()}/api/v1/bookings/${bookingId}`, {
+      headers: {
+        Accept: "application/json",
+        ...(cookie ? { Cookie: cookie } : {}),
+        ...(authorization ? { Authorization: authorization } : {}),
+      },
+      cache: "no-store",
+      redirect: "manual",
+    });
 
     if (!response.ok) {
       let message = `API Error: ${response.status} ${response.statusText}`;

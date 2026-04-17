@@ -82,6 +82,11 @@ Primary database:
 
 - PostgreSQL via Supabase
 
+Supported backend connection modes:
+
+- `pooler` for the Supabase pooler endpoint
+- `direct` for the direct Supabase database endpoint when pooler connectivity fails
+
 Why this setup:
 
 - one hosted online database for all team members
@@ -219,6 +224,7 @@ Expected backend checks:
 Environment management:
 
 - backend `.env.example` for local setup guidance
+- backend startup requires explicit Supabase DB settings; there is no localhost Postgres fallback
 - real credentials stay local and untracked
 
 ---
