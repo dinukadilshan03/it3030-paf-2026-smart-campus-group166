@@ -13,7 +13,17 @@ export default function EditResourcePage() {
   const { id } = useParams();
   const router = useRouter();
 
-  const [form, setForm] = useState<any>({});
+  // ✅ FIX: Proper initial form (VERY IMPORTANT)
+  const [form, setForm] = useState({
+    name: "",
+    resourceCode: "",
+    capacity: "",
+    categoryId: "",
+    locationId: "",
+    status: "ACTIVE",
+    requiresApproval: true,
+  });
+
   const [categories, setCategories] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [preview, setPreview] = useState("");
@@ -31,7 +41,7 @@ export default function EditResourcePage() {
 
     setCategories(cat || []);
 
-    // ✅ REMOVE DUPLICATE LOCATIONS (same as Add page)
+    // ✅ REMOVE DUPLICATES
     const uniqueLocations = Array.from(
       new Map((loc || []).map((l: any) => [l.name, l])).values()
     );
@@ -39,19 +49,20 @@ export default function EditResourcePage() {
 
     const resource = resources.find((r: any) => r.id == id);
 
+    if (!resource) return; // ✅ SAFE GUARD
+
     setForm({
-      name: resource?.name || "",
-      resourceCode: resource?.resourceCode || "",
-      capacity: resource?.capacity || "",
-      categoryId: resource?.categoryId,
-      locationId: resource?.locationId,
-      status: resource?.status || "ACTIVE",
-      requiresApproval: resource?.requiresApproval ?? true,
+      name: resource.name || "",
+      resourceCode: resource.resourceCode || "",
+      capacity: resource.capacity || "",
+      categoryId: resource.categoryId || "",
+      locationId: resource.locationId || "",
+      status: resource.status || "ACTIVE",
+      requiresApproval: resource.requiresApproval ?? true,
     });
 
-    // Load image (local or backend)
     const localImg = localStorage.getItem("resource_image_" + id);
-    setPreview(localImg || resource?.imageUrl || "");
+    setPreview(localImg || resource.imageUrl || "");
   };
 
   const handleChange = (e: any) => {
@@ -73,8 +84,6 @@ export default function EditResourcePage() {
     reader.onloadend = () => {
       const base64 = reader.result as string;
       setPreview(base64);
-
-      // store locally
       localStorage.setItem("resource_image_" + id, base64);
     };
 
@@ -84,10 +93,13 @@ export default function EditResourcePage() {
   const handleUpdate = async () => {
     try {
       const payload = {
-        ...form,
+        name: form.name,
+        resourceCode: form.resourceCode,
         capacity: form.capacity ? Number(form.capacity) : null,
         resourceCategoryId: Number(form.categoryId),
         locationId: Number(form.locationId),
+        status: form.status,
+        requiresApproval: form.requiresApproval,
         imageUrl: "",
       };
 
@@ -132,10 +144,11 @@ export default function EditResourcePage() {
 
           <select
             name="categoryId"
-            value={form.categoryId}
+            value={form.categoryId || ""}
             onChange={handleChange}
             style={styles.input}
           >
+            <option value="">Select Category</option>
             {categories.map((c: any) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
@@ -143,10 +156,11 @@ export default function EditResourcePage() {
 
           <select
             name="locationId"
-            value={form.locationId}
+            value={form.locationId || ""}
             onChange={handleChange}
             style={styles.input}
           >
+            <option value="">Select Location</option>
             {locations.map((l: any) => (
               <option key={l.id} value={l.id}>{l.name}</option>
             ))}
@@ -154,7 +168,7 @@ export default function EditResourcePage() {
 
           <select
             name="status"
-            value={form.status}
+            value={form.status || "ACTIVE"}
             onChange={handleChange}
             style={styles.input}
           >
@@ -166,24 +180,19 @@ export default function EditResourcePage() {
             <input
               type="checkbox"
               name="requiresApproval"
-              checked={form.requiresApproval}
+              checked={form.requiresApproval ?? false}
               onChange={handleChange}
             />
             <label>Requires Approval</label>
           </div>
 
-          {/* FILE UPLOAD */}
           <div style={styles.uploadBox}>
             <input type="file" accept="image/*" onChange={handleImageUpload} />
           </div>
         </div>
 
-        {/* IMAGE PREVIEW */}
-        {preview && (
-          <img src={preview} style={styles.image} />
-        )}
+        {preview && <img src={preview} style={styles.image} />}
 
-        {/* BUTTONS */}
         <div style={styles.buttons}>
           <button onClick={handleUpdate} style={styles.updateBtn}>
             💾 Update
@@ -201,7 +210,7 @@ export default function EditResourcePage() {
   );
 }
 
-/* 🎨 SAME STYLE AS ADD PAGE */
+/* 🎨 STYLES */
 const styles: any = {
   container: {
     display: "flex",
@@ -235,7 +244,6 @@ const styles: any = {
     padding: "12px",
     borderRadius: "10px",
     border: "1px solid #ddd",
-    fontSize: "14px",
   },
 
   checkboxRow: {
@@ -272,7 +280,6 @@ const styles: any = {
     padding: "10px 22px",
     borderRadius: "8px",
     border: "none",
-    cursor: "pointer",
   },
 
   cancelBtn: {
@@ -280,6 +287,5 @@ const styles: any = {
     padding: "10px 22px",
     borderRadius: "8px",
     border: "none",
-    cursor: "pointer",
   },
 };
