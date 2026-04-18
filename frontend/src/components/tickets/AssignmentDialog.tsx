@@ -38,13 +38,18 @@ export function AssignmentDialog({
 
   const inputClassName =
     "rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:bg-white";
+  const isRejectedTicket = ticket?.status === "REJECTED";
 
   return (
     <TicketDialog
       open={open}
       onClose={onClose}
-      title="Assign staff owner"
-      description="Admins can assign or reassign a staff member. The backend records assignment history automatically and adds a system status note."
+      title={isRejectedTicket ? "Reopen and assign staff owner" : "Assign staff owner"}
+      description={
+        isRejectedTicket
+          ? "Assigning a staff member will reopen this rejected ticket for another check. The backend keeps the rejection trail and records the new assignment in history."
+          : "Admins can assign or reassign a staff member. The backend records assignment history automatically and adds a system status note."
+      }
       widthClassName="max-w-2xl"
     >
       <form
@@ -81,6 +86,11 @@ export function AssignmentDialog({
             <p className="mt-2">
               Current staff owner: {ticket.assignedStaffDisplayName ?? "No one assigned yet"}
             </p>
+            {isRejectedTicket ? (
+              <p className="mt-2 text-rose-700">
+                Current state: rejected. Saving this assignment will reopen the ticket for review.
+              </p>
+            ) : null}
           </div>
         ) : null}
 
@@ -143,7 +153,13 @@ export function AssignmentDialog({
             disabled={busy || staffUsers.length === 0}
             className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {busy ? "Saving assignment..." : "Save assignment"}
+            {busy
+              ? isRejectedTicket
+                ? "Reopening ticket..."
+                : "Saving assignment..."
+              : isRejectedTicket
+                ? "Reopen and assign"
+                : "Save assignment"}
           </button>
           <button
             type="button"

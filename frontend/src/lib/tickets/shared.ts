@@ -340,7 +340,9 @@ export function getSlaRiskTicketCount(tickets: TicketSlaRecord[], nowMs = Date.n
 }
 
 export function getTicketProgressLabel(
-  ticket: Pick<TicketDetail, "status" | "assignedStaffUserId">,
+  ticket: Pick<TicketDetail, "status" | "assignedStaffUserId"> & {
+    reconsiderationRequestedAt?: string | null;
+  },
 ) {
   switch (ticket.status) {
     case "OPEN":
@@ -354,7 +356,9 @@ export function getTicketProgressLabel(
     case "CLOSED":
       return "Closed after resolution review.";
     case "REJECTED":
-      return "Rejected by admin review.";
+      return ticket.reconsiderationRequestedAt
+        ? "Rejected by admin review and waiting for reconsideration."
+        : "Rejected by admin review.";
   }
 }
 

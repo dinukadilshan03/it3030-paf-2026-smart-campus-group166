@@ -22,5 +22,9 @@ public record TicketSummaryResponse(
         TicketPriority priority,
         TicketStatus status,
         LocalDateTime createdAt,
+        LocalDateTime updatedAt,
         LocalDateTime firstRespondedAt,
-        LocalDateTime resolvedAt) {}
+        LocalDateTime resolvedAt,
+        Integer reconsiderationRequestCount,
+        Integer staffReviewCount,
+        Integer adminReviewCount) {}

@@ -2,8 +2,14 @@ import { clientApiFetch } from "@/lib/api/client";
 import { buildTicketQuery, throwTicketApiError } from "@/lib/tickets/shared";
 import type {
   CreateTicketCategoryRequest,
+  TicketAssistantQueryRequest,
+  TicketAssistantResponse,
   CreateTicketCommentRequest,
   CreateTicketRequest,
+  RequestTicketReconsiderationRequest,
+  GenerateTicketReportRequest,
+  RefineTicketDescriptionRequest,
+  RefineTicketDescriptionResponse,
   TicketAttachment,
   TicketAttachmentUpload,
   TicketBundle,
@@ -12,6 +18,9 @@ import type {
   TicketComment,
   TicketDetail,
   TicketFilters,
+  TicketReportAssistantInterpretRequest,
+  TicketReportAssistantResponse,
+  TicketReportRecord,
   TicketSummary,
   UpdateTicketCommentRequest,
   UpdateTicketAssignmentRequest,
@@ -81,6 +90,13 @@ export function updateTicketStatusClient(id: number, payload: UpdateTicketStatus
   return sendJson<TicketDetail>(`/api/v1/tickets/${id}/status`, "PATCH", payload);
 }
 
+export function requestTicketReconsiderationClient(
+  id: number,
+  payload: RequestTicketReconsiderationRequest,
+) {
+  return sendJson<TicketDetail>(`/api/v1/tickets/${id}/reconsideration`, "PATCH", payload);
+}
+
 export async function listTicketCommentsClient(ticketId: number) {
   const response = await clientApiFetch(`/api/v1/tickets/${ticketId}/comments`, {
     cache: "no-store",
@@ -140,6 +156,57 @@ export function deleteTicketAttachmentClient(ticketId: number, attachmentId: num
   return sendJson<void>(`/api/v1/tickets/${ticketId}/attachments/${attachmentId}`, "DELETE");
 }
 
+export async function listTicketReportsClient() {
+  const response = await clientApiFetch("/api/v1/ticket-reports", {
+    cache: "no-store",
+  });
+  if (!response.ok) await throwTicketApiError(response);
+  return ((await response.json()) as TicketReportRecord[]) ?? [];
+}
+
+export function generateTicketReportClient(payload: GenerateTicketReportRequest) {
+  return sendJson<TicketReportRecord>("/api/v1/ticket-reports", "POST", payload);
+}
+
+export function interpretTicketReportAssistantClient(
+  payload: TicketReportAssistantInterpretRequest,
+) {
+  return sendJson<TicketReportAssistantResponse>(
+    "/api/v1/ticket-reports/assistant/interpret",
+    "POST",
+    payload,
+  );
+}
+
+export function queryTicketAssistantClient(payload: TicketAssistantQueryRequest) {
+  return sendJson<TicketAssistantResponse>("/api/v1/ticket-assistant/query", "POST", payload);
+}
+
+export function refineTicketDescriptionClient(payload: RefineTicketDescriptionRequest) {
+  return sendJson<RefineTicketDescriptionResponse>(
+    "/api/v1/ticket-assistant/refine-description",
+    "POST",
+    payload,
+  );
+}
+
+export async function downloadTicketReportClient(reportId: number) {
+  const response = await clientApiFetch(`/api/v1/ticket-reports/${reportId}/download`, {
+    cache: "no-store",
+  });
+  if (!response.ok) await throwTicketApiError(response);
+
+  const blob = await response.blob();
+  const contentDisposition = response.headers.get("content-disposition");
+  const fileName = extractDownloadFilename(contentDisposition) ?? `ticket-report-${reportId}`;
+
+  return {
+    blob,
+    fileName,
+    mimeType: response.headers.get("content-type") ?? blob.type ?? "application/octet-stream",
+  };
+}
+
 export async function listTicketCategoriesClient() {
   const response = await clientApiFetch("/api/v1/ticket-categories", {
     cache: "no-store",
@@ -161,4 +228,20 @@ export function updateTicketCategoryClient(
 
 export function deleteTicketCategoryClient(id: number) {
   return sendJson<void>(`/api/v1/ticket-categories/${id}`, "DELETE");
+}
+
+function extractDownloadFilename(contentDisposition: string | null) {
+  if (!contentDisposition) return null;
+
+  const utfMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utfMatch?.[1]) {
+    try {
+      return decodeURIComponent(utfMatch[1]);
+    } catch {
+      return utfMatch[1];
+    }
+  }
+
+  const basicMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/i);
+  return basicMatch?.[1] ?? null;
 }

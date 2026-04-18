@@ -10,6 +10,7 @@ import {
   getFirstResponseTimerState,
   getResolutionTimerState,
   getSlaTargetLabel,
+  getTicketErrorMessage,
   getTicketProgressLabel,
   toTicketTitleCase,
 } from "@/lib/tickets/shared";
@@ -34,6 +35,7 @@ type TicketDetailPanelProps = {
   onOpenAssignment: () => void;
   onOpenStatus: () => void;
   onDeleteTicket: () => Promise<void>;
+  onRequestReconsideration: (note: string) => Promise<void>;
   onCreateComment: (payload: CreateTicketCommentRequest) => Promise<void>;
   onUpdateComment: (commentId: number, payload: UpdateTicketCommentRequest) => Promise<void>;
   onDeleteComment: (commentId: number) => Promise<void>;
@@ -79,6 +81,7 @@ export function TicketDetailPanel({
   onOpenAssignment,
   onOpenStatus,
   onDeleteTicket,
+  onRequestReconsideration,
   onCreateComment,
   onUpdateComment,
   onDeleteComment,
@@ -86,6 +89,8 @@ export function TicketDetailPanel({
   onDeleteAttachment,
 }: TicketDetailPanelProps) {
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [reconsiderationNote, setReconsiderationNote] = useState("");
+  const [reconsiderationError, setReconsiderationError] = useState<string | null>(null);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNowMs(Date.now()), 30000);
@@ -110,6 +115,12 @@ export function TicketDetailPanel({
   }
 
   const { detail, comments, attachments } = ticketBundle;
+
+  useEffect(() => {
+    setReconsiderationNote(detail.reconsiderationNote ?? "");
+    setReconsiderationError(null);
+  }, [detail.id, detail.reconsiderationNote]);
+
   const canAssign = currentUser.role === "ADMIN";
   const canEdit =
     currentUser.role != null &&
@@ -129,6 +140,17 @@ export function TicketDetailPanel({
     detail.status === "REJECTED"
       ? 0
       : WORKFLOW_STEPS.findIndex((step) => step.status === detail.status);
+  const canRequestReconsideration =
+    currentUser.id != null &&
+    currentUser.role != null &&
+    currentUser.role !== "ADMIN" &&
+    detail.status === "REJECTED" &&
+    detail.reporterUserId === currentUser.id;
+  const hasReconsiderationTrail =
+    detail.reconsiderationRequestCount > 0 ||
+    detail.reconsiderationNote != null ||
+    detail.reconsiderationRequestedAt != null ||
+    detail.reconsiderationReviewedAt != null;
 
   return (
     <section className="space-y-6">
@@ -179,7 +201,7 @@ export function TicketDetailPanel({
               disabled={busy}
               className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Assign or reassign staff
+              {detail.status === "REJECTED" ? "Reopen and assign staff" : "Assign or reassign staff"}
             </button>
           ) : null}
           {canUpdate ? (
@@ -343,9 +365,92 @@ export function TicketDetailPanel({
             })}
 
             {detail.status === "REJECTED" ? (
-              <div className="rounded-[1.2rem] border border-rose-200 bg-rose-50 p-4 text-sm leading-7 text-rose-700">
-                <p className="font-semibold">Rejected by admin</p>
-                <p>{detail.rejectionReason || "A rejection reason has not been recorded yet."}</p>
+              <div className="space-y-4 rounded-[1.2rem] border border-rose-200 bg-rose-50 p-4 text-sm leading-7 text-rose-700">
+                <div>
+                  <p className="font-semibold">Rejected by admin</p>
+                  <p>{detail.rejectionReason || "A rejection reason has not been recorded yet."}</p>
+                  <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-rose-500">
+                    Rejected on {formatDateTime(detail.rejectedAt)}
+                  </p>
+                </div>
+
+                {detail.reconsiderationNote ? (
+                  <div className="rounded-[1rem] border border-rose-200/80 bg-white/70 px-4 py-3 text-sm text-slate-700">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-500">
+                      Latest reconsideration note
+                    </p>
+                    <p className="mt-2 leading-7">{detail.reconsiderationNote}</p>
+                    <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Requested {formatDateTime(detail.reconsiderationRequestedAt)}
+                    </p>
+                  </div>
+                ) : null}
+
+                {canRequestReconsideration ? (
+                  <form
+                    className="rounded-[1rem] border border-rose-200/80 bg-white/80 p-4"
+                    onSubmit={async (event) => {
+                      event.preventDefault();
+                      const nextNote = reconsiderationNote.trim();
+                      if (!nextNote) {
+                        setReconsiderationError("Explain why admin should review this rejection again.");
+                        return;
+                      }
+
+                      setReconsiderationError(null);
+                      try {
+                        await onRequestReconsideration(nextNote);
+                      } catch (error) {
+                        setReconsiderationError(
+                          getTicketErrorMessage(
+                            error,
+                            "Could not send the reconsideration request.",
+                          ),
+                        );
+                      }
+                    }}
+                  >
+                    <p className="text-sm font-semibold text-slate-950">Ask admin to check again</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Add the missing context, explain what may have been misunderstood, or point out
+                      why this ticket should be reviewed again.
+                    </p>
+                    <textarea
+                      rows={4}
+                      value={reconsiderationNote}
+                      onChange={(event) => setReconsiderationNote(event.target.value)}
+                      className="mt-4 min-h-28 w-full resize-y rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-rose-300"
+                      placeholder="Example: this is not a duplicate because it affects a different lab and the issue is still active."
+                    />
+                    {reconsiderationError ? (
+                      <p className="mt-2 text-xs font-semibold text-rose-600">{reconsiderationError}</p>
+                    ) : null}
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <button
+                        type="submit"
+                        disabled={busy}
+                        className="inline-flex items-center justify-center rounded-full bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {detail.reconsiderationRequestedAt ? "Update reconsideration note" : "Request reconsideration"}
+                      </button>
+                      {detail.reconsiderationRequestedAt ? (
+                        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Last sent {formatDateTime(detail.reconsiderationRequestedAt)}
+                        </span>
+                      ) : null}
+                    </div>
+                  </form>
+                ) : null}
+
+                {canAssign ? (
+                  <div className="rounded-[1rem] border border-rose-200/80 bg-white/75 px-4 py-3 text-sm text-slate-700">
+                    <p className="font-semibold text-slate-950">Admin reconsideration action</p>
+                    <p className="mt-2 leading-7">
+                      Reassigning a staff member will reopen this ticket, keep the rejection trail
+                      visible for audit, and send the issue back for another operational check.
+                    </p>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -382,6 +487,47 @@ export function TicketDetailPanel({
                 Target: {getSlaTargetLabel(detail.priority, "resolution")}
               </p>
               <p className="mt-1 text-sm">Resolved at: {formatDateTime(detail.resolvedAt)}</p>
+            </div>
+          </div>
+        </article>
+
+        <article className="rounded-[1.5rem] border border-white/70 bg-white/85 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Review counters
+          </p>
+          <div className="mt-5 grid gap-4 sm:grid-cols-3">
+            <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/80 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Staff review actions
+              </p>
+              <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+                {detail.staffReviewCount}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Counted when staff picks up or resolves the ticket during handling.
+              </p>
+            </div>
+            <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/80 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Admin review actions
+              </p>
+              <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+                {detail.adminReviewCount}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Counted when admin assigns, closes, rejects, or reopens the ticket for review.
+              </p>
+            </div>
+            <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/80 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Reconsideration requests
+              </p>
+              <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+                {detail.reconsiderationRequestCount}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Reporter requests asking admin to review a rejection again.
+              </p>
             </div>
           </div>
         </article>
@@ -450,7 +596,11 @@ export function TicketDetailPanel({
             </div>
             <div>
               <dt className="font-semibold text-slate-900">Rejection reason</dt>
-              <dd>{detail.rejectionReason || "Not rejected"}</dd>
+              <dd>{detail.rejectionReason || "No rejection recorded"}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-slate-900">Reconsideration note</dt>
+              <dd>{detail.reconsiderationNote || "No reconsideration request recorded"}</dd>
             </div>
             <div>
               <dt className="font-semibold text-slate-900">First response at</dt>
@@ -468,8 +618,40 @@ export function TicketDetailPanel({
               <dt className="font-semibold text-slate-900">Closed at</dt>
               <dd>{formatDateTime(detail.closedAt)}</dd>
             </div>
+            <div>
+              <dt className="font-semibold text-slate-900">Reconsideration requested at</dt>
+              <dd>{formatDateTime(detail.reconsiderationRequestedAt)}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-slate-900">Reconsideration reviewed at</dt>
+              <dd>{formatDateTime(detail.reconsiderationReviewedAt)}</dd>
+            </div>
           </dl>
         </article>
+
+        {hasReconsiderationTrail ? (
+          <article className="rounded-[1.5rem] border border-white/70 bg-white/85 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur xl:col-span-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              Reconsideration trail
+            </p>
+            <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+              <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/80 p-4">
+                <p className="text-sm font-semibold text-slate-950">Reporter note to admin</p>
+                <p className="mt-3 text-sm leading-7 text-slate-700">
+                  {detail.reconsiderationNote || "No reconsideration note is recorded yet."}
+                </p>
+              </div>
+              <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/80 p-4 text-sm leading-7 text-slate-600">
+                <p className="font-semibold text-slate-950">Audit checkpoints</p>
+                <p className="mt-3">
+                  Requested: {formatDateTime(detail.reconsiderationRequestedAt)}
+                </p>
+                <p>Reviewed: {formatDateTime(detail.reconsiderationReviewedAt)}</p>
+                <p>Requests made: {detail.reconsiderationRequestCount}</p>
+              </div>
+            </div>
+          </article>
+        ) : null}
       </div>
 
       <TicketComments

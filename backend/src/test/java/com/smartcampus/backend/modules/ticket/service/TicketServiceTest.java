@@ -212,6 +212,7 @@ class TicketServiceTest {
                         new UpdateTicketStatusRequest(TicketStatus.IN_PROGRESS, null, null));
 
         assertThat(response.status()).isEqualTo(TicketStatus.IN_PROGRESS);
+        assertThat(response.staffReviewCount()).isEqualTo(1);
         verify(ticketSlaService).markFirstResponseIfNeeded(ticket);
         verify(ticketCommentService).createSystemStatusNote(any(Ticket.class), any(String.class), any(User.class));
         verify(notificationService).notifyTicketStatusChanged(ticket, TicketStatus.IN_PROGRESS, staff, staff);
@@ -394,6 +395,70 @@ class TicketServiceTest {
         ticketService.updateStatus(160L, new UpdateTicketStatusRequest(TicketStatus.CLOSED, null, null));
 
         verify(notificationService).notifyTicketStatusChanged(ticket, TicketStatus.CLOSED, admin, staff);
+    }
+
+    @Test
+    void reporterCanRequestReconsiderationForRejectedTicket() {
+        User reporter = buildUser(50L, "student-reconsider@example.com", "Student Reconsider");
+        UserRole membership = buildMembership(reporter, RoleCode.STUDENT);
+        Ticket ticket = buildTicket(170L, reporter);
+        ticket.setStatus(TicketStatus.REJECTED);
+        ticket.setRejectionReason("Duplicate request");
+        ticket.setRejectedAt(LocalDateTime.now().minusHours(2));
+
+        when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
+        when(ticketRepository.findById(170L)).thenReturn(Optional.of(ticket));
+        when(ticketRepository.save(ticket)).thenReturn(ticket);
+        when(ticketRepository.findDetailedById(170L)).thenReturn(Optional.of(ticket));
+        when(ticketAssignmentRepository.findByTicketIdOrderByAssignedAtDesc(170L)).thenReturn(List.of());
+
+        TicketDetailResponse response =
+                ticketService.requestReconsideration(
+                        170L,
+                        new com.smartcampus.backend.modules.ticket.dto.RequestTicketReconsiderationRequest(
+                                "Please review this again. It is a different room issue."));
+
+        assertThat(response.reconsiderationNote()).contains("different room issue");
+        assertThat(response.reconsiderationRequestCount()).isEqualTo(1);
+        verify(ticketCommentService)
+                .createSystemStatusNote(ticket, "Reporter requested reconsideration review", reporter);
+    }
+
+    @Test
+    void adminAssignmentReopensRejectedTicketAndTracksReview() {
+        User admin = buildUser(60L, "admin-reopen@example.com", "Admin Reopen");
+        User reporter = buildUser(61L, "reporter-reopen@example.com", "Reporter Reopen");
+        User staff = buildUser(62L, "staff-reopen@example.com", "Staff Reopen");
+        UserRole membership = buildMembership(admin, RoleCode.ADMIN);
+        Ticket ticket = buildTicket(171L, reporter);
+        ticket.setStatus(TicketStatus.REJECTED);
+        ticket.setRejectionReason("Insufficient evidence");
+        ticket.setRejectedAt(LocalDateTime.now().minusHours(1));
+        ticket.setReconsiderationNote("The problem still exists.");
+        ticket.setReconsiderationRequestedAt(LocalDateTime.now().minusMinutes(30));
+
+        when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
+        when(ticketRepository.findById(171L)).thenReturn(Optional.of(ticket));
+        when(ticketAssignmentRepository.findActiveByTicketId(171L)).thenReturn(Optional.empty());
+        when(userRepository.findById(62L)).thenReturn(Optional.of(staff));
+        when(userRoleRepository.findActiveByUserId(62L))
+                .thenReturn(Optional.of(buildMembership(staff, RoleCode.STAFF)));
+        when(ticketRepository.save(ticket)).thenReturn(ticket);
+        when(ticketRepository.findDetailedById(171L)).thenReturn(Optional.of(ticket));
+        when(ticketAssignmentRepository.findByTicketIdOrderByAssignedAtDesc(171L)).thenReturn(List.of());
+
+        TicketDetailResponse response =
+                ticketService.updateAssignment(171L, new UpdateTicketAssignmentRequest(62L, "Check again"));
+
+        assertThat(response.status()).isEqualTo(TicketStatus.OPEN);
+        assertThat(response.assignedStaffUserId()).isEqualTo(62L);
+        assertThat(response.adminReviewCount()).isEqualTo(1);
+        assertThat(response.reconsiderationReviewedAt()).isNotNull();
+        verify(ticketCommentService)
+                .createSystemStatusNote(
+                        ticket,
+                        "Rejected ticket reopened for reconsideration and assigned to Staff Reopen",
+                        admin);
     }
 
     private User buildUser(Long id, String email, String displayName) {

@@ -1,0 +1,17 @@
+package com.smartcampus.backend.common.enums;
+
+public enum TicketAssistantIntent {
+    STATUS_QUERY,
+    HISTORY_SUMMARY,
+    FAQ,
+    CREATION_HELP,
+    DUPLICATE_CHECK,
+    PRIORITY_RECOMMENDATION,
+    CATEGORY_RECOMMENDATION,
+    REMINDER,
+    RESOLUTION_EXPLANATION,
+    COMMENT_ASSISTANT,
+    REPORT_HELP,
+    INSIGHTS,
+    UNKNOWN
+}

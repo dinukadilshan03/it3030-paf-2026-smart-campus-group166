@@ -5,6 +5,7 @@ import {
   listAssignableStaffServer,
   listTicketCategoriesServer,
   listTicketLocationsServer,
+  listTicketReportsServer,
   listTicketReporterUsersServer,
   listTicketResourcesServer,
   listTicketsServer,
@@ -19,14 +20,16 @@ export default async function TicketsPage({
   const resolvedSearchParams = await searchParams;
   const requestedTicketId = Number(resolvedSearchParams.ticketId);
 
-  const [tickets, categories, locations, resources, activeStaffUsers, reporterUsers] = await Promise.all([
-    listTicketsServer(),
-    listTicketCategoriesServer(),
-    listTicketLocationsServer(),
-    listTicketResourcesServer(),
-    currentUser.role === "ADMIN" ? listAssignableStaffServer() : Promise.resolve([]),
-    currentUser.role === "ADMIN" ? listTicketReporterUsersServer() : Promise.resolve([]),
-  ]);
+  const [tickets, categories, locations, resources, reports, activeStaffUsers, reporterUsers] =
+    await Promise.all([
+      listTicketsServer(),
+      listTicketCategoriesServer(),
+      listTicketLocationsServer(),
+      listTicketResourcesServer(),
+      listTicketReportsServer(),
+      currentUser.role === "ADMIN" ? listAssignableStaffServer() : Promise.resolve([]),
+      currentUser.role === "ADMIN" ? listTicketReporterUsersServer() : Promise.resolve([]),
+    ]);
 
   const selectedTicketId =
     Number.isFinite(requestedTicketId) && tickets.some((ticket) => ticket.id === requestedTicketId)
@@ -44,6 +47,7 @@ export default async function TicketsPage({
       initialResources={resources}
       initialStaffUsers={activeStaffUsers}
       initialReporterUsers={reporterUsers}
+      initialReports={reports}
       initialSelectedBundle={initialSelectedBundle}
     />
   );

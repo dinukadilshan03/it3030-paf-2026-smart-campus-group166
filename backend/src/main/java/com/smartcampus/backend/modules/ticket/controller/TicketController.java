@@ -3,6 +3,7 @@ package com.smartcampus.backend.modules.ticket.controller;
 import com.smartcampus.backend.common.enums.TicketPriority;
 import com.smartcampus.backend.common.enums.TicketStatus;
 import com.smartcampus.backend.modules.ticket.dto.CreateTicketRequest;
+import com.smartcampus.backend.modules.ticket.dto.RequestTicketReconsiderationRequest;
 import com.smartcampus.backend.modules.ticket.dto.TicketDetailResponse;
 import com.smartcampus.backend.modules.ticket.dto.TicketSummaryResponse;
 import com.smartcampus.backend.modules.ticket.dto.UpdateTicketAssignmentRequest;
@@ -82,5 +83,12 @@ public class TicketController {
     public TicketDetailResponse updateStatus(
             @PathVariable Long id, @Valid @RequestBody UpdateTicketStatusRequest request) {
         return ticketService.updateStatus(id, request);
+    }
+
+    @PatchMapping("/{id}/reconsideration")
+    @PreAuthorize("hasAnyRole('STUDENT', 'STAFF')")
+    public TicketDetailResponse requestReconsideration(
+            @PathVariable Long id, @Valid @RequestBody RequestTicketReconsiderationRequest request) {
+        return ticketService.requestReconsideration(id, request);
     }
 }
