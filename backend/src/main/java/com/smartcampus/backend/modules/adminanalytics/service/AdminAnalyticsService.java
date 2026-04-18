@@ -722,18 +722,117 @@ public class AdminAnalyticsService {
     private Map<String, Object> buildAiSnapshot(AnalyticsSnapshot snapshot) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("range", snapshot.range().wireValue());
-        result.put("overview", snapshot.overview());
-        result.put("charts", snapshot.charts());
-        result.put("health", snapshot.health());
+        result.put("generatedAt", snapshot.overview().generatedAt());
+        result.put("overview", compactOverview(snapshot));
+        result.put("charts", compactCharts(snapshot));
+        result.put("health", compactHealth(snapshot));
         result.put("quickLinks", snapshot.quickLinks().stream()
-                .map(
-                        link ->
-                                Map.of(
-                                        "id", link.id(),
-                                        "label", link.label(),
-                                        "href", link.href(),
-                                        "description", link.description()))
+                .map(this::compactQuickLink)
                 .toList());
+        return result;
+    }
+
+    private Map<String, Object> compactOverview(AnalyticsSnapshot snapshot) {
+        Map<String, Object> overview = new LinkedHashMap<>();
+        overview.put(
+                "metrics",
+                snapshot.overview().metrics().stream()
+                        .map(this::compactMetric)
+                        .toList());
+        overview.put(
+                "alerts",
+                snapshot.overview().alerts().stream()
+                        .limit(4)
+                        .map(this::compactAlert)
+                        .toList());
+        return overview;
+    }
+
+    private Map<String, Object> compactCharts(AnalyticsSnapshot snapshot) {
+        Map<String, Object> charts = new LinkedHashMap<>();
+        charts.put("bookingsByDay", compactSeries(snapshot.charts().bookingsByDay(), 7));
+        charts.put("ticketsByDay", compactSeries(snapshot.charts().ticketsByDay(), 7));
+        charts.put("peakBookingHours", compactSeries(snapshot.charts().peakBookingHours(), 5));
+        charts.put("topResources", compactSeries(snapshot.charts().topResources(), 5));
+        charts.put("topLocations", compactSeries(snapshot.charts().topLocations(), 5));
+        charts.put("ticketCategories", compactSeries(snapshot.charts().ticketCategories(), 5));
+        charts.put("notificationTypes", compactSeries(snapshot.charts().notificationTypes(), 5));
+        charts.put("authEventsByType", compactSeries(snapshot.charts().authEventsByType(), 5));
+        return charts;
+    }
+
+    private Map<String, Object> compactHealth(AnalyticsSnapshot snapshot) {
+        Map<String, Object> health = new LinkedHashMap<>();
+        health.put("roleDistribution", compactNamedValues(snapshot.health().roleDistribution(), 6));
+        health.put("statusDistribution", compactNamedValues(snapshot.health().statusDistribution(), 6));
+        health.put("loginMethodDistribution", compactNamedValues(snapshot.health().loginMethodDistribution(), 4));
+        health.put("authHealth", compactNamedValues(snapshot.health().authHealth(), 6));
+        health.put("notificationHealth", compactNamedValues(snapshot.health().notificationHealth(), 6));
+        health.put(
+                "flags",
+                snapshot.health().flags().stream()
+                        .limit(4)
+                        .map(this::compactAlert)
+                        .toList());
+        return health;
+    }
+
+    private Map<String, Object> compactMetric(AnalyticsMetricCardResponse metric) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", metric.id());
+        result.put("label", metric.label());
+        result.put("value", metric.value());
+        result.put("changeLabel", metric.changeLabel());
+        result.put("trend", metric.trend());
+        return result;
+    }
+
+    private Map<String, Object> compactAlert(AnalyticsAlertResponse alert) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", alert.id());
+        result.put("title", alert.title());
+        result.put("message", alert.message());
+        result.put("severity", alert.severity());
+        result.put("referencedMetricIds", alert.referencedMetricIds());
+        return result;
+    }
+
+    private List<Map<String, Object>> compactSeries(List<AnalyticsSeriesPointResponse> points, int limit) {
+        return points.stream()
+                .limit(limit)
+                .map(this::compactSeriesPoint)
+                .toList();
+    }
+
+    private Map<String, Object> compactSeriesPoint(AnalyticsSeriesPointResponse point) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", point.id());
+        result.put("label", point.label());
+        result.put("value", point.value());
+        return result;
+    }
+
+    private List<Map<String, String>> compactNamedValues(List<AnalyticsNamedValueResponse> points, int limit) {
+        return points.stream()
+                .limit(limit)
+                .map(this::compactNamedValue)
+                .toList();
+    }
+
+    private Map<String, String> compactNamedValue(AnalyticsNamedValueResponse point) {
+        Map<String, String> result = new LinkedHashMap<>();
+        result.put("id", point.id());
+        result.put("label", point.label());
+        result.put("value", point.value());
+        return result;
+    }
+
+    private Map<String, Object> compactQuickLink(AnalyticsQuickLinkResponse link) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", link.id());
+        result.put("label", link.label());
+        result.put("href", link.href());
+        result.put("description", link.description());
         return result;
     }
 
