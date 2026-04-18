@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+
 import {
   getAwaitingFirstResponseCount,
   getFirstResponseTimerState,
@@ -9,6 +13,8 @@ import type { TicketCategorySummary, TicketPriority, TicketStatus, TicketSummary
 import type { CurrentUser } from "@/types/auth";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+type AnalyticsFocus = "pressure" | "movement" | "oversight";
+type TrendMode = "both" | "created" | "resolved";
 
 const STATUS_META: Record<
   TicketStatus,
@@ -211,7 +217,7 @@ function getOldestOpenTicketDays(tickets: TicketSummary[], nowMs: number) {
 function getRoleAnalyticsDescription(role: CurrentUser["role"]) {
   switch (role) {
     case "ADMIN":
-      return "Track backlog, assignment coverage, SLA pressure, and the categories creating the most operational load across campus.";
+      return "Track backlog, assignment coverage, service level agreement pressure, and the categories creating the most operational load across campus.";
     case "STAFF":
       return "See where your assigned workload is growing, which priorities need attention, and how quickly tickets are moving from report to fix.";
     case "STUDENT":
@@ -255,7 +261,7 @@ function buildInsights({
       insights.push(`${unassignedCount} ticket(s) still need assignment before work can begin.`);
     }
     if (slaRiskCount > 0) {
-      insights.push(`${slaRiskCount} ticket(s) are already at SLA risk and should be reviewed first.`);
+      insights.push(`${slaRiskCount} ticket(s) are already at service level agreement risk and should be reviewed first.`);
     }
     if (topCategory) {
       insights.push(`${topCategory} is currently the busiest reporting category in this workspace.`);
@@ -289,6 +295,53 @@ function buildInsights({
   return insights.slice(0, 4);
 }
 
+function AnalyticsFocusButton({
+  label,
+  title,
+  value,
+  detail,
+  active,
+  onClick,
+}: {
+  label: string;
+  title: string;
+  value: string | number;
+  detail: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-[1.45rem] border p-4 text-left transition ${
+        active
+          ? "border-sky-200 bg-[linear-gradient(135deg,rgba(224,242,254,0.92),rgba(255,255,255,0.98),rgba(238,242,255,0.94))] shadow-[0_18px_42px_rgba(59,130,246,0.12)]"
+          : "border-white/80 bg-white/85 shadow-[0_14px_34px_rgba(15,23,42,0.05)] hover:border-sky-100 hover:bg-white"
+      }`}
+      aria-pressed={active}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-slate-500">
+            {label}
+          </p>
+          <p className="mt-3 text-base font-semibold text-slate-950">{title}</p>
+        </div>
+        <span
+          className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
+            active ? "bg-sky-100 text-sky-800" : "bg-slate-100 text-slate-700"
+          }`}
+        >
+          {active ? "Active" : "Open"}
+        </span>
+      </div>
+      <p className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">{value}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{detail}</p>
+    </button>
+  );
+}
+
 function MetricCard({
   label,
   value,
@@ -301,10 +354,11 @@ function MetricCard({
   accent: string;
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-white/80 bg-white/90 p-5 shadow-[0_18px_55px_rgba(15,23,42,0.06)]">
-      <div className={`h-1.5 w-16 rounded-full ${accent}`} />
+    <div className="relative overflow-hidden rounded-[1.6rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-5 shadow-[0_18px_55px_rgba(15,23,42,0.06)]">
+      <div className={`absolute inset-x-0 top-0 h-1.5 ${accent}`} />
+      <div className={`pointer-events-none absolute right-2 top-2 h-20 w-20 rounded-full opacity-10 blur-2xl ${accent}`} />
       <p className="mt-4 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">{label}</p>
-      <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{value}</p>
+      <p className="mt-3 text-[2.1rem] font-semibold tracking-tight text-slate-950">{value}</p>
       <p className="mt-3 text-sm leading-6 text-slate-600">{detail}</p>
     </div>
   );
@@ -329,7 +383,7 @@ function SegmentedDistribution({
   const total = series.reduce((sum, item) => sum + item.value, 0);
 
   return (
-    <div className="rounded-[1.7rem] border border-white/80 bg-white/90 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.06)]">
+    <div className="rounded-[1.7rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-6 shadow-[0_18px_55px_rgba(15,23,42,0.06)]">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-lg font-semibold text-slate-950">{title}</h3>
@@ -340,11 +394,11 @@ function SegmentedDistribution({
         </span>
       </div>
 
-      <div className="mt-6 flex h-4 overflow-hidden rounded-full bg-slate-100">
+      <div className="mt-6 flex h-5 overflow-hidden rounded-full bg-slate-100/90 p-1">
         {series.map((item) => (
           <div
             key={item.key}
-            className={item.tone}
+            className={`rounded-full ${item.tone}`}
             style={{ width: total === 0 ? "0%" : `${Math.max(8, (item.value / total) * 100)}%` }}
           />
         ))}
@@ -354,7 +408,7 @@ function SegmentedDistribution({
         {series.map((item) => (
           <div
             key={item.key}
-            className="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3"
+            className={`rounded-2xl border border-slate-200/80 px-4 py-3 ${item.softTone}`}
           >
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -385,13 +439,13 @@ function HorizontalBarList({
   const maxValue = Math.max(...items.map((item) => item.value), 1);
 
   return (
-    <div className="rounded-[1.7rem] border border-white/80 bg-white/90 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.06)]">
+    <div className="rounded-[1.7rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-6 shadow-[0_18px_55px_rgba(15,23,42,0.06)]">
       <h3 className="text-lg font-semibold text-slate-950">{title}</h3>
       <p className="mt-2 text-sm leading-6 text-slate-600">{subtitle}</p>
 
       <div className="mt-6 space-y-4">
         {items.map((item) => (
-          <div key={item.label} className="space-y-2">
+          <div key={item.label} className="space-y-2 rounded-[1.2rem] border border-slate-200/70 bg-white/80 p-4">
             <div className="flex items-center justify-between gap-4 text-sm text-slate-700">
               <span>{item.label}</span>
               <span className="font-semibold text-slate-950">{item.value}</span>
@@ -411,8 +465,12 @@ function HorizontalBarList({
 
 function WeeklyTrendChart({
   points,
+  trendMode,
+  onTrendModeChange,
 }: {
   points: Array<{ key: number; label: string; created: number; resolved: number }>;
+  trendMode: TrendMode;
+  onTrendModeChange: (nextMode: TrendMode) => void;
 }) {
   const maxValue = Math.max(...points.flatMap((point) => [point.created, point.resolved]), 1);
   const guideValues = [maxValue, Math.max(1, Math.ceil(maxValue / 2)), 0];
@@ -425,7 +483,7 @@ function WeeklyTrendChart({
   }
 
   return (
-    <div className="rounded-[1.7rem] border border-white/80 bg-white/90 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.06)]">
+    <div className="rounded-[1.7rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(239,246,255,0.92))] p-6 shadow-[0_18px_55px_rgba(15,23,42,0.06)]">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h3 className="text-lg font-semibold text-slate-950">Six-week movement</h3>
@@ -433,15 +491,33 @@ function WeeklyTrendChart({
             Compare newly reported tickets against tickets resolved over the last six weekly cycles.
           </p>
         </div>
-        <div className="flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-          <span className="inline-flex items-center gap-2">
-            <span className="h-3 w-3 rounded-full bg-slate-400" />
-            Created
-          </span>
-          <span className="inline-flex items-center gap-2">
-            <span className="h-3 w-3 rounded-full bg-emerald-500" />
-            Resolved
-          </span>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <span className="inline-flex items-center gap-2">
+              <span className={`h-3 w-3 rounded-full ${trendMode === "resolved" ? "bg-slate-300" : "bg-sky-500"}`} />
+              Created
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span className={`h-3 w-3 rounded-full ${trendMode === "created" ? "bg-emerald-200" : "bg-emerald-500"}`} />
+              Resolved
+            </span>
+          </div>
+          <div className="flex rounded-full border border-slate-200 bg-white/85 p-1 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+            {(["both", "created", "resolved"] as TrendMode[]).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => onTrendModeChange(mode)}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] transition ${
+                  trendMode === mode
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -471,7 +547,11 @@ function WeeklyTrendChart({
                       {point.created}
                     </div>
                     <div
-                      className="w-full rounded-full bg-slate-400"
+                      className={`w-full rounded-full ${
+                        trendMode === "resolved"
+                          ? "bg-slate-300"
+                          : "bg-[linear-gradient(180deg,rgba(59,130,246,0.96),rgba(99,102,241,0.92))]"
+                      }`}
                       style={{ height: getHeight(point.created) }}
                     />
                     <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -484,7 +564,11 @@ function WeeklyTrendChart({
                       {point.resolved}
                     </div>
                     <div
-                      className="w-full rounded-full bg-emerald-500"
+                      className={`w-full rounded-full ${
+                        trendMode === "created"
+                          ? "bg-emerald-200"
+                          : "bg-[linear-gradient(180deg,rgba(16,185,129,0.96),rgba(45,212,191,0.92))]"
+                      }`}
                       style={{ height: getHeight(point.resolved) }}
                     />
                     <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -545,7 +629,7 @@ function ReviewOversightPanel({
   ];
 
   return (
-    <div className="rounded-[1.7rem] border border-white/80 bg-white/90 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.06)]">
+    <div className="rounded-[1.7rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-6 shadow-[0_18px_55px_rgba(15,23,42,0.06)]">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h3 className="text-lg font-semibold text-slate-950">Review oversight</h3>
@@ -561,7 +645,7 @@ function ReviewOversightPanel({
 
       <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
-          <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/80 p-4">
+            <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/80 p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
               Staff review actions
             </p>
@@ -589,7 +673,7 @@ function ReviewOversightPanel({
 
         <div className="space-y-4">
           {items.map((item) => (
-            <div key={item.label} className="rounded-[1.2rem] border border-slate-200 bg-slate-50/80 p-4">
+            <div key={item.label} className="rounded-[1.2rem] border border-slate-200 bg-white/84 p-4">
               <div className="flex items-center justify-between gap-4">
                 <p className="text-sm font-medium text-slate-700">{item.label}</p>
                 <p className="text-sm font-semibold text-slate-950">{item.value}</p>
@@ -616,13 +700,13 @@ function InsightList({
   items: string[];
 }) {
   return (
-    <div className="rounded-[1.7rem] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(226,232,240,0.35),rgba(255,255,255,0.95))] p-6 shadow-[0_18px_55px_rgba(15,23,42,0.05)]">
+    <div className="rounded-[1.7rem] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(224,242,254,0.48),rgba(255,255,255,0.96),rgba(238,242,255,0.92))] p-6 shadow-[0_18px_55px_rgba(15,23,42,0.05)]">
       <h3 className="text-lg font-semibold text-slate-950">{title}</h3>
       <div className="mt-5 space-y-3">
         {items.map((item) => (
           <div
             key={item}
-            className="rounded-2xl border border-white/80 bg-white/90 px-4 py-3 text-sm leading-6 text-slate-700"
+            className="rounded-2xl border border-white/80 bg-white/90 px-4 py-3 text-sm leading-6 text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
           >
             {item}
           </div>
@@ -638,7 +722,6 @@ function getRoleSpotlightData(
   tickets: TicketSummary[],
   awaitingResponse: number,
   slaRiskCount: number,
-  unassignedCount: number,
 ) {
   if (role === "ADMIN") {
     const assignmentCounts = toCountMap(
@@ -684,7 +767,7 @@ function getRoleSpotlightData(
           softTone: "bg-amber-100",
         },
         {
-          label: "At SLA risk",
+          label: "Service level agreement risk",
           value: slaRiskCount,
           tone: "bg-rose-500",
           softTone: "bg-rose-100",
@@ -734,8 +817,10 @@ export function TicketAnalyticsPanel({
   currentUser: CurrentUser;
   categories: TicketCategorySummary[];
 }) {
+  const [focus, setFocus] = useState<AnalyticsFocus>("pressure");
+  const [trendMode, setTrendMode] = useState<TrendMode>("both");
+  const [nowMs] = useState(() => Date.now());
   const role = currentUser.role ?? "STUDENT";
-  const nowMs = Date.now();
   const totalTickets = tickets.length;
   const awaitingResponse = getAwaitingFirstResponseCount(tickets);
   const unassignedCount = getUnassignedTicketCount(tickets);
@@ -757,6 +842,16 @@ export function TicketAnalyticsPanel({
     (sum, ticket) => sum + ticket.reconsiderationRequestCount,
     0,
   );
+  const resolvedOrClosedCount = tickets.filter(
+    (ticket) => ticket.status === "RESOLVED" || ticket.status === "CLOSED",
+  ).length;
+  const activeWorkCount = tickets.filter(
+    (ticket) => ticket.status === "OPEN" || ticket.status === "IN_PROGRESS",
+  ).length;
+  const completionRate = formatPercentage(resolvedOrClosedCount, totalTickets);
+  const weeklyCreatedTotal = weeklySeries.reduce((sum, point) => sum + point.created, 0);
+  const weeklyResolvedTotal = weeklySeries.reduce((sum, point) => sum + point.resolved, 0);
+  const combinedReviews = totalStaffReviews + totalAdminReviews;
 
   const statusSeries = (Object.keys(STATUS_META) as TicketStatus[]).map((status) => ({
     key: status,
@@ -795,7 +890,6 @@ export function TicketAnalyticsPanel({
     tickets,
     awaitingResponse,
     slaRiskCount,
-    unassignedCount,
   );
   const topCategory = categorySeries[0]?.label ?? null;
   const insights = buildInsights({
@@ -809,6 +903,66 @@ export function TicketAnalyticsPanel({
     avgFirstResponseHours,
     avgResolutionHours,
   });
+  const focusCards = [
+    {
+      id: "pressure" as const,
+      label: "Pressure",
+      title: "Timing pressure",
+      value: slaRiskCount,
+      detail: `${firstResponseRiskCount} first response risk and ${resolutionRiskCount} resolution risk.`,
+      summary:
+        "See where the service level agreement clock is putting the most pressure on the current workspace.",
+      statLabel: "Tickets needing timing attention",
+      stats: [
+        { label: "Awaiting first response", value: awaitingResponse },
+        { label: "First response risk", value: firstResponseRiskCount },
+        { label: "Resolution risk", value: resolutionRiskCount },
+      ],
+      surface:
+        "border-rose-200 bg-[linear-gradient(135deg,rgba(255,241,242,0.96),rgba(255,255,255,0.98),rgba(255,247,237,0.92))]",
+      badge: "bg-rose-100 text-rose-800",
+      accent: "bg-[linear-gradient(90deg,rgba(244,63,94,0.94),rgba(251,113,133,0.78))]",
+    },
+    {
+      id: "movement" as const,
+      label: "Movement",
+      title: "Flow through the queue",
+      value: completionRate,
+      detail: `${weeklyCreatedTotal} created and ${weeklyResolvedTotal} resolved across the last six weekly cycles.`,
+      summary:
+        "Use this view to judge whether incoming ticket volume is being cleared fast enough over time.",
+      statLabel: "Current completion rate",
+      stats: [
+        { label: "Active work", value: activeWorkCount },
+        { label: "Resolved or closed", value: resolvedOrClosedCount },
+        { label: "Oldest active ticket", value: formatDays(oldestOpenTicketDays) },
+      ],
+      surface:
+        "border-sky-200 bg-[linear-gradient(135deg,rgba(224,242,254,0.96),rgba(255,255,255,0.98),rgba(238,242,255,0.92))]",
+      badge: "bg-sky-100 text-sky-800",
+      accent: "bg-[linear-gradient(90deg,rgba(14,165,233,0.94),rgba(99,102,241,0.78))]",
+    },
+    {
+      id: "oversight" as const,
+      label: "Oversight",
+      title: "Handling and review activity",
+      value: combinedReviews,
+      detail: `${totalStaffReviews} staff reviews, ${totalAdminReviews} admin reviews, and ${totalReconsiderationRequests} reconsideration requests.`,
+      summary:
+        "This lens surfaces how much human handling is happening around assignment, review, and rejected-ticket follow-up.",
+      statLabel: "Review actions recorded",
+      stats: [
+        { label: "Unassigned", value: unassignedCount },
+        { label: "Admin reviews", value: totalAdminReviews },
+        { label: "Reconsiderations", value: totalReconsiderationRequests },
+      ],
+      surface:
+        "border-emerald-200 bg-[linear-gradient(135deg,rgba(236,253,245,0.96),rgba(255,255,255,0.98),rgba(236,254,255,0.92))]",
+      badge: "bg-emerald-100 text-emerald-800",
+      accent: "bg-[linear-gradient(90deg,rgba(16,185,129,0.94),rgba(45,212,191,0.78))]",
+    },
+  ];
+  const activeFocus = focusCards.find((item) => item.id === focus) ?? focusCards[0];
 
   const headlineMetrics =
     role === "ADMIN"
@@ -826,7 +980,7 @@ export function TicketAnalyticsPanel({
             accent: "bg-amber-500",
           },
           {
-            label: "At SLA risk",
+            label: "Service level agreement risk",
             value: slaRiskCount,
             detail: "Tickets with first-response or resolution timing already in danger.",
             accent: "bg-rose-500",
@@ -847,17 +1001,17 @@ export function TicketAnalyticsPanel({
               accent: "bg-slate-900",
             },
             {
-              label: "Awaiting response",
-              value: awaitingResponse,
-              detail: "Tickets still lacking an initial operational update.",
-              accent: "bg-sky-500",
-            },
-            {
-              label: "At SLA risk",
-              value: slaRiskCount,
-              detail: "Tickets that need immediate attention to avoid breach pressure.",
-              accent: "bg-rose-500",
-            },
+            label: "Awaiting response",
+            value: awaitingResponse,
+            detail: "Tickets still lacking an initial operational update.",
+            accent: "bg-sky-500",
+          },
+          {
+            label: "Service level agreement risk",
+            value: slaRiskCount,
+            detail: "Tickets that need immediate attention to avoid service level agreement pressure.",
+            accent: "bg-rose-500",
+          },
             {
               label: "Oldest active ticket",
               value: formatDays(oldestOpenTicketDays),
@@ -893,101 +1047,172 @@ export function TicketAnalyticsPanel({
           ];
 
   return (
-    <section className="space-y-6 rounded-[2rem] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.92))] p-8 shadow-[0_20px_65px_rgba(15,23,42,0.08)] backdrop-blur">
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-        <div className="max-w-3xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-            Analytics section
-          </p>
-          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">
-            {role === "ADMIN"
-              ? "Ticket operations analytics"
-              : role === "STAFF"
-                ? "Support workload analytics"
-                : "My ticket analytics"}
-          </h2>
-          <p className="mt-4 text-sm leading-7 text-slate-600">
-            {getRoleAnalyticsDescription(role)}
-          </p>
-        </div>
+    <section className="relative space-y-6 overflow-hidden rounded-[2rem] border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.1),transparent_26%),radial-gradient(circle_at_82%_18%,rgba(45,212,191,0.12),transparent_24%),radial-gradient(circle_at_70%_100%,rgba(99,102,241,0.1),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-8 shadow-[0_20px_65px_rgba(15,23,42,0.08)] backdrop-blur">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.35),transparent_28%,rgba(224,242,254,0.12)_56%,rgba(238,242,255,0.14))]" />
+      <div className="pointer-events-none absolute -left-12 top-12 h-40 w-40 rounded-full bg-sky-300/12 blur-3xl" />
+      <div className="pointer-events-none absolute right-8 top-0 h-36 w-36 rounded-full bg-teal-300/10 blur-3xl" />
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-[1.4rem] border border-slate-200/80 bg-white/90 px-4 py-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Response pressure
+      <div className="relative space-y-6">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.95fr)]">
+          <div className="rounded-[1.85rem] border border-white/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(255,255,255,0.76),rgba(239,246,255,0.88))] p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              Analytics section
             </p>
-            <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-              {firstResponseRiskCount}
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">
+              {role === "ADMIN"
+                ? "Ticket operations analytics"
+                : role === "STAFF"
+                  ? "Support workload analytics"
+                  : "My ticket analytics"}
+            </h2>
+            <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600">
+              {getRoleAnalyticsDescription(role)}
             </p>
-            <p className="mt-2 text-sm text-slate-600">Tickets breaching or threatening first response timing.</p>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-[1.25rem] border border-white/90 bg-white/82 p-4 shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
+                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Tickets in scope
+                </p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+                  {totalTickets}
+                </p>
+              </div>
+              <div className="rounded-[1.25rem] border border-white/90 bg-white/82 p-4 shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
+                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Active work
+                </p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+                  {activeWorkCount}
+                </p>
+              </div>
+              <div className="rounded-[1.25rem] border border-white/90 bg-white/82 p-4 shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
+                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Completion rate
+                </p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+                  {completionRate}
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="rounded-[1.4rem] border border-slate-200/80 bg-white/90 px-4 py-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Resolution pressure
-            </p>
-            <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-              {resolutionRiskCount}
-            </p>
-            <p className="mt-2 text-sm text-slate-600">Tickets breaching or threatening overall resolution timing.</p>
+
+          <div className="grid gap-3 lg:grid-cols-3 xl:grid-cols-1">
+            {focusCards.map((card) => (
+              <AnalyticsFocusButton
+                key={card.id}
+                label={card.label}
+                title={card.title}
+                value={card.value}
+                detail={card.detail}
+                active={focus === card.id}
+                onClick={() => setFocus(card.id)}
+              />
+            ))}
           </div>
         </div>
-      </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {headlineMetrics.map((metric) => (
-          <MetricCard
-            key={metric.label}
-            label={metric.label}
-            value={metric.value}
-            detail={metric.detail}
-            accent={metric.accent}
-          />
-        ))}
-      </div>
+        <div className={`rounded-[1.85rem] border p-6 shadow-[0_20px_55px_rgba(15,23,42,0.06)] ${activeFocus.surface}`}>
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div className="max-w-3xl">
+              <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${activeFocus.badge}`}>
+                {activeFocus.label} focus
+              </span>
+              <h3 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">
+                {activeFocus.title}
+              </h3>
+              <p className="mt-3 text-sm leading-7 text-slate-600">{activeFocus.summary}</p>
+            </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
-        <WeeklyTrendChart points={weeklySeries} />
-        <div className="space-y-4">
-          <SegmentedDistribution
-            title="Status distribution"
-            subtitle="A quick view of how the current ticket scope is spread across the full workflow."
-            series={statusSeries}
-          />
-          <SegmentedDistribution
-            title="Priority mix"
-            subtitle="Useful for spotting whether the workspace is leaning toward urgent or routine maintenance work."
-            series={prioritySeries}
-          />
+            <div className="min-w-[15rem] rounded-[1.35rem] border border-white/90 bg-white/82 p-5 shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
+              <div className={`h-2 w-20 rounded-full ${activeFocus.accent}`} />
+              <p className="mt-4 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                {activeFocus.statLabel}
+              </p>
+              <p className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">
+                {activeFocus.value}
+              </p>
+              <p className="mt-3 text-sm leading-6 text-slate-600">{activeFocus.detail}</p>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            {activeFocus.stats.map((stat) => (
+              <div
+                key={stat.label}
+                className="rounded-[1.25rem] border border-white/90 bg-white/78 p-4 shadow-[0_12px_28px_rgba(15,23,42,0.04)]"
+              >
+                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  {stat.label}
+                </p>
+                <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+                  {stat.value}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
 
-      <ReviewOversightPanel
-        totalTickets={totalTickets}
-        totalStaffReviews={totalStaffReviews}
-        totalAdminReviews={totalAdminReviews}
-        totalReconsiderationRequests={totalReconsiderationRequests}
-      />
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {headlineMetrics.map((metric) => (
+            <MetricCard
+              key={metric.label}
+              label={metric.label}
+              value={metric.value}
+              detail={metric.detail}
+              accent={metric.accent}
+            />
+          ))}
+        </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.95fr)]">
-        <HorizontalBarList
-          title="Category hotspots"
-          subtitle="The categories driving the most ticket activity in the current workspace."
-          items={
-            categorySeries.length > 0
-              ? categorySeries
-              : [{ label: "No category data yet", value: 0, tone: "bg-slate-300", softTone: "bg-slate-100" }]
-          }
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
+          <WeeklyTrendChart
+            points={weeklySeries}
+            trendMode={trendMode}
+            onTrendModeChange={setTrendMode}
+          />
+          <div className="space-y-4">
+            <SegmentedDistribution
+              title="Status distribution"
+              subtitle="A quick view of how the current ticket scope is spread across the full workflow."
+              series={statusSeries}
+            />
+            <SegmentedDistribution
+              title="Priority mix"
+              subtitle="Useful for spotting whether the workspace is leaning toward urgent or routine maintenance work."
+              series={prioritySeries}
+            />
+          </div>
+        </div>
+
+        <ReviewOversightPanel
+          totalTickets={totalTickets}
+          totalStaffReviews={totalStaffReviews}
+          totalAdminReviews={totalAdminReviews}
+          totalReconsiderationRequests={totalReconsiderationRequests}
         />
-        <HorizontalBarList
-          title={spotlight.title}
-          subtitle={spotlight.subtitle}
-          items={
-            spotlight.items.length > 0
-              ? spotlight.items
-              : [{ label: "No distribution available", value: 0, tone: "bg-slate-300", softTone: "bg-slate-100" }]
-          }
-        />
-        <InsightList title="What stands out" items={insights} />
+
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.95fr)]">
+          <HorizontalBarList
+            title="Category hotspots"
+            subtitle="The categories driving the most ticket activity in the current workspace."
+            items={
+              categorySeries.length > 0
+                ? categorySeries
+                : [{ label: "No category data yet", value: 0, tone: "bg-slate-300", softTone: "bg-slate-100" }]
+            }
+          />
+          <HorizontalBarList
+            title={spotlight.title}
+            subtitle={spotlight.subtitle}
+            items={
+              spotlight.items.length > 0
+                ? spotlight.items
+                : [{ label: "No distribution available", value: 0, tone: "bg-slate-300", softTone: "bg-slate-100" }]
+            }
+          />
+          <InsightList title="What stands out" items={insights} />
+        </div>
       </div>
     </section>
   );

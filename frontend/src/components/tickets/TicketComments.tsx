@@ -30,6 +30,7 @@ type TicketCommentsProps = {
   ticket: TicketDetail;
   comments: TicketComment[];
   busy?: boolean;
+  embedded?: boolean;
   onSubmit: (payload: CreateTicketCommentRequest) => Promise<void>;
   onUpdate: (commentId: number, payload: UpdateTicketCommentRequest) => Promise<void>;
   onDelete: (commentId: number) => Promise<void>;
@@ -47,6 +48,7 @@ export function TicketComments({
   ticket,
   comments,
   busy = false,
+  embedded = false,
   onSubmit,
   onUpdate,
   onDelete,
@@ -67,18 +69,31 @@ export function TicketComments({
     currentUser.role != null &&
     currentUser.id != null &&
     canCurrentUserAddInternalNote(currentUser.role, currentUser.id, ticket);
+  const wrapperClass = embedded
+    ? "rounded-[1.35rem] border border-white/80 bg-white/76 p-5 shadow-[0_14px_30px_rgba(15,23,42,0.05)]"
+    : "rounded-[1.5rem] border border-white/70 bg-white/85 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur";
+  const titleClass = embedded
+    ? "mt-3 text-xl font-semibold tracking-tight text-slate-950"
+    : "mt-3 text-2xl font-semibold tracking-tight text-slate-950";
+  const introClass = embedded
+    ? "mt-2 text-sm leading-7 text-slate-600"
+    : "mt-2 text-sm leading-7 text-slate-600";
+  const formSpacingClass = embedded
+    ? "mt-5 space-y-4 rounded-[1.35rem] border border-slate-200 bg-slate-50/80 p-4"
+    : "mt-6 space-y-4 rounded-[1.35rem] border border-slate-200 bg-slate-50/80 p-4";
+  const commentsSpacingClass = embedded ? "mt-5 space-y-4" : "mt-6 space-y-4";
 
   return (
-    <section className="rounded-[1.5rem] border border-white/70 bg-white/85 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur">
+    <section className={wrapperClass}>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
             Conversation
           </p>
-          <h3 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+          <h3 className={titleClass}>
             Comments and operational notes
           </h3>
-          <p className="mt-2 text-sm leading-7 text-slate-600">
+          <p className={introClass}>
             Public replies are visible to the reporter and assigned staff. Internal notes stay
             inside the operational queue.
           </p>
@@ -86,7 +101,7 @@ export function TicketComments({
       </div>
 
       <form
-        className="mt-6 space-y-4 rounded-[1.35rem] border border-slate-200 bg-slate-50/80 p-4"
+        className={formSpacingClass}
         onSubmit={async (event) => {
           event.preventDefault();
           setFormError(null);
@@ -174,7 +189,7 @@ export function TicketComments({
         </button>
       </form>
 
-      <div className="mt-6 space-y-4">
+      <div className={commentsSpacingClass}>
         {comments.length === 0 ? (
           <div className="rounded-[1.2rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-sm leading-7 text-slate-600">
             No comments on this ticket yet.

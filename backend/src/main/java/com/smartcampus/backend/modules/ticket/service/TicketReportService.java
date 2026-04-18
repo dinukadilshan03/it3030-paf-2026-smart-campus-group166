@@ -321,6 +321,7 @@ public class TicketReportService {
     }
 
     private TicketReportResponse toResponse(TicketReport report) {
+        ReportTicketMetadata ticketMetadata = extractReportTicketMetadata(report);
         return new TicketReportResponse(
                 report.getId(),
                 report.getGeneratedByUser().getId(),
@@ -331,10 +332,31 @@ public class TicketReportService {
                 report.getRecordCount(),
                 report.getFileName(),
                 report.getMimeType(),
+                ticketMetadata.ticketNumber(),
+                ticketMetadata.ticketTitle(),
                 report.getFilterSummary(),
                 report.getSummaryText(),
                 report.getNaturalLanguageRequest(),
                 report.getGeneratedAt());
+    }
+
+    private ReportTicketMetadata extractReportTicketMetadata(TicketReport report) {
+        if (report.getReportType() != TicketReportType.DETAIL) {
+            return new ReportTicketMetadata(null, null);
+        }
+
+        GenerateTicketReportRequest request = deserializeRequest(report.getFilterJson());
+        if (request == null) {
+            return new ReportTicketMetadata(null, null);
+        }
+
+        try {
+            Ticket ticket = resolveDetailedTicket(request);
+            return new ReportTicketMetadata(ticket.getTicketNumber(), ticket.getTitle());
+        } catch (RuntimeException ex) {
+            log.debug("Could not resolve ticket metadata for report={}", report.getId(), ex);
+            return new ReportTicketMetadata(normalizeOptionalText(request.ticketNumber()), null);
+        }
     }
 
     private void ensureCanAccessReport(UserRole membership, TicketReport report) {
@@ -393,6 +415,20 @@ public class TicketReportService {
         }
     }
 
+    private GenerateTicketReportRequest deserializeRequest(String value) {
+        String normalized = normalizeOptionalText(value);
+        if (normalized == null) {
+            return null;
+        }
+
+        try {
+            return objectMapper.readValue(normalized, GenerateTicketReportRequest.class);
+        } catch (JsonProcessingException ex) {
+            log.warn("Could not deserialize saved ticket report request", ex);
+            return null;
+        }
+    }
+
     private String resolveScopeLabel(RoleCode roleCode) {
         return switch (roleCode) {
             case ADMIN -> "All campus ticket records";
@@ -440,4 +476,6 @@ public class TicketReportService {
                 .reduce((left, right) -> left + " " + right)
                 .orElse(value);
     }
+
+    private record ReportTicketMetadata(String ticketNumber, String ticketTitle) {}
 }
