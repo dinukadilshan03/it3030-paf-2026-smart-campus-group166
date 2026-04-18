@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AssignmentDialog } from "@/components/tickets/AssignmentDialog";
 import { CreateTicketForm } from "@/components/tickets/CreateTicketForm";
@@ -72,15 +72,21 @@ type TicketWorkspacePageProps = {
   initialSelectedBundle: TicketBundle | null;
 };
 
-type FeedbackState =
-  | {
-      tone: "success" | "error";
-      message: string;
-    }
-  | null;
+type FeedbackState = {
+  tone: "success" | "error";
+  message: string;
+} | null;
 
+type TicketWorkspaceSection = "queue" | "detail" | "analytics" | "reports";
 type TicketQuickView = "ALL" | "OPEN" | "IN_PROGRESS" | "RESOLVED" | "FOCUS";
 type SnapshotTone = "slate" | "sky" | "amber" | "emerald" | "rose";
+
+const TICKET_WORKSPACE_SECTIONS: TicketWorkspaceSection[] = [
+  "queue",
+  "detail",
+  "analytics",
+  "reports",
+];
 
 function getWorkspaceHeading(role: CurrentUser["role"]) {
   switch (role) {
@@ -119,7 +125,10 @@ function getFocusMetricDescription(role: NonNullable<CurrentUser["role"]>) {
   }
 }
 
-function getQuickViewLabel(quickView: TicketQuickView, focusMetricLabel: string): string {
+function getQuickViewLabel(
+  quickView: TicketQuickView,
+  focusMetricLabel: string,
+): string {
   switch (quickView) {
     case "ALL":
       return "All in-scope tickets";
@@ -160,7 +169,7 @@ function getSnapshotToneClass(tone: SnapshotTone, active: boolean) {
   if (active) {
     switch (tone) {
       case "slate":
-        return `${baseClass} border-slate-900 bg-slate-950 text-white shadow-[0_18px_55px_rgba(15,23,42,0.2)]`;
+        return `${baseClass} border-cyan-400/70 bg-[linear-gradient(135deg,rgba(15,118,110,0.98),rgba(14,116,144,0.96),rgba(67,56,202,0.96))] text-white shadow-[0_18px_55px_rgba(14,116,144,0.24)]`;
       case "sky":
         return `${baseClass} border-sky-400 bg-sky-50 text-sky-950`;
       case "amber":
@@ -182,14 +191,23 @@ function isFocusTicket(
 ) {
   switch (role) {
     case "ADMIN":
-      return !ticket.assignedStaffUserId && !["CLOSED", "REJECTED"].includes(ticket.status);
+      return (
+        !ticket.assignedStaffUserId &&
+        !["CLOSED", "REJECTED"].includes(ticket.status)
+      );
     case "STAFF": {
       const firstResponseState = getFirstResponseTimerState(ticket, nowMs);
       const resolutionState = getResolutionTimerState(ticket, nowMs);
-      return firstResponseState.tone === "danger" || resolutionState.tone === "danger";
+      return (
+        firstResponseState.tone === "danger" ||
+        resolutionState.tone === "danger"
+      );
     }
     case "STUDENT":
-      return !ticket.firstRespondedAt && !["CLOSED", "REJECTED"].includes(ticket.status);
+      return (
+        !ticket.firstRespondedAt &&
+        !["CLOSED", "REJECTED"].includes(ticket.status)
+      );
   }
 }
 
@@ -213,8 +231,20 @@ function getTicketsForQuickView(
   }
 }
 
-function scrollToSection(section: HTMLElement | null) {
-  section?.scrollIntoView({ behavior: "smooth", block: "start" });
+function isTicketWorkspaceSection(
+  value: string,
+): value is TicketWorkspaceSection {
+  return TICKET_WORKSPACE_SECTIONS.includes(value as TicketWorkspaceSection);
+}
+
+function formatTicketSelectorDate(value: string) {
+  try {
+    return new Intl.DateTimeFormat("en-LK", {
+      dateStyle: "medium",
+    }).format(new Date(value));
+  } catch {
+    return value;
+  }
 }
 
 export function TicketWorkspacePage({
@@ -229,22 +259,24 @@ export function TicketWorkspacePage({
   initialSelectedBundle,
 }: TicketWorkspacePageProps) {
   const currentRole = currentUser.role ?? "STUDENT";
-  const queueSectionRef = useRef<HTMLElement | null>(null);
-  const detailSectionRef = useRef<HTMLElement | null>(null);
-  const analyticsSectionRef = useRef<HTMLElement | null>(null);
-  const reportsSectionRef = useRef<HTMLElement | null>(null);
   const [tickets, setTickets] = useState(initialTickets);
   const [categories, setCategories] = useState(initialCategories);
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(
     initialSelectedBundle?.detail.id ?? initialTickets[0]?.id ?? null,
   );
-  const [selectedBundle, setSelectedBundle] = useState<TicketBundle | null>(initialSelectedBundle);
+  const [selectedBundle, setSelectedBundle] = useState<TicketBundle | null>(
+    initialSelectedBundle,
+  );
   const [filters, setFilters] = useState<Required<TicketFilterValues>>({
     ...DEFAULT_TICKET_FILTERS,
   });
-  const [draftFilters, setDraftFilters] = useState<Required<TicketFilterValues>>({
+  const [draftFilters, setDraftFilters] = useState<
+    Required<TicketFilterValues>
+  >({
     ...DEFAULT_TICKET_FILTERS,
   });
+  const [activeSection, setActiveSection] =
+    useState<TicketWorkspaceSection>("queue");
   const [quickView, setQuickView] = useState<TicketQuickView>("ALL");
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [isListLoading, setIsListLoading] = useState(false);
@@ -255,6 +287,23 @@ export function TicketWorkspacePage({
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+
+  useEffect(() => {
+    const sectionFromHash = window.location.hash.replace("#", "").toLowerCase();
+    if (sectionFromHash && isTicketWorkspaceSection(sectionFromHash)) {
+      setActiveSection(sectionFromHash);
+    }
+  }, []);
+
+  useEffect(() => {
+    const currentUrl = new URL(window.location.href);
+    currentUrl.hash = activeSection === "queue" ? "" : activeSection;
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`,
+    );
+  }, [activeSection]);
 
   const nowMs = Date.now();
 
@@ -277,13 +326,46 @@ export function TicketWorkspacePage({
         ? slaRiskCount
         : awaitingFirstResponseCount;
   const focusMetricTone: SnapshotTone =
-    currentRole === "ADMIN" ? "amber" : currentRole === "STAFF" ? "rose" : "sky";
+    currentRole === "ADMIN"
+      ? "amber"
+      : currentRole === "STAFF"
+        ? "rose"
+        : "sky";
   const activeQuickViewLabel = getQuickViewLabel(quickView, focusMetricLabel);
-  const visibleTickets = getTicketsForQuickView(tickets, quickView, currentRole, nowMs);
+  const visibleTickets = getTicketsForQuickView(
+    tickets,
+    quickView,
+    currentRole,
+    nowMs,
+  );
   const emptyStateMessage =
     tickets.length === 0
       ? "No tickets match the current role scope and server filters."
       : "No tickets match the selected snapshot card. Choose another card or clear the quick view.";
+  const sectionNavItems = [
+    {
+      id: "queue" as const,
+      label: "Queue",
+      description: `${visibleTickets.length} shown`,
+    },
+    {
+      id: "detail" as const,
+      label: "Selected ticket",
+      description: selectedBundle
+        ? selectedBundle.detail.ticketNumber
+        : "Open a ticket from the queue",
+    },
+    {
+      id: "analytics" as const,
+      label: "Analytics",
+      description: "Trends and pressure signals",
+    },
+    {
+      id: "reports" as const,
+      label: "Reports",
+      description: "Downloads and guided summaries",
+    },
+  ];
 
   async function syncWorkspace(
     nextFilters: Required<TicketFilterValues>,
@@ -302,7 +384,9 @@ export function TicketWorkspacePage({
       preferredTicketId,
     );
     const nextBundle =
-      nextSelectedTicketId == null ? null : await getTicketBundleClient(nextSelectedTicketId);
+      nextSelectedTicketId == null
+        ? null
+        : await getTicketBundleClient(nextSelectedTicketId);
 
     setTickets(nextTickets);
     setSelectedTicketId(nextSelectedTicketId);
@@ -327,9 +411,29 @@ export function TicketWorkspacePage({
     return nextCategories;
   }
 
+  async function refreshQueue() {
+    setFeedback(null);
+    setIsListLoading(true);
+    try {
+      await syncWorkspace(filters, selectedTicketId);
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        message: getTicketErrorMessage(
+          error,
+          "Could not refresh the ticket queue.",
+        ),
+      });
+    } finally {
+      setIsListLoading(false);
+    }
+  }
+
   async function applyQuickView(nextQuickView: TicketQuickView) {
     const resolvedQuickView =
-      nextQuickView === quickView && nextQuickView !== "ALL" ? "ALL" : nextQuickView;
+      nextQuickView === quickView && nextQuickView !== "ALL"
+        ? "ALL"
+        : nextQuickView;
     const nextVisibleTickets = getTicketsForQuickView(
       tickets,
       resolvedQuickView,
@@ -344,10 +448,10 @@ export function TicketWorkspacePage({
     setQuickView(resolvedQuickView);
     setSelectedTicketId(nextSelectedTicketId);
     setFeedback(null);
+    setActiveSection("queue");
 
     if (nextSelectedTicketId == null) {
       setSelectedBundle(null);
-      scrollToSection(queueSectionRef.current);
       return;
     }
 
@@ -367,8 +471,6 @@ export function TicketWorkspacePage({
         setIsDetailLoading(false);
       }
     }
-
-    scrollToSection(queueSectionRef.current);
   }
 
   async function handleSelectTicket(ticketId: number) {
@@ -377,11 +479,14 @@ export function TicketWorkspacePage({
     setIsDetailLoading(true);
     try {
       setSelectedBundle(await getTicketBundleClient(ticketId));
-      scrollToSection(detailSectionRef.current);
+      setActiveSection("detail");
     } catch (error) {
       setFeedback({
         tone: "error",
-        message: getTicketErrorMessage(error, "Could not load the selected ticket."),
+        message: getTicketErrorMessage(
+          error,
+          "Could not load the selected ticket.",
+        ),
       });
     } finally {
       setIsDetailLoading(false);
@@ -389,28 +494,29 @@ export function TicketWorkspacePage({
   }
 
   return (
-    <>
+    <div className="ticketing-workspace">
       <section className="space-y-8">
         <section className="rounded-[1.9rem] border border-white/70 bg-white/85 p-8 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur">
-          <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-            <div className="max-w-4xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                Ticket workflow
-              </p>
-              <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-950">
-                {getWorkspaceHeading(currentUser.role)}
-              </h1>
-              <p className="mt-4 text-base leading-8 text-slate-600">
-                {getWorkspaceDescription(currentUser.role)}
-              </p>
-              <p className="mt-4 text-sm leading-7 text-slate-500">
-                Use the snapshot cards to move through the queue quickly, then jump straight into
-                the queue or the selected ticket workspace below.
-              </p>
-            </div>
+          <div className="flex flex-col gap-8">
+            <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+              <div className="max-w-4xl">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  Ticket workflow
+                </p>
+                <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-950">
+                  {getWorkspaceHeading(currentUser.role)}
+                </h1>
+                <p className="mt-4 text-base leading-8 text-slate-600">
+                  {getWorkspaceDescription(currentUser.role)}
+                </p>
+                <p className="mt-4 text-sm leading-7 text-slate-500">
+                  Use the ticket navigation bar below to open the queue,
+                  selected ticket, analytics, and reporting areas as separate
+                  workspace views.
+                </p>
+              </div>
 
-            <div className="flex flex-col items-start gap-3 xl:items-end">
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-3 xl:justify-end">
                 <button
                   type="button"
                   onClick={() => setCreateDialogOpen(true)}
@@ -430,70 +536,53 @@ export function TicketWorkspacePage({
                 <button
                   type="button"
                   disabled={isListLoading || isMutating}
-                  onClick={async () => {
-                    setFeedback(null);
-                    setIsListLoading(true);
-                    try {
-                      await syncWorkspace(filters, selectedTicketId);
-                    } catch (error) {
-                      setFeedback({
-                        tone: "error",
-                        message: getTicketErrorMessage(
-                          error,
-                          "Could not refresh the ticket queue.",
-                        ),
-                      });
-                    } finally {
-                      setIsListLoading(false);
-                    }
-                  }}
+                  onClick={refreshQueue}
                   className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Refresh queue
                 </button>
               </div>
-
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={() => scrollToSection(queueSectionRef.current)}
-                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  Jump to queue
-                </button>
-                <button
-                  type="button"
-                  onClick={() => scrollToSection(analyticsSectionRef.current)}
-                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  Jump to analytics
-                </button>
-                <button
-                  type="button"
-                  disabled={!selectedBundle}
-                  onClick={() => scrollToSection(detailSectionRef.current)}
-                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Jump to selected ticket
-                </button>
-                <button
-                  type="button"
-                  onClick={() => scrollToSection(reportsSectionRef.current)}
-                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  Jump to reports
-                </button>
-                {quickView !== "ALL" ? (
-                  <button
-                    type="button"
-                    onClick={() => applyQuickView("ALL")}
-                    className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                  >
-                    Clear quick view
-                  </button>
-                ) : null}
-              </div>
             </div>
+
+            <nav
+              aria-label="Ticket workspace sections"
+              className="rounded-[1.6rem] border border-slate-200/80 bg-slate-50/80 p-2"
+            >
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                {sectionNavItems.map((section) => {
+                  const isActive = activeSection === section.id;
+
+                  return (
+                    <button
+                      key={section.id}
+                      type="button"
+                      aria-current={isActive ? "page" : undefined}
+                      onClick={() => setActiveSection(section.id)}
+                      className={`rounded-[1.2rem] border px-4 py-4 text-left transition ${
+                        isActive
+                          ? "border-cyan-400/70 bg-[linear-gradient(135deg,rgba(15,118,110,0.98),rgba(14,116,144,0.96),rgba(67,56,202,0.96))] text-white shadow-[0_18px_40px_rgba(14,116,144,0.22)]"
+                          : "border-transparent bg-white/90 text-slate-900 hover:border-slate-200 hover:bg-white"
+                      }`}
+                    >
+                      <span
+                        className={`text-xs font-semibold uppercase tracking-[0.2em] ${
+                          isActive ? "text-white/70" : "text-slate-500"
+                        }`}
+                      >
+                        {section.label}
+                      </span>
+                      <p
+                        className={`mt-2 text-sm leading-6 ${
+                          isActive ? "text-white" : "text-slate-600"
+                        }`}
+                      >
+                        {section.description}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </nav>
           </div>
         </section>
 
@@ -509,420 +598,516 @@ export function TicketWorkspacePage({
           </p>
         ) : null}
 
-        <section className="space-y-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                Queue shortcuts
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                Click a card to focus the queue
-              </h2>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
-                These are quick queue controls, not the full analytics dashboard. Clicking a card
-                changes only the queue view below, so you can narrow work fast without losing your
-                search and filter setup.
-              </p>
-            </div>
-            <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
-              Viewing: {activeQuickViewLabel}
-            </div>
-          </div>
+        <div className="space-y-8">
+          {activeSection === "queue" ? (
+            <section className="space-y-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    Queue shortcuts
+                  </p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                    Click a card to focus the queue
+                  </h2>
+                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                    These are quick queue controls, not the full analytics
+                    dashboard. Clicking a card changes only the queue view
+                    below, so you can narrow work fast without losing your
+                    search and filter setup.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+                    Viewing: {activeQuickViewLabel}
+                  </div>
+                  {quickView !== "ALL" ? (
+                    <button
+                      type="button"
+                      onClick={() => applyQuickView("ALL")}
+                      className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                    >
+                      Clear quick view
+                    </button>
+                  ) : null}
+                </div>
+              </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            {[
-              {
-                id: "ALL" as const,
-                label: "Tickets in scope",
-                value: tickets.length,
-                tone: "slate" as const,
-                description: "Every ticket returned by the current queue filters.",
-              },
-              {
-                id: "OPEN" as const,
-                label: "Open",
-                value: openCount,
-                tone: "sky" as const,
-                description: "Freshly reported incidents waiting for active handling.",
-              },
-              {
-                id: "IN_PROGRESS" as const,
-                label: "In progress",
-                value: inProgressCount,
-                tone: "amber" as const,
-                description: "Issues with staff work already underway.",
-              },
-              {
-                id: "RESOLVED" as const,
-                label: "Resolved",
-                value: resolvedCount,
-                tone: "emerald" as const,
-                description: "Tickets fixed by staff and ready for final closure steps.",
-              },
-              {
-                id: "FOCUS" as const,
-                label: focusMetricLabel,
-                value: focusMetricValue,
-                tone: focusMetricTone,
-                description: getFocusMetricDescription(currentRole),
-              },
-            ].map((card) => {
-              const isActive = quickView === card.id;
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                {[
+                  {
+                    id: "ALL" as const,
+                    label: "Tickets in scope",
+                    value: tickets.length,
+                    tone: "slate" as const,
+                    description:
+                      "Every ticket returned by the current queue filters.",
+                  },
+                  {
+                    id: "OPEN" as const,
+                    label: "Open",
+                    value: openCount,
+                    tone: "sky" as const,
+                    description:
+                      "Freshly reported incidents waiting for active handling.",
+                  },
+                  {
+                    id: "IN_PROGRESS" as const,
+                    label: "In progress",
+                    value: inProgressCount,
+                    tone: "amber" as const,
+                    description: "Issues with staff work already underway.",
+                  },
+                  {
+                    id: "RESOLVED" as const,
+                    label: "Resolved",
+                    value: resolvedCount,
+                    tone: "emerald" as const,
+                    description:
+                      "Tickets fixed by staff and ready for final closure steps.",
+                  },
+                  {
+                    id: "FOCUS" as const,
+                    label: focusMetricLabel,
+                    value: focusMetricValue,
+                    tone: focusMetricTone,
+                    description: getFocusMetricDescription(currentRole),
+                  },
+                ].map((card) => {
+                  const isActive = quickView === card.id;
 
-              return (
-                <button
-                  key={card.id}
-                  type="button"
-                  aria-pressed={isActive}
-                  onClick={() => applyQuickView(card.id)}
-                  className={getSnapshotToneClass(card.tone, isActive)}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
+                  return (
+                    <button
+                      key={card.id}
+                      type="button"
+                      aria-pressed={isActive}
+                      onClick={() => applyQuickView(card.id)}
+                      className={getSnapshotToneClass(card.tone, isActive)}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p
+                            className={`text-sm font-medium ${
+                              isActive && card.tone === "slate"
+                                ? "text-white/80"
+                                : "text-slate-600"
+                            }`}
+                          >
+                            {card.label}
+                          </p>
+                          <p className="mt-3 text-3xl font-semibold tracking-tight">
+                            {card.value}
+                          </p>
+                        </div>
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
+                            isActive
+                              ? card.tone === "slate"
+                                ? "bg-white/15 text-white"
+                                : "bg-white text-slate-900"
+                              : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {isActive ? "Active" : "View"}
+                        </span>
+                      </div>
                       <p
-                        className={`text-sm font-medium ${
-                          isActive && card.tone === "slate" ? "text-white/80" : "text-slate-600"
+                        className={`mt-4 text-sm leading-6 ${
+                          isActive && card.tone === "slate"
+                            ? "text-white/80"
+                            : "text-slate-600"
                         }`}
                       >
-                        {card.label}
+                        {card.description}
                       </p>
-                      <p className="mt-3 text-3xl font-semibold tracking-tight">{card.value}</p>
-                    </div>
-                    <span
-                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
-                        isActive
-                          ? card.tone === "slate"
-                            ? "bg-white/15 text-white"
-                            : "bg-white text-slate-900"
-                          : "bg-slate-100 text-slate-700"
-                      }`}
-                    >
-                      {isActive ? "Active" : "View"}
-                    </span>
-                  </div>
-                  <p
-                    className={`mt-4 text-sm leading-6 ${
-                      isActive && card.tone === "slate" ? "text-white/80" : "text-slate-600"
-                    }`}
-                  >
-                    {card.description}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
-          <section ref={queueSectionRef} className="scroll-mt-28 space-y-5">
-            <div className="px-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                Queue and filters
-              </p>
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
-                  Browse the active queue
-                </h2>
-                <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
-                  {visibleTickets.length} shown
-                  {visibleTickets.length !== tickets.length ? ` / ${tickets.length}` : ""}
-                </span>
+                    </button>
+                  );
+                })}
               </div>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
-                {getQuickViewDescription(quickView, focusMetricLabel, currentRole)}
-              </p>
-            </div>
+            </section>
+          ) : null}
 
-            <TicketFilters
-              value={draftFilters}
-              categories={categories}
-              busy={isListLoading || isMutating}
-              onChange={setDraftFilters}
-              onApply={async () => {
-                setFeedback(null);
-                setIsListLoading(true);
-                try {
-                  await syncWorkspace(draftFilters, selectedTicketId);
-                } catch (error) {
-                  setFeedback({
-                    tone: "error",
-                    message: getTicketErrorMessage(error, "Could not apply ticket filters."),
-                  });
-                } finally {
-                  setIsListLoading(false);
-                }
-              }}
-              onReset={async () => {
-                const nextFilters = { ...DEFAULT_TICKET_FILTERS };
-                setDraftFilters(nextFilters);
-                setFeedback(null);
-                setIsListLoading(true);
-                try {
-                  await syncWorkspace(nextFilters, selectedTicketId);
-                } catch (error) {
-                  setFeedback({
-                    tone: "error",
-                    message: getTicketErrorMessage(error, "Could not reset the ticket filters."),
-                  });
-                } finally {
-                  setIsListLoading(false);
-                }
-              }}
-            />
-
-            <TicketList
-              role={currentRole}
-              currentUserId={currentUser.id}
-              tickets={visibleTickets}
-              totalTickets={tickets.length}
-              activeViewLabel={activeQuickViewLabel}
-              emptyStateMessage={emptyStateMessage}
-              selectedTicketId={selectedTicketId}
-              busy={isListLoading}
-              onSelect={async (ticketId) => {
-                await handleSelectTicket(ticketId);
-              }}
-            />
-          </section>
-
-          <section ref={detailSectionRef} className="scroll-mt-28 space-y-5">
-            <div className="px-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                Selected ticket workspace
-              </p>
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
-                  Inspect, communicate, and act
-                </h2>
-                {selectedBundle ? (
+          {activeSection === "queue" ? (
+            <section className="space-y-5">
+              <div className="px-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  Queue and filters
+                </p>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+                    Browse the active queue
+                  </h2>
                   <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
-                    {selectedBundle.detail.ticketNumber}
+                    {visibleTickets.length} shown
+                    {visibleTickets.length !== tickets.length
+                      ? ` / ${tickets.length}`
+                      : ""}
                   </span>
-                ) : null}
+                </div>
+                <p className="mt-2 text-sm leading-7 text-slate-600">
+                  {getQuickViewDescription(
+                    quickView,
+                    focusMetricLabel,
+                    currentRole,
+                  )}
+                </p>
               </div>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
-                {selectedBundle
-                  ? "Review the selected issue context, people, timers, comments, and evidence images in one place."
-                  : "Choose a ticket from the queue to open the full detail workspace."}
-              </p>
-            </div>
 
-            <TicketDetailPanel
-              currentUser={currentUser}
-              ticketBundle={selectedBundle}
-              detailLoading={isDetailLoading}
-              busy={isMutating}
-              onOpenEdit={() => setEditDialogOpen(true)}
-              onOpenAssignment={() => setAssignmentDialogOpen(true)}
-              onOpenStatus={() => setStatusDialogOpen(true)}
-              onDeleteTicket={async () => {
-                if (selectedTicketId == null) return;
+              <TicketFilters
+                value={draftFilters}
+                categories={categories}
+                busy={isListLoading || isMutating}
+                onChange={setDraftFilters}
+                onApply={async () => {
+                  setFeedback(null);
+                  setIsListLoading(true);
+                  try {
+                    await syncWorkspace(draftFilters, selectedTicketId);
+                  } catch (error) {
+                    setFeedback({
+                      tone: "error",
+                      message: getTicketErrorMessage(
+                        error,
+                        "Could not apply ticket filters.",
+                      ),
+                    });
+                  } finally {
+                    setIsListLoading(false);
+                  }
+                }}
+                onReset={async () => {
+                  const nextFilters = { ...DEFAULT_TICKET_FILTERS };
+                  setDraftFilters(nextFilters);
+                  setFeedback(null);
+                  setIsListLoading(true);
+                  try {
+                    await syncWorkspace(nextFilters, selectedTicketId);
+                  } catch (error) {
+                    setFeedback({
+                      tone: "error",
+                      message: getTicketErrorMessage(
+                        error,
+                        "Could not reset the ticket filters.",
+                      ),
+                    });
+                  } finally {
+                    setIsListLoading(false);
+                  }
+                }}
+              />
 
-                const deletedTicketNumber =
-                  selectedBundle?.detail.ticketNumber ?? `Ticket #${selectedTicketId}`;
-                setFeedback(null);
-                setIsMutating(true);
-                try {
-                  await deleteTicketClient(selectedTicketId);
-                  await syncWorkspace(filters, null);
-                  setFeedback({
-                    tone: "success",
-                    message:
-                      currentRole === "ADMIN"
-                        ? `${deletedTicketNumber} deleted successfully.`
-                        : `${deletedTicketNumber} withdrawn successfully.`,
-                  });
-                } catch (error) {
-                  setFeedback({
-                    tone: "error",
-                    message: getTicketErrorMessage(error, "Could not remove the ticket."),
-                  });
-                } finally {
-                  setIsMutating(false);
-                }
-              }}
-              onRequestReconsideration={async (note) => {
-                if (selectedTicketId == null) return;
+              <TicketList
+                role={currentRole}
+                currentUserId={currentUser.id}
+                tickets={visibleTickets}
+                totalTickets={tickets.length}
+                activeViewLabel={activeQuickViewLabel}
+                emptyStateMessage={emptyStateMessage}
+                selectedTicketId={selectedTicketId}
+                busy={isListLoading}
+                onSelect={async (ticketId) => {
+                  await handleSelectTicket(ticketId);
+                }}
+              />
+            </section>
+          ) : null}
 
-                setFeedback(null);
-                setIsMutating(true);
-                try {
-                  await requestTicketReconsiderationClient(selectedTicketId, { note });
-                  await syncWorkspace(filters, selectedTicketId);
-                  setFeedback({
-                    tone: "success",
-                    message: "Reconsideration request sent to admin for review.",
-                  });
-                } catch (error) {
-                  setFeedback({
-                    tone: "error",
-                    message: getTicketErrorMessage(
-                      error,
-                      "Could not send the reconsideration request.",
-                    ),
-                  });
-                  throw error;
-                } finally {
-                  setIsMutating(false);
-                }
-              }}
-              onCreateComment={async (payload: CreateTicketCommentRequest) => {
-                if (selectedTicketId == null) return;
+          {activeSection === "detail" ? (
+            <section className="space-y-5">
+              <div className="px-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  Selected ticket workspace
+                </p>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+                    Inspect, communicate, and act
+                  </h2>
+                  {tickets.length > 1 ? (
+                    <div className="w-full max-w-md">
+                      <label className="block">
+                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Switch ticket
+                        </span>
+                        <select
+                          aria-label="Select another ticket"
+                          value={selectedTicketId == null ? "" : String(selectedTicketId)}
+                          disabled={isDetailLoading || isMutating}
+                          onChange={(event) => {
+                            const nextTicketId = Number(event.target.value);
+                            if (Number.isFinite(nextTicketId)) {
+                              void handleSelectTicket(nextTicketId);
+                            }
+                          }}
+                          className="w-full rounded-[1rem] border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-[0_10px_30px_rgba(15,23,42,0.06)] outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {selectedTicketId == null ? (
+                            <option value="">Choose a ticket</option>
+                          ) : null}
+                          {tickets.map((ticket) => (
+                            <option key={ticket.id} value={ticket.id}>
+                              {`${ticket.title} • ${formatTicketSelectorDate(ticket.createdAt)}`}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  ) : selectedBundle ? (
+                    <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+                      {selectedBundle.detail.ticketNumber}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-2 text-sm leading-7 text-slate-600">
+                  {selectedBundle
+                    ? "Review the selected issue context, people, timers, comments, and evidence images in one place."
+                    : "Choose a ticket from the queue to open the full detail workspace."}
+                </p>
+              </div>
 
-                setIsMutating(true);
-                try {
-                  await createTicketCommentClient(selectedTicketId, payload);
-                  await refreshSelectedBundle(selectedTicketId);
-                  setFeedback({
-                    tone: "success",
-                    message:
-                      payload.commentType === "INTERNAL_NOTE"
-                        ? "Internal note added."
-                        : "Ticket comment posted.",
-                  });
-                } catch (error) {
-                  throw error;
-                } finally {
-                  setIsMutating(false);
-                }
-              }}
-              onUpdateComment={async (
-                commentId: number,
-                payload: UpdateTicketCommentRequest,
-              ) => {
-                if (selectedTicketId == null) return;
+              <TicketDetailPanel
+                key={`${selectedBundle?.detail.id ?? "empty"}-${selectedBundle?.detail.updatedAt ?? "none"}`}
+                currentUser={currentUser}
+                ticketBundle={selectedBundle}
+                detailLoading={isDetailLoading}
+                busy={isMutating}
+                onOpenEdit={() => setEditDialogOpen(true)}
+                onOpenAssignment={() => setAssignmentDialogOpen(true)}
+                onOpenStatus={() => setStatusDialogOpen(true)}
+                onDeleteTicket={async () => {
+                  if (selectedTicketId == null) return;
 
-                setIsMutating(true);
-                try {
-                  await updateTicketCommentClient(selectedTicketId, commentId, payload);
-                  await refreshSelectedBundle(selectedTicketId);
-                  setFeedback({
-                    tone: "success",
-                    message: "Comment updated.",
-                  });
-                } catch (error) {
-                  throw error;
-                } finally {
-                  setIsMutating(false);
-                }
-              }}
-              onDeleteComment={async (commentId: number) => {
-                if (selectedTicketId == null) return;
+                  const deletedTicketNumber =
+                    selectedBundle?.detail.ticketNumber ??
+                    `Ticket #${selectedTicketId}`;
+                  setFeedback(null);
+                  setIsMutating(true);
+                  try {
+                    await deleteTicketClient(selectedTicketId);
+                    await syncWorkspace(filters, null);
+                    setFeedback({
+                      tone: "success",
+                      message:
+                        currentRole === "ADMIN"
+                          ? `${deletedTicketNumber} deleted successfully.`
+                          : `${deletedTicketNumber} withdrawn successfully.`,
+                    });
+                  } catch (error) {
+                    setFeedback({
+                      tone: "error",
+                      message: getTicketErrorMessage(
+                        error,
+                        "Could not remove the ticket.",
+                      ),
+                    });
+                  } finally {
+                    setIsMutating(false);
+                  }
+                }}
+                onRequestReconsideration={async (note) => {
+                  if (selectedTicketId == null) return;
 
-                setIsMutating(true);
-                try {
-                  await deleteTicketCommentClient(selectedTicketId, commentId);
-                  await refreshSelectedBundle(selectedTicketId);
-                  setFeedback({
-                    tone: "success",
-                    message: "Comment deleted.",
-                  });
-                } catch (error) {
-                  throw error;
-                } finally {
-                  setIsMutating(false);
-                }
-              }}
-              onCreateAttachment={async (payload) => {
-                if (selectedTicketId == null) return;
+                  setFeedback(null);
+                  setIsMutating(true);
+                  try {
+                    await requestTicketReconsiderationClient(selectedTicketId, {
+                      note,
+                    });
+                    await syncWorkspace(filters, selectedTicketId);
+                    setFeedback({
+                      tone: "success",
+                      message:
+                        "Reconsideration request sent to admin for review.",
+                    });
+                  } catch (error) {
+                    setFeedback({
+                      tone: "error",
+                      message: getTicketErrorMessage(
+                        error,
+                        "Could not send the reconsideration request.",
+                      ),
+                    });
+                    throw error;
+                  } finally {
+                    setIsMutating(false);
+                  }
+                }}
+                onCreateComment={async (
+                  payload: CreateTicketCommentRequest,
+                ) => {
+                  if (selectedTicketId == null) return;
 
-                setIsMutating(true);
-                try {
-                  await createTicketAttachmentClient(selectedTicketId, payload);
-                  await refreshSelectedBundle(selectedTicketId);
-                  setFeedback({
-                    tone: "success",
-                    message: "Attachment image uploaded.",
-                  });
-                } catch (error) {
-                  throw error;
-                } finally {
-                  setIsMutating(false);
-                }
-              }}
-              onDeleteAttachment={async (attachmentId) => {
-                if (selectedTicketId == null) return;
+                  setIsMutating(true);
+                  try {
+                    await createTicketCommentClient(selectedTicketId, payload);
+                    await refreshSelectedBundle(selectedTicketId);
+                    setFeedback({
+                      tone: "success",
+                      message:
+                        payload.commentType === "INTERNAL_NOTE"
+                          ? "Internal note added."
+                          : "Ticket comment posted.",
+                    });
+                  } catch (error) {
+                    throw error;
+                  } finally {
+                    setIsMutating(false);
+                  }
+                }}
+                onUpdateComment={async (
+                  commentId: number,
+                  payload: UpdateTicketCommentRequest,
+                ) => {
+                  if (selectedTicketId == null) return;
 
-                setFeedback(null);
-                setIsMutating(true);
-                try {
-                  await deleteTicketAttachmentClient(selectedTicketId, attachmentId);
-                  await refreshSelectedBundle(selectedTicketId);
-                  setFeedback({
-                    tone: "success",
-                    message: "Attachment image deleted.",
-                  });
-                } catch (error) {
-                  setFeedback({
-                    tone: "error",
-                    message: getTicketErrorMessage(
-                      error,
-                      "Could not delete the attachment image.",
-                    ),
-                  });
-                } finally {
-                  setIsMutating(false);
-                }
-              }}
-            />
-          </section>
+                  setIsMutating(true);
+                  try {
+                    await updateTicketCommentClient(
+                      selectedTicketId,
+                      commentId,
+                      payload,
+                    );
+                    await refreshSelectedBundle(selectedTicketId);
+                    setFeedback({
+                      tone: "success",
+                      message: "Comment updated.",
+                    });
+                  } catch (error) {
+                    throw error;
+                  } finally {
+                    setIsMutating(false);
+                  }
+                }}
+                onDeleteComment={async (commentId: number) => {
+                  if (selectedTicketId == null) return;
+
+                  setIsMutating(true);
+                  try {
+                    await deleteTicketCommentClient(
+                      selectedTicketId,
+                      commentId,
+                    );
+                    await refreshSelectedBundle(selectedTicketId);
+                    setFeedback({
+                      tone: "success",
+                      message: "Comment deleted.",
+                    });
+                  } catch (error) {
+                    throw error;
+                  } finally {
+                    setIsMutating(false);
+                  }
+                }}
+                onCreateAttachment={async (payload) => {
+                  if (selectedTicketId == null) return;
+
+                  setIsMutating(true);
+                  try {
+                    await createTicketAttachmentClient(
+                      selectedTicketId,
+                      payload,
+                    );
+                    await refreshSelectedBundle(selectedTicketId);
+                    setFeedback({
+                      tone: "success",
+                      message: "Attachment image uploaded.",
+                    });
+                  } catch (error) {
+                    throw error;
+                  } finally {
+                    setIsMutating(false);
+                  }
+                }}
+                onDeleteAttachment={async (attachmentId) => {
+                  if (selectedTicketId == null) return;
+
+                  setFeedback(null);
+                  setIsMutating(true);
+                  try {
+                    await deleteTicketAttachmentClient(
+                      selectedTicketId,
+                      attachmentId,
+                    );
+                    await refreshSelectedBundle(selectedTicketId);
+                    setFeedback({
+                      tone: "success",
+                      message: "Attachment image deleted.",
+                    });
+                  } catch (error) {
+                    setFeedback({
+                      tone: "error",
+                      message: getTicketErrorMessage(
+                        error,
+                        "Could not delete the attachment image.",
+                      ),
+                    });
+                  } finally {
+                    setIsMutating(false);
+                  }
+                }}
+              />
+            </section>
+          ) : null}
+
+          {activeSection === "analytics" ? (
+            <section className="space-y-5">
+              <div className="px-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  Analytics workspace
+                </p>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+                    Review trends, pressure, and hotspots
+                  </h2>
+                  <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+                    Based on current role scope
+                  </span>
+                </div>
+                <p className="mt-2 text-sm leading-7 text-slate-600">
+                  This section turns the current ticket workspace into charts
+                  and operational signals so student, staff, and admin users can
+                  understand what needs attention without reading the queue row
+                  by row.
+                </p>
+              </div>
+
+              <TicketAnalyticsPanel
+                tickets={tickets}
+                currentUser={currentUser}
+                categories={categories}
+              />
+            </section>
+          ) : null}
+
+          {activeSection === "reports" ? (
+            <section className="space-y-5">
+              <div className="px-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  Reports and assistant
+                </p>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+                    Generate downloads and guided summaries
+                  </h2>
+                </div>
+                <p className="mt-2 text-sm leading-7 text-slate-600">
+                  Build formal ticket reports, review previous downloads, and
+                  use the student assistant where it is enabled.
+                </p>
+              </div>
+
+              <TicketReportsPanel
+                currentUser={currentUser}
+                categories={categories}
+                locations={initialLocations}
+                resources={initialResources}
+                staffUsers={initialStaffUsers}
+                reporterUsers={initialReporterUsers}
+                selectedTicket={selectedBundle?.detail ?? null}
+                initialReports={initialReports}
+                onSelectTicket={handleSelectTicket}
+              />
+            </section>
+          ) : null}
         </div>
-
-        <section ref={analyticsSectionRef} className="scroll-mt-28 space-y-5">
-          <div className="px-1">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-              Analytics workspace
-            </p>
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
-                Review trends, pressure, and hotspots
-              </h2>
-              <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
-                Based on current role scope
-              </span>
-            </div>
-            <p className="mt-2 text-sm leading-7 text-slate-600">
-              This section turns the current ticket workspace into charts and operational signals
-              so student, staff, and admin users can understand what needs attention without
-              reading the queue row by row.
-            </p>
-          </div>
-
-          <TicketAnalyticsPanel
-            tickets={tickets}
-            currentUser={currentUser}
-            categories={categories}
-          />
-        </section>
-
-        <section ref={reportsSectionRef} className="scroll-mt-28 space-y-5">
-          <div className="px-1">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-              Reports and assistant
-            </p>
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
-                Generate downloads and guided summaries
-              </h2>
-            </div>
-            <p className="mt-2 text-sm leading-7 text-slate-600">
-              Build formal ticket reports, review previous downloads, and use the student
-              assistant where it is enabled.
-            </p>
-          </div>
-
-          <TicketReportsPanel
-            currentUser={currentUser}
-            categories={categories}
-            locations={initialLocations}
-            resources={initialResources}
-            staffUsers={initialStaffUsers}
-            reporterUsers={initialReporterUsers}
-            selectedTicket={selectedBundle?.detail ?? null}
-            initialReports={initialReports}
-            onSelectTicket={handleSelectTicket}
-          />
-        </section>
       </section>
 
       {createDialogOpen ? (
@@ -944,12 +1129,17 @@ export function TicketWorkspacePage({
             let createdTicketId: number | null = null;
 
             try {
-              const createdTicket = await createTicketClient(submission.request);
+              const createdTicket = await createTicketClient(
+                submission.request,
+              );
               createdTicketNumber = createdTicket.ticketNumber;
               createdTicketId = createdTicket.id;
 
               for (const attachment of submission.attachments) {
-                await createTicketAttachmentClient(createdTicket.id, attachment);
+                await createTicketAttachmentClient(
+                  createdTicket.id,
+                  attachment,
+                );
               }
 
               const nextFilters = { ...DEFAULT_TICKET_FILTERS };
@@ -963,14 +1153,15 @@ export function TicketWorkspacePage({
                     ? `${createdTicket.ticketNumber} created with ${submission.attachments.length} image attachment(s).`
                     : `${createdTicket.ticketNumber} created successfully.`,
               });
+              setActiveSection("detail");
               setCreateDialogOpen(false);
-              scrollToSection(detailSectionRef.current);
             } catch (error) {
               if (createdTicketId != null && createdTicketNumber) {
                 try {
                   const nextFilters = { ...DEFAULT_TICKET_FILTERS };
                   await syncWorkspace(nextFilters, createdTicketId);
                   setQuickView("ALL");
+                  setActiveSection("detail");
                 } catch {
                   // Best effort refresh after partial success.
                 }
@@ -983,10 +1174,18 @@ export function TicketWorkspacePage({
                 return;
               }
 
-              if (!(error instanceof TicketApiError && Object.keys(error.validationErrors).length > 0)) {
+              if (
+                !(
+                  error instanceof TicketApiError &&
+                  Object.keys(error.validationErrors).length > 0
+                )
+              ) {
                 setFeedback({
                   tone: "error",
-                  message: getTicketErrorMessage(error, "Could not create the ticket."),
+                  message: getTicketErrorMessage(
+                    error,
+                    "Could not create the ticket.",
+                  ),
                 });
               }
 
@@ -1117,7 +1316,10 @@ export function TicketWorkspacePage({
             setFeedback(null);
             setIsMutating(true);
             try {
-              const detail = await updateTicketCategoryClient(categoryId, payload);
+              const detail = await updateTicketCategoryClient(
+                categoryId,
+                payload,
+              );
               await refreshCategories();
               await syncWorkspace(filters, selectedTicketId);
               setFeedback({
@@ -1138,7 +1340,9 @@ export function TicketWorkspacePage({
 
               const nextFilters: Required<TicketFilterValues> =
                 filters.ticketCategoryId &&
-                !nextCategories.some((category) => category.id === filters.ticketCategoryId)
+                !nextCategories.some(
+                  (category) => category.id === filters.ticketCategoryId,
+                )
                   ? { ...filters, ticketCategoryId: "" }
                   : filters;
 
@@ -1150,7 +1354,10 @@ export function TicketWorkspacePage({
             } catch (error) {
               setFeedback({
                 tone: "error",
-                message: getTicketErrorMessage(error, "Could not delete the ticket category."),
+                message: getTicketErrorMessage(
+                  error,
+                  "Could not delete the ticket category.",
+                ),
               });
             } finally {
               setIsMutating(false);
@@ -1158,6 +1365,6 @@ export function TicketWorkspacePage({
           }}
         />
       ) : null}
-    </>
+    </div>
   );
 }

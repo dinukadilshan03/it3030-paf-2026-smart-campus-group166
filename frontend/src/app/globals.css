@@ -61,6 +61,11 @@ button {
   font: inherit;
 }
 
+.ticketing-workspace button:not(:disabled),
+.ticketing-workspace [role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   body {
     animation: page-fade 600ms ease-out;

@@ -15,6 +15,8 @@ public record TicketReportResponse(
         Integer recordCount,
         String fileName,
         String mimeType,
+        String ticketNumber,
+        String ticketTitle,
         String filterSummary,
         String summaryText,
         String naturalLanguageRequest,

@@ -3,7 +3,12 @@ import type { RoleCode } from "@/types/auth";
 
 export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
-export type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED" | "REJECTED";
+export type TicketStatus =
+  | "OPEN"
+  | "IN_PROGRESS"
+  | "RESOLVED"
+  | "CLOSED"
+  | "REJECTED";
 
 export type CommentType = "PUBLIC_REPLY" | "INTERNAL_NOTE" | "STATUS_NOTE";
 
@@ -322,6 +327,8 @@ export type TicketReportRecord = {
   recordCount: number;
   fileName: string;
   mimeType: string;
+  ticketNumber: string | null;
+  ticketTitle: string | null;
   filterSummary: string | null;
   summaryText: string | null;
   naturalLanguageRequest: string | null;
