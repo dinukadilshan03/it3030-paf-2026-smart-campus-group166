@@ -247,10 +247,12 @@ export function BookingDetailPanel({
 
       <style jsx>{`
         .booking-detail-panel {
-          padding: 1.5rem;
-          background: white;
-          border-radius: 4px;
-          border: 1px solid #e0e0e0;
+          padding: 2rem;
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(91, 76, 243, 0.02) 100%);
+          border-radius: 1rem;
+          border: 1px solid rgba(91, 76, 243, 0.15);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+          backdrop-filter: blur(10px);
         }
 
         .panel-header {
@@ -258,132 +260,151 @@ export function BookingDetailPanel({
           justify-content: space-between;
           align-items: center;
           gap: 1rem;
-          margin-bottom: 1.5rem;
-          padding-bottom: 1rem;
-          border-bottom: 1px solid #e0e0e0;
+          margin-bottom: 2rem;
+          padding-bottom: 1.5rem;
+          border-bottom: 2px solid rgba(91, 76, 243, 0.15);
         }
 
         .panel-header h2 {
           margin: 0;
-          font-size: 1.5rem;
+          font-size: 1.75rem;
+          font-weight: 700;
+          background: linear-gradient(135deg, #5b4cf3 0%, #06b6d4 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          letter-spacing: -0.5px;
         }
 
         .status-badge {
           display: inline-block;
-          padding: 0.375rem 1rem;
-          border-radius: 12px;
+          padding: 0.5rem 1.25rem;
+          border-radius: 0.625rem;
           font-size: 0.75rem;
-          font-weight: 600;
+          font-weight: 700;
           text-transform: uppercase;
           white-space: nowrap;
+          letter-spacing: 0.5px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .status-badge.status-pending {
-          background-color: #fff3cd;
-          color: #856404;
+          background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+          color: white;
         }
 
         .status-badge.status-approved {
-          background-color: #d4edda;
-          color: #155724;
+          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+          color: white;
         }
 
         .status-badge.status-rejected {
-          background-color: #f8d7da;
-          color: #721c24;
+          background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+          color: white;
         }
 
         .status-badge.status-cancelled {
-          background-color: #e2e3e5;
-          color: #383d41;
+          background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+          color: white;
         }
 
         .panel-body {
           display: flex;
           flex-direction: column;
-          gap: 1.5rem;
-          margin-bottom: 1.5rem;
+          gap: 2rem;
+          margin-bottom: 2rem;
         }
 
         .detail-section h3 {
-          margin: 0 0 1rem;
-          font-size: 1rem;
-          color: #333;
+          margin: 0 0 1.25rem;
+          font-size: 1.0625rem;
+          font-weight: 700;
+          color: var(--primary);
           text-transform: uppercase;
           letter-spacing: 0.5px;
+          color: #5b4cf3;
         }
 
         .detail-group {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-          gap: 1rem;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 1.5rem;
         }
 
         .detail-item {
           display: flex;
           flex-direction: column;
-          gap: 0.25rem;
+          gap: 0.5rem;
+          padding: 1rem;
+          background: rgba(91, 76, 243, 0.04);
+          border-radius: 0.625rem;
+          border-left: 3px solid #5b4cf3;
         }
 
         .detail-item .label {
-          font-weight: 600;
-          color: #666;
-          font-size: 0.875rem;
+          font-weight: 700;
+          color: #475569;
+          font-size: 0.8125rem;
           text-transform: uppercase;
-          letter-spacing: 0.4px;
+          letter-spacing: 0.5px;
         }
 
         .detail-item .value {
-          color: #333;
-          font-size: 0.95rem;
+          color: #1e293b;
+          font-size: 1rem;
+          font-weight: 500;
           word-break: break-word;
         }
 
         .panel-actions {
           display: flex;
-          gap: 0.5rem;
+          gap: 0.875rem;
           flex-wrap: wrap;
-          padding: 1rem;
-          background-color: #f9f9f9;
-          border-radius: 4px;
-          border: 1px solid #e0e0e0;
+          padding: 1.5rem;
+          background: linear-gradient(135deg, rgba(91, 76, 243, 0.08) 0%, rgba(6, 182, 212, 0.08) 100%);
+          border-radius: 0.875rem;
+          border: 1px solid rgba(91, 76, 243, 0.15);
         }
 
         .panel-actions button {
-          padding: 0.625rem 1.25rem;
+          padding: 0.75rem 1.5rem;
           font-size: 0.875rem;
           border: none;
-          border-radius: 4px;
+          border-radius: 0.625rem;
           cursor: pointer;
           transition: all 0.2s ease;
-          font-weight: 500;
+          font-weight: 700;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .primary-button {
-          background-color: #0066cc;
+          background: linear-gradient(135deg, #5b4cf3 0%, #7c63f8 100%);
           color: white;
         }
 
         .primary-button:hover:not(:disabled) {
-          background-color: #0052a3;
+          box-shadow: 0 4px 16px rgba(91, 76, 243, 0.3);
+          transform: translateY(-2px);
         }
 
         .danger-button {
-          background-color: #dc3545;
+          background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
           color: white;
         }
 
         .danger-button:hover:not(:disabled) {
-          background-color: #c82333;
+          box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
+          transform: translateY(-2px);
         }
 
         .secondary-button {
-          background-color: #6c757d;
+          background: linear-gradient(135deg, #64748b 0%, #475569 100%);
           color: white;
         }
 
         .secondary-button:hover:not(:disabled) {
-          background-color: #5a6268;
+          box-shadow: 0 4px 16px rgba(71, 85, 105, 0.3);
+          transform: translateY(-2px);
         }
 
         button:disabled {

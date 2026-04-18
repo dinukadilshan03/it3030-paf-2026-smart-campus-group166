@@ -160,11 +160,13 @@ export function BookingList({
         }
 
         .booking-card {
-          padding: 1.5rem;
-          border: 1px solid #e0e0e0;
-          border-radius: 4px;
-          background: white;
-          transition: all 0.2s ease;
+          padding: 1.75rem;
+          border: 1px solid rgba(91, 76, 243, 0.15);
+          border-radius: 0.875rem;
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(91, 76, 243, 0.02) 100%);
+          backdrop-filter: blur(10px);
+          transition: all 0.3s ease;
+          box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
         }
 
         .booking-card.clickable {
@@ -172,69 +174,80 @@ export function BookingList({
         }
 
         .booking-card.clickable:hover {
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-          border-color: #0066cc;
+          box-shadow: 0 8px 32px rgba(91, 76, 243, 0.15);
+          border-color: rgba(91, 76, 243, 0.3);
+          transform: translateY(-2px);
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(91, 76, 243, 0.04) 100%);
         }
 
         .booking-header {
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
-          margin-bottom: 1rem;
+          margin-bottom: 1.25rem;
           gap: 1rem;
         }
 
         .booking-header h3 {
           margin: 0;
-          font-size: 1.125rem;
+          font-size: 1.25rem;
+          font-weight: 700;
+          background: linear-gradient(135deg, #5b4cf3 0%, #06b6d4 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          letter-spacing: -0.25px;
         }
 
         .booking-meta {
-          margin: 0.25rem 0 0;
+          margin: 0.375rem 0 0;
           font-size: 0.875rem;
-          color: #666;
+          color: #64748b;
+          font-weight: 500;
         }
 
         .status-badge {
           display: inline-block;
-          padding: 0.25rem 0.75rem;
-          border-radius: 12px;
+          padding: 0.5rem 1rem;
+          border-radius: 0.625rem;
           font-size: 0.75rem;
-          font-weight: 600;
+          font-weight: 700;
           text-transform: uppercase;
           white-space: nowrap;
+          letter-spacing: 0.5px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .status-badge.status-pending {
-          background-color: #fff3cd;
-          color: #856404;
+          background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+          color: white;
         }
 
         .status-badge.status-approved {
-          background-color: #d4edda;
-          color: #155724;
+          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+          color: white;
         }
 
         .status-badge.status-rejected {
-          background-color: #f8d7da;
-          color: #721c24;
+          background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+          color: white;
         }
 
         .status-badge.status-cancelled {
-          background-color: #e2e3e5;
-          color: #383d41;
+          background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+          color: white;
         }
 
         .booking-details {
-          margin-bottom: 1rem;
+          margin-bottom: 1.25rem;
         }
 
         .detail-row {
           display: grid;
           grid-template-columns: 150px 1fr;
           gap: 1rem;
-          padding: 0.5rem 0;
-          border-bottom: 1px solid #f0f0f0;
+          padding: 0.75rem 0;
+          border-bottom: 1px solid rgba(91, 76, 243, 0.08);
         }
 
         .detail-row:last-child {
@@ -242,56 +255,65 @@ export function BookingList({
         }
 
         .detail-row .label {
-          font-weight: 500;
-          color: #666;
+          font-weight: 700;
+          color: #475569;
           font-size: 0.875rem;
+          text-transform: uppercase;
+          letter-spacing: 0.25px;
+          color: var(--primary);
         }
 
         .detail-row .value {
-          color: #333;
-          font-size: 0.875rem;
+          color: #1e293b;
+          font-size: 0.9375rem;
+          font-weight: 500;
         }
 
         .booking-actions {
           display: flex;
-          gap: 0.5rem;
+          gap: 0.75rem;
           flex-wrap: wrap;
         }
 
         .booking-actions button {
-          padding: 0.5rem 1rem;
+          padding: 0.65rem 1.25rem;
           font-size: 0.875rem;
+          font-weight: 600;
           border: none;
-          border-radius: 4px;
+          border-radius: 0.625rem;
           cursor: pointer;
           transition: all 0.2s ease;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .primary-button {
-          background-color: #0066cc;
+          background: linear-gradient(135deg, #5b4cf3 0%, #7c63f8 100%);
           color: white;
         }
 
         .primary-button:hover:not(:disabled) {
-          background-color: #0052a3;
+          box-shadow: 0 4px 16px rgba(91, 76, 243, 0.3);
+          transform: translateY(-2px);
         }
 
         .danger-button {
-          background-color: #dc3545;
+          background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
           color: white;
         }
 
         .danger-button:hover:not(:disabled) {
-          background-color: #c82333;
+          box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
+          transform: translateY(-2px);
         }
 
         .secondary-button {
-          background-color: #6c757d;
+          background: linear-gradient(135deg, #64748b 0%, #475569 100%);
           color: white;
         }
 
         .secondary-button:hover:not(:disabled) {
-          background-color: #5a6268;
+          box-shadow: 0 4px 16px rgba(71, 85, 105, 0.3);
+          transform: translateY(-2px);
         }
 
         button:disabled {
@@ -300,9 +322,11 @@ export function BookingList({
         }
 
         .muted {
-          color: #999;
+          color: #94a3b8;
           text-align: center;
-          padding: 2rem;
+          padding: 3rem 2rem;
+          font-size: 1rem;
+          font-weight: 500;
         }
       `}</style>
     </div>
