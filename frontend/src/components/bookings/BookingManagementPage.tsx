@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Trash2, XCircle } from "lucide-react";
 import type { BookingSummaryResponse } from "@/lib/bookings/types";
 import type { CurrentUser } from "@/types/auth";
 import type { Resource } from "@/lib/resources/types";
@@ -13,7 +14,8 @@ import { BookingCalendar } from "./BookingCalendar";
 interface ReviewAction {
   bookingId: number;
   reason: string;
-  decision: "APPROVE" | "REJECT" | "CANCEL";
+  decision: "APPROVE" | "REJECT" | "CANCEL" | "DELETE";
+  bookingStatus?: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
 }
 
 type TabType = "pending" | "approved" | "rejected" | "cancelled" | "all";
@@ -196,6 +198,16 @@ export function BookingManagementPage({
     setShowReviewDialog(true);
   };
 
+  const handleDeleteClick = (bookingId: number, status: string) => {
+    setPendingAction({
+      bookingId,
+      reason: "",
+      decision: "DELETE",
+      bookingStatus: status as any,
+    });
+    setShowReviewDialog(true);
+  };
+
   const handleConfirmReview = async () => {
     if (!pendingAction) return;
 
@@ -203,13 +215,18 @@ export function BookingManagementPage({
     setActionInProgress(pendingAction.bookingId);
 
     try {
-      const isCancel = pendingAction.decision === "CANCEL";
-      const endpoint = isCancel ? "cancel" : "review";
-
+      let endpoint = "review";
+      
+      if (pendingAction.decision === "CANCEL") {
+        endpoint = "cancel";
+      } else if (pendingAction.decision === "DELETE") {
+        endpoint = "delete";
+      }
+      
       const requestBody: Record<string, unknown> = {};
 
       // For review (approve/reject), include decision
-      if (!isCancel) {
+      if (pendingAction.decision !== "CANCEL" && pendingAction.decision !== "DELETE") {
         requestBody.decision = pendingAction.decision;
       }
 
@@ -229,11 +246,14 @@ export function BookingManagementPage({
       });
       if (!response.ok) {
         const errorData = (await response.json().catch(() => ({}))) as { message?: string };
-        throw new Error(errorData.message || `Failed to ${isCancel ? "cancel" : "review"} booking`);
+        const actionName = pendingAction.decision === "DELETE" ? "delete" : pendingAction.decision === "CANCEL" ? "cancel" : "review";
+        throw new Error(errorData.message || `Failed to ${actionName} booking`);
       }
 
       let message = "";
-      if (isCancel) {
+      if (pendingAction.decision === "DELETE") {
+        message = "Booking deleted successfully!";
+      } else if (pendingAction.decision === "CANCEL") {
         message = "Booking cancelled successfully!";
       } else if (pendingAction.decision === "APPROVE") {
         message = "Booking approved successfully!";
@@ -407,9 +427,33 @@ export function BookingManagementPage({
                       </h3>
                       <p className="booking-meta">Code: {booking.resourceCode}</p>
                     </div>
-                    <span className={`status-badge status-${booking.status.toLowerCase()}`}>
-                      {booking.status}
-                    </span>
+                    <div className="header-actions">
+                      <span className={`status-badge status-${booking.status.toLowerCase()}`}>
+                        {booking.status}
+                      </span>
+                      {(booking.status === "PENDING" || booking.status === "APPROVED" || booking.status === "REJECTED") && (
+                        <>
+                          <button
+                            className="icon-button delete-icon"
+                            onClick={() => handleDeleteClick(booking.id, booking.status)}
+                            title="Delete booking"
+                            disabled={actionInProgress === booking.id}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                          {(booking.status === "APPROVED" || booking.status === "PENDING") && (
+                            <button
+                              className="icon-button cancel-icon"
+                              onClick={() => handleStudentCancelClick(booking.id)}
+                              title="Cancel booking"
+                              disabled={actionInProgress === booking.id}
+                            >
+                              <XCircle size={18} />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   <div className="booking-details">
@@ -576,9 +620,33 @@ export function BookingManagementPage({
                       </h3>
                       <p className="booking-meta">Code: {booking.resourceCode}</p>
                     </div>
-                    <span className={`status-badge status-${booking.status.toLowerCase()}`}>
-                      {booking.status}
-                    </span>
+                    <div className="header-actions">
+                      <span className={`status-badge status-${booking.status.toLowerCase()}`}>
+                        {booking.status}
+                      </span>
+                      {(booking.status === "PENDING" || booking.status === "APPROVED" || booking.status === "REJECTED") && (
+                        <>
+                          <button
+                            className="icon-button delete-icon"
+                            onClick={() => handleDeleteClick(booking.id, booking.status)}
+                            title="Delete booking"
+                            disabled={actionInProgress === booking.id}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                          {(booking.status === "APPROVED" || booking.status === "PENDING") && (
+                            <button
+                              className="icon-button cancel-icon"
+                              onClick={() => handleStudentCancelClick(booking.id)}
+                              title="Cancel booking"
+                              disabled={actionInProgress === booking.id}
+                            >
+                              <XCircle size={18} />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   <div className="booking-details">
@@ -606,19 +674,6 @@ export function BookingManagementPage({
                       <span className="value">{formatDateTime(booking.createdAt)}</span>
                     </div>
                   </div>
-
-                  {/* Action Button - Only for Pending or Approved */}
-                  {(booking.status === "PENDING" || booking.status === "APPROVED") && (
-                    <div className="booking-actions">
-                      <button
-                        className="danger-button"
-                        onClick={() => handleStudentCancelClick(booking.id)}
-                        disabled={actionInProgress === booking.id}
-                      >
-                        {actionInProgress === booking.id ? "Processing..." : "Cancel Booking"}
-                      </button>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
@@ -635,14 +690,18 @@ export function BookingManagementPage({
                 ? "Approve Booking"
                 : pendingAction.decision === "REJECT"
                   ? "Reject Booking"
-                  : "Cancel Booking"}
+                  : pendingAction.decision === "DELETE"
+                    ? "Delete Booking"
+                    : "Cancel Booking"}
             </h2>
             <p>
               {pendingAction.decision === "APPROVE"
                 ? "Are you sure you want to approve this booking?"
                 : pendingAction.decision === "REJECT"
                   ? "Are you sure you want to reject this booking?"
-                  : "Are you sure you want to cancel this booking?"}
+                  : pendingAction.decision === "DELETE"
+                    ? "Are you sure you want to delete this booking? This action cannot be undone."
+                    : "Are you sure you want to cancel this booking?"}
             </p>
 
             <div className="field">
@@ -651,7 +710,9 @@ export function BookingManagementPage({
                   ? "Approval"
                   : pendingAction.decision === "REJECT"
                     ? "Rejection"
-                    : "Cancellation"}{" "}
+                    : pendingAction.decision === "DELETE"
+                      ? "Reason for deletion"
+                      : "Cancellation"}{" "}
                 Reason (optional)
                 <textarea
                   rows={4}
@@ -664,7 +725,9 @@ export function BookingManagementPage({
                       ? "Enter approval notes..."
                       : pendingAction.decision === "REJECT"
                         ? "Enter rejection reason..."
-                        : "Enter cancellation reason..."
+                        : pendingAction.decision === "DELETE"
+                          ? "Why are you deleting this booking?"
+                          : "Enter cancellation reason..."
                   }
                 />
               </label>
@@ -673,7 +736,9 @@ export function BookingManagementPage({
             <div className="button-row">
               <button
                 className={
-                  pendingAction.decision === "APPROVE" ? "primary-button" : "danger-button"
+                  pendingAction.decision === "APPROVE"
+                    ? "primary-button"
+                    : "danger-button"
                 }
                 onClick={handleConfirmReview}
               >
@@ -681,13 +746,15 @@ export function BookingManagementPage({
                   ? "Approve"
                   : pendingAction.decision === "REJECT"
                     ? "Reject"
-                    : "Cancel booking"}
+                    : pendingAction.decision === "DELETE"
+                      ? "Delete"
+                      : "Cancel booking"}
               </button>
               <button
                 className="secondary-button"
                 onClick={() => setShowReviewDialog(false)}
               >
-                Cancel
+                Go Back
               </button>
             </div>
           </div>
@@ -892,6 +959,47 @@ export function BookingManagementPage({
           gap: 1rem;
           border-bottom: 1px solid #f0f0f0;
           padding-bottom: 1rem;
+        }
+
+        .header-actions {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+        }
+
+        .icon-button {
+          background: none;
+          border: none;
+          padding: 0.4rem;
+          cursor: pointer;
+          color: #666;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 4px;
+          transition: all 0.2s ease;
+        }
+
+        .icon-button:hover:not(:disabled) {
+          background-color: #f5f5f5;
+          color: #d32f2f;
+        }
+
+        .icon-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .icon-button.delete-icon {
+          color: #d32f2f;
+        }
+
+        .icon-button.cancel-icon {
+          color: #ff9800;
+        }
+
+        .icon-button.cancel-icon:hover:not(:disabled) {
+          color: #f57c00;
         }
 
         .booking-header h3 {
