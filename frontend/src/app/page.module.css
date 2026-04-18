@@ -1,0 +1,97 @@
+.page {
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(86, 208, 210, 0.08), transparent 24%),
+    radial-gradient(circle at 86% 10%, rgba(95, 103, 255, 0.12), transparent 20%),
+    linear-gradient(180deg, #0a0f1c 0%, #09111f 50%, #070c16 100%);
+}
+
+.orb {
+  position: absolute;
+  height: 24rem;
+  width: 24rem;
+  border-radius: 9999px;
+  filter: blur(92px);
+  opacity: 0.52;
+  pointer-events: none;
+}
+
+.orbLeft {
+  inset-inline-start: -8rem;
+  inset-block-start: 1rem;
+  background: rgba(86, 208, 210, 0.14);
+}
+
+.orbRight {
+  inset-inline-end: -8rem;
+  inset-block-start: 32rem;
+  background: rgba(95, 103, 255, 0.14);
+}
+
+.heroScene {
+  position: relative;
+  overflow: hidden;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: #09121f;
+}
+
+.heroImage {
+  position: absolute;
+  inset: 0;
+  object-fit: cover;
+  object-position: center;
+}
+
+.heroOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(5, 10, 20, 0.18), rgba(5, 10, 20, 0.42));
+}
+
+.heroShadeLeft {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(6, 10, 20, 0.82) 0%, rgba(6, 10, 20, 0.48) 28%, rgba(6, 10, 20, 0.12) 56%, rgba(6, 10, 20, 0.28) 100%);
+}
+
+.heroFade {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  height: 10rem;
+  background: linear-gradient(180deg, rgba(2, 6, 18, 0), rgba(2, 6, 18, 0.82));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .orbLeft {
+    animation: floatLeft 14s ease-in-out infinite;
+  }
+
+  .orbRight {
+    animation: floatRight 16s ease-in-out infinite;
+  }
+}
+
+@keyframes floatLeft {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  50% {
+    transform: translate3d(18px, -20px, 0);
+  }
+}
+
+@keyframes floatRight {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  50% {
+    transform: translate3d(-20px, 18px, 0);
+  }
+}
