@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AIChat from "./AIChat";
 import { getResources, deleteResource } from "@/lib/resources/api";
 import { useRouter } from "next/navigation";
 
@@ -14,6 +15,10 @@ const [selectedLocation, setSelectedLocation] = useState("");
 
   // ✅ ADDED SEARCH STATE
   const [search, setSearch] = useState("");
+  // AI recommendation state
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<any[]>([]);
   const getDescription = (r: any) => {
   if (r.description) return r.description;
 
@@ -98,6 +103,9 @@ const [selectedLocation, setSelectedLocation] = useState("");
         onChange={(e) => setSearch(e.target.value)}
         style={styles.search}
       />
+
+      {/* AI Chat Component */}
+      <AIChat isAdmin={isAdmin} onUse={(name: string) => { setSearch(name); window.scrollTo({ top: 400, behavior: 'smooth' }); }} />
       <div style={styles.filterRow}>
   {/* CATEGORY FILTER */}
   <select
