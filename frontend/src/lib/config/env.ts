@@ -25,5 +25,5 @@ export function getFrontendApiBaseUrl() {
 }
 
 export function getBackendOAuthUrl() {
-  return `${getFrontendApiBaseUrl()}/oauth2/authorization/google`;
+  return `${getApiBaseUrl()}/oauth2/authorization/google`;
 }
