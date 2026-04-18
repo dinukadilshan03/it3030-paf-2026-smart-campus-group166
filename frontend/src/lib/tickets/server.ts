@@ -9,6 +9,7 @@ import type {
   TicketDetail,
   TicketFilters,
   TicketLocationOption,
+  TicketReportRecord,
   TicketResourceOption,
   TicketSummary,
 } from "@/lib/tickets/types";
@@ -86,4 +87,10 @@ export async function listTicketReporterUsersServer() {
   return Array.from(byId.values()).sort((left, right) =>
     left.displayName.localeCompare(right.displayName),
   );
+}
+
+export async function listTicketReportsServer() {
+  const response = await serverApiFetch("/api/v1/ticket-reports");
+  if (!response.ok) await throwTicketApiError(response);
+  return ((await response.json()) as TicketReportRecord[]) ?? [];
 }

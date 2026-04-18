@@ -33,7 +33,7 @@ export function AppShell({
 
   return (
     <div className="min-h-screen px-4 py-4 md:px-6 md:py-6">
-      <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-7xl overflow-visible rounded-[2rem] border border-white/70 bg-white/60 shadow-[0_30px_90px_rgba(15,23,42,0.10)] backdrop-blur md:min-h-[calc(100vh-3rem)]">
+      <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full overflow-visible rounded-[2rem] border border-white/70 bg-white/60 shadow-[0_30px_90px_rgba(15,23,42,0.10)] backdrop-blur md:min-h-[calc(100vh-3rem)]">
         <aside className="hidden w-72 flex-col border-r border-slate-200/80 bg-slate-100/70 p-6 md:flex">
           <div className="space-y-3">
             <span className="inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">

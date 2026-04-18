@@ -102,4 +102,25 @@ public class Ticket extends AuditableEntity {
 
     @Column(name = "closed_at")
     private LocalDateTime closedAt;
+
+    @Column(name = "reconsideration_note")
+    private String reconsiderationNote;
+
+    @Column(name = "reconsideration_requested_at")
+    private LocalDateTime reconsiderationRequestedAt;
+
+    @Column(name = "reconsideration_reviewed_at")
+    private LocalDateTime reconsiderationReviewedAt;
+
+    @Column(name = "reconsideration_request_count", nullable = false)
+    @Builder.Default
+    private Integer reconsiderationRequestCount = 0;
+
+    @Column(name = "staff_review_count", nullable = false)
+    @Builder.Default
+    private Integer staffReviewCount = 0;
+
+    @Column(name = "admin_review_count", nullable = false)
+    @Builder.Default
+    private Integer adminReviewCount = 0;
 }

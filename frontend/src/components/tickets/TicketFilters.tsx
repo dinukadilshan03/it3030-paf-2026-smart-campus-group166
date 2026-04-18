@@ -32,8 +32,8 @@ export function TicketFilters({
             Narrow the ticket list
           </h2>
           <p className="mt-2 text-sm leading-7 text-slate-600">
-            Search by ticket number, title, or category and focus the workspace on the
-            incidents that need action now.
+            Search by ticket number, title, or category, then combine these server filters
+            with the snapshot cards above for faster queue navigation.
           </p>
         </div>
       </div>
