@@ -3,8 +3,10 @@ package com.smartcampus.backend.modules.auth.service;
 import com.smartcampus.backend.common.entity.LocalAuthCredential;
 import com.smartcampus.backend.common.entity.User;
 import com.smartcampus.backend.common.entity.UserRole;
+import com.smartcampus.backend.common.enums.AuthEventType;
 import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.UserStatus;
+import com.smartcampus.backend.common.enums.UserLoginMethod;
 import com.smartcampus.backend.modules.auth.exception.AuthFailureCode;
 import com.smartcampus.backend.modules.auth.exception.AuthFlowException;
 import com.smartcampus.backend.modules.auth.repository.LocalAuthCredentialRepository;
@@ -31,6 +33,7 @@ public class LocalAuthenticationService {
     private final LocalAuthCredentialRepository localAuthCredentialRepository;
     private final PasswordEncoder passwordEncoder;
     private final SecurityContextRepository securityContextRepository;
+    private final AuthEventService authEventService;
 
     @Value("${app.auth.local.max-failed-attempts:5}")
     private int maxFailedAttempts;
@@ -47,11 +50,23 @@ public class LocalAuthenticationService {
         String email = normalizeEmail(rawEmail);
         UserRole membership = userRoleRepository.findActiveByUserEmail(email).orElse(null);
         if (membership == null) {
+            authEventService.record(
+                    null,
+                    email,
+                    AuthEventType.LOGIN_FAILURE,
+                    UserLoginMethod.LOCAL,
+                    AuthFailureCode.INVALID_CREDENTIALS.getQueryValue());
             throw invalidCredentials();
         }
 
         User user = membership.getUser();
         if (user.getStatus() != UserStatus.ACTIVE) {
+            authEventService.record(
+                    user,
+                    email,
+                    AuthEventType.LOGIN_FAILURE,
+                    UserLoginMethod.LOCAL,
+                    AuthFailureCode.ACCOUNT_BLOCKED.getQueryValue());
             throw new AuthFlowException(
                     AuthFailureCode.ACCOUNT_BLOCKED, "This account is not allowed to sign in");
         }
@@ -65,15 +80,41 @@ public class LocalAuthenticationService {
         LocalAuthCredential credential =
                 localAuthCredentialRepository.findByUserId(user.getId()).orElse(null);
         if (credential == null) {
+            authEventService.record(
+                    user,
+                    email,
+                    AuthEventType.LOGIN_FAILURE,
+                    UserLoginMethod.LOCAL,
+                    AuthFailureCode.INVALID_CREDENTIALS.getQueryValue());
             throw invalidCredentials();
         }
 
         if (isLocked(credential)) {
+            authEventService.record(
+                    user,
+                    email,
+                    AuthEventType.ACCOUNT_LOCKED,
+                    UserLoginMethod.LOCAL,
+                    AuthFailureCode.INVALID_CREDENTIALS.getQueryValue());
             throw invalidCredentials();
         }
 
         if (!passwordEncoder.matches(rawPassword, credential.getPasswordHash())) {
-            registerFailedAttempt(credential);
+            boolean accountLocked = registerFailedAttempt(credential);
+            authEventService.record(
+                    user,
+                    email,
+                    AuthEventType.LOGIN_FAILURE,
+                    UserLoginMethod.LOCAL,
+                    AuthFailureCode.INVALID_CREDENTIALS.getQueryValue());
+            if (accountLocked) {
+                authEventService.record(
+                        user,
+                        email,
+                        AuthEventType.ACCOUNT_LOCKED,
+                        UserLoginMethod.LOCAL,
+                        AuthFailureCode.INVALID_CREDENTIALS.getQueryValue());
+            }
             throw invalidCredentials();
         }
 
@@ -83,6 +124,12 @@ public class LocalAuthenticationService {
 
         user.setLastLoginAt(LocalDateTime.now());
         establishSession(request, response, membership);
+        authEventService.record(
+                user,
+                email,
+                AuthEventType.LOGIN_SUCCESS,
+                UserLoginMethod.LOCAL,
+                null);
         return membership;
     }
 
@@ -116,6 +163,12 @@ public class LocalAuthenticationService {
         localAuthCredentialRepository.save(credential);
 
         establishSession(request, response, membership);
+        authEventService.record(
+                membership.getUser(),
+                normalizeEmail(membership.getUser().getEmail()),
+                AuthEventType.PASSWORD_CHANGED,
+                UserLoginMethod.LOCAL,
+                null);
     }
 
     private void establishSession(
@@ -139,14 +192,17 @@ public class LocalAuthenticationService {
                 && credential.getLockedUntil().isAfter(LocalDateTime.now());
     }
 
-    private void registerFailedAttempt(LocalAuthCredential credential) {
+    private boolean registerFailedAttempt(LocalAuthCredential credential) {
         int failedAttempts = credential.getFailedAttemptCount() + 1;
         credential.setFailedAttemptCount(failedAttempts);
+        boolean accountLocked = false;
         if (failedAttempts >= Math.max(1, maxFailedAttempts)) {
             credential.setLockedUntil(LocalDateTime.now().plusMinutes(Math.max(1, lockDurationMinutes)));
             credential.setFailedAttemptCount(0);
+            accountLocked = true;
         }
         localAuthCredentialRepository.save(credential);
+        return accountLocked;
     }
 
     private AuthFlowException invalidCredentials() {

@@ -3,6 +3,7 @@ package com.smartcampus.backend.modules.ticket.repository;
 import com.smartcampus.backend.common.enums.TicketPriority;
 import com.smartcampus.backend.common.enums.TicketStatus;
 import com.smartcampus.backend.modules.ticket.entity.Ticket;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -109,4 +110,20 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
             @Param("priority") TicketPriority priority,
             @Param("ticketCategoryId") Long ticketCategoryId,
             @Param("search") String search);
+
+    @Query(
+            """
+            select distinct t
+            from Ticket t
+            join fetch t.ticketCategory tc
+            join fetch t.reporterUser ru
+            left join fetch t.assignedStaffUser asu
+            left join fetch t.resource r
+            left join fetch t.location l
+            where t.createdAt >= :start
+              and t.createdAt < :end
+            order by t.createdAt asc, t.id asc
+            """)
+    List<Ticket> findCreatedBetween(
+            @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }
