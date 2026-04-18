@@ -31,3 +31,8 @@ target/
 # -----------------------
 .DS_Store
 Thumbs.db
+
+# -----------------------
+# Codex Local Files
+# -----------------------
+.codex/skills/
