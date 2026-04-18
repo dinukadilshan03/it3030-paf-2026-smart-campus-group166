@@ -1,6 +1,16 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Bell, CalendarRange, LayoutDashboard, Menu, ShieldCheck } from "lucide-react";
+import {
+  Bell,
+  BookOpen,
+  CalendarRange,
+  ChartColumnIncreasing,
+  LayoutDashboard,
+  Menu,
+  ShieldCheck,
+  UserRound,
+  Users,
+} from "lucide-react";
 
 import { redirectIfAuthenticated } from "@/lib/auth/session";
 import styles from "./page.module.css";
@@ -12,19 +22,39 @@ const features = [
     description: "Reserve spaces and track approvals.",
   },
   {
+    icon: LayoutDashboard,
+    title: "Dashboard",
+    description: "Role-based landing pages for every user type.",
+  },
+  {
+    icon: BookOpen,
+    title: "Resources",
+    description: "Browse and manage campus resources in one place.",
+  },
+  {
     icon: ShieldCheck,
     title: "Support",
     description: "Manage tickets and campus issues.",
   },
   {
-    icon: LayoutDashboard,
-    title: "Dashboards",
-    description: "Role-based workspaces for every user.",
+    icon: Bell,
+    title: "Notifications",
+    description: "Stay on top of alerts, replies, and activity.",
   },
   {
-    icon: Bell,
-    title: "Updates",
-    description: "Stay on top of alerts and activity.",
+    icon: Users,
+    title: "Users",
+    description: "Admin tools for account oversight and access.",
+  },
+  {
+    icon: ChartColumnIncreasing,
+    title: "Analytics",
+    description: "Track usage and operational trends.",
+  },
+  {
+    icon: UserRound,
+    title: "Profile",
+    description: "Manage your shared account details and settings.",
   },
 ];
 
@@ -66,14 +96,14 @@ export default async function HomePage() {
               </div>
 
               <nav className="hidden items-center gap-8 text-sm text-white/80 md:flex">
-                <a href="#features" className="transition hover:text-white">
-                  Features
+                <a href="#platform" className="transition hover:text-white">
+                  Platform
+                </a>
+                <a href="#capabilities" className="transition hover:text-white">
+                  Capabilities
                 </a>
                 <a href="#overview" className="transition hover:text-white">
                   Overview
-                </a>
-                <a href="#access" className="transition hover:text-white">
-                  Access
                 </a>
               </nav>
 
@@ -115,18 +145,11 @@ export default async function HomePage() {
               </p>
 
               <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <Link
-                  href="/login"
-                  className="inline-flex min-w-[220px] items-center justify-center gap-2 rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-slate-950 shadow-[0_16px_36px_rgba(255,255,255,0.16)] transition hover:bg-slate-100"
-                >
-                  Login to SmartCampus
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
                 <a
-                  href="#features"
-                  className="inline-flex min-w-[190px] items-center justify-center rounded-full border border-cyan-300/70 bg-cyan-300 px-6 py-3.5 text-sm font-semibold text-slate-950 shadow-[0_16px_36px_rgba(103,232,249,0.18)] transition hover:bg-cyan-200 hover:border-cyan-200"
+                  href="#platform"
+                  className="inline-flex min-w-[220px] items-center justify-center rounded-full border border-cyan-300/70 bg-cyan-300 px-6 py-3.5 text-sm font-semibold text-slate-950 shadow-[0_16px_36px_rgba(103,232,249,0.18)] transition hover:bg-cyan-200 hover:border-cyan-200"
                 >
-                  Explore features
+                  Explore platform
                 </a>
               </div>
 
@@ -177,53 +200,64 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <section className="bg-[linear-gradient(180deg,rgba(7,12,22,0.96),rgba(7,12,22,0.98))] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        <section className="bg-[linear-gradient(180deg,rgba(7,12,22,0.96),rgba(7,12,22,0.99))] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
           <div
-            id="features"
-            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+            id="platform"
+            className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-[0_16px_40px_rgba(2,8,23,0.18)] backdrop-blur-xl"
           >
-            {features.map((feature) => {
-              const Icon = feature.icon;
-
-              return (
-                <article
-                  key={feature.title}
-                  className="rounded-[1.6rem] border border-white/10 bg-white/5 p-5 shadow-[0_16px_40px_rgba(2,8,23,0.18)] backdrop-blur-xl"
-                >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-950">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <h2 className="mt-4 text-xl font-semibold tracking-[-0.03em] text-white">
-                    {feature.title}
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 text-white/64">{feature.description}</p>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="bg-[linear-gradient(180deg,rgba(7,12,22,0.98),rgba(7,12,22,1))] px-4 pb-8 sm:px-6 lg:px-8">
-          <div
-            id="access"
-            className="border border-white/10 bg-white/5 px-6 py-6 shadow-[0_16px_40px_rgba(2,8,23,0.18)] backdrop-blur-xl sm:px-8"
-          >
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
+            <div className="grid gap-8 px-6 py-6 sm:px-8 sm:py-8 lg:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)] lg:items-start lg:px-10 lg:py-10">
+              <div className="max-w-xl">
                 <p className="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-white/45">
-                  Access
+                  Platform surface
                 </p>
-                <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">
-                  Google for students. Local login for staff and admins.
+                <h2 className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-white sm:text-4xl">
+                  Everything in the app, grouped into one clear overview.
                 </h2>
+                <p className="mt-4 max-w-lg text-sm leading-7 text-white/62 sm:text-base">
+                  The home page now reflects the actual product breadth: booking, resources,
+                  tickets, dashboards, notifications, users, analytics, and profile access.
+                </p>
+
+                <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-[1.35rem] border border-white/10 bg-black/10 p-4">
+                    <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-cyan-100/75">
+                      For students
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-white/74">
+                      Book spaces, check notifications, update profile details, and track support.
+                    </p>
+                  </div>
+                  <div className="rounded-[1.35rem] border border-white/10 bg-black/10 p-4">
+                    <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-cyan-100/75">
+                      For staff and admins
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-white/74">
+                      Manage tickets, resources, dashboards, and user oversight from one shell.
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <Link
-                href="/login"
-                className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
-              >
-                Continue to login
-              </Link>
+              <div id="capabilities" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {features.map((feature) => {
+                  const Icon = feature.icon;
+
+                  return (
+                    <article
+                      key={feature.title}
+                      className="rounded-[1.5rem] border border-white/10 bg-[rgba(255,255,255,0.04)] p-5 shadow-[0_18px_42px_rgba(2,8,23,0.16)] transition hover:-translate-y-0.5 hover:bg-[rgba(255,255,255,0.06)]"
+                    >
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-950 shadow-[0_10px_24px_rgba(255,255,255,0.12)]">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <h3 className="mt-4 text-lg font-semibold tracking-[-0.03em] text-white">
+                        {feature.title}
+                      </h3>
+                      <p className="mt-2 text-sm leading-6 text-white/64">{feature.description}</p>
+                    </article>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </section>
