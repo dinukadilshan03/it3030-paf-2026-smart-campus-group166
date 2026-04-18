@@ -15,6 +15,9 @@ type TicketListProps = {
   role: RoleCode;
   currentUserId: number | null;
   tickets: TicketSummary[];
+  totalTickets: number;
+  activeViewLabel: string;
+  emptyStateMessage: string;
   selectedTicketId: number | null;
   busy?: boolean;
   onSelect: (ticketId: number) => void;
@@ -59,6 +62,9 @@ export function TicketList({
   role,
   currentUserId,
   tickets,
+  totalTickets,
+  activeViewLabel,
+  emptyStateMessage,
   selectedTicketId,
   busy = false,
   onSelect,
@@ -74,15 +80,27 @@ export function TicketList({
             {describeTicketScope(role)}
           </h2>
           <p className="mt-2 text-sm leading-7 text-slate-600">
-            {busy ? "Refreshing tickets from the backend..." : `${tickets.length} ticket(s) loaded.`}
+            {busy
+              ? "Refreshing tickets from the backend..."
+              : `${tickets.length} ticket(s) shown in ${activeViewLabel}.`}
           </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700">
+              {activeViewLabel}
+            </span>
+            {tickets.length !== totalTickets ? (
+              <span className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 ring-1 ring-inset ring-slate-200">
+                {totalTickets} total in workspace
+              </span>
+            ) : null}
+          </div>
         </div>
       </div>
 
       <div className="mt-6 space-y-3">
         {tickets.length === 0 ? (
           <div className="rounded-[1.25rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-sm leading-7 text-slate-600">
-            No tickets match the current role scope and filters.
+            {emptyStateMessage}
           </div>
         ) : null}
 
@@ -124,6 +142,20 @@ export function TicketList({
               </div>
 
               <div className="mt-4">{TicketSupplementalText(role, currentUserId, ticket)}</div>
+
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
+                  Staff reviews {ticket.staffReviewCount}
+                </span>
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
+                  Admin reviews {ticket.adminReviewCount}
+                </span>
+                {ticket.reconsiderationRequestCount > 0 ? (
+                  <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-rose-700">
+                    Reconsideration {ticket.reconsiderationRequestCount}
+                  </span>
+                ) : null}
+              </div>
             </button>
           );
         })}

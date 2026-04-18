@@ -105,7 +105,7 @@ export function AdminAnalyticsWorkspace({
             </h1>
             <p className="mt-4 max-w-4xl text-base leading-8 text-slate-600">
               Move from management views to operational signals with usage analytics, auth health,
-              notification posture, and Gemini-assisted interpretation grounded in backend metrics.
+              notification posture, and AI-assisted interpretation grounded in backend metrics.
             </p>
           </div>
 
@@ -215,7 +215,7 @@ export function AdminAnalyticsWorkspace({
                   AI insights
                 </p>
                 <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-                  Gemini Flash-Lite
+                  AI summary layer
                 </h2>
               </div>
             </div>
@@ -295,7 +295,7 @@ export function AdminAnalyticsWorkspace({
                 onClick={handleAsk}
                 className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isAsking ? "Asking Gemini..." : "Ask analytics"}
+                {isAsking ? "Asking AI..." : "Ask analytics"}
               </button>
 
               {insights.followUpQuestions.length > 0 ? (

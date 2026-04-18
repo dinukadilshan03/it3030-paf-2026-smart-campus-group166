@@ -71,7 +71,7 @@ export function LocalSignInForm() {
           type="email"
           autoComplete="username"
           required
-          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-500"
+          className="w-full rounded-[1.1rem] border border-slate-300 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-500 focus:ring-4 focus:ring-slate-200/70"
           placeholder="staff.admin@example.com"
         />
       </div>
@@ -86,13 +86,13 @@ export function LocalSignInForm() {
           type="password"
           autoComplete="current-password"
           required
-          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-500"
+          className="w-full rounded-[1.1rem] border border-slate-300 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-500 focus:ring-4 focus:ring-slate-200/70"
           placeholder="Enter your password"
         />
       </div>
 
       {errorMessage ? (
-        <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-7 text-amber-800">
+        <p className="rounded-[1.1rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-7 text-amber-800">
           {errorMessage}
         </p>
       ) : null}
@@ -100,7 +100,7 @@ export function LocalSignInForm() {
       <button
         type="submit"
         disabled={isPending}
-        className="inline-flex w-full items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+        className="inline-flex w-full items-center justify-center rounded-full bg-slate-950 px-5 py-3.5 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(15,23,42,0.18)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
       >
         {isPending ? "Signing in..." : "Sign in with email and password"}
       </button>

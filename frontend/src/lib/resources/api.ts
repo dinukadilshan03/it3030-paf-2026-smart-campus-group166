@@ -14,13 +14,19 @@ export const getResources = async (search?: string) => {
     });
 
     if (!res.ok) {
-      console.error("GET ERROR:", await res.text());
+      const text = await res.text().catch(() => '');
+      // Avoid printing console.error in server components (dev overlay). Handle 401 quietly.
+      if (res.status === 401) {
+        console.warn('GET resources: authentication required');
+        return [];
+      }
+      console.warn("GET ERROR:", text);
       return [];
     }
 
     return await res.json();
   } catch (err) {
-    console.error("FETCH ERROR:", err);
+    console.warn("FETCH ERROR:", err);
     return [];
   }
 };
@@ -31,6 +37,11 @@ export const getCategories = async () => {
     const res = await fetch(`${BASE_URL}/resource-categories`, {
       credentials: "include",
     });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      console.warn('GET categories error:', res.status, text);
+      return [];
+    }
     return await res.json();
   } catch (err) {
     console.error(err);
@@ -44,6 +55,11 @@ export const getLocations = async () => {
     const res = await fetch(`${BASE_URL}/locations`, {
       credentials: "include",
     });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      console.warn('GET locations error:', res.status, text);
+      return [];
+    }
     return await res.json();
   } catch (err) {
     console.error(err);

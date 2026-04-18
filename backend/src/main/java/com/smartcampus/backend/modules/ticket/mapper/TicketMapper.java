@@ -60,8 +60,12 @@ public class TicketMapper {
                 ticket.getPriority(),
                 ticket.getStatus(),
                 ticket.getCreatedAt(),
+                ticket.getUpdatedAt(),
                 ticket.getFirstRespondedAt(),
-                ticket.getResolvedAt());
+                ticket.getResolvedAt(),
+                ticket.getReconsiderationRequestCount(),
+                ticket.getStaffReviewCount(),
+                ticket.getAdminReviewCount());
     }
 
     public TicketDetailResponse toDetail(Ticket ticket, List<TicketAssignmentResponse> assignmentHistory) {
@@ -99,12 +103,18 @@ public class TicketMapper {
                 ticket.getPreferredContactPhone(),
                 ticket.getResolutionSummary(),
                 ticket.getRejectionReason(),
+                ticket.getReconsiderationNote(),
                 ticket.getFirstRespondedAt(),
                 ticket.getResolvedAt(),
                 ticket.getRejectedAt(),
                 ticket.getClosedAt(),
+                ticket.getReconsiderationRequestedAt(),
+                ticket.getReconsiderationReviewedAt(),
                 ticket.getCreatedAt(),
                 ticket.getUpdatedAt(),
+                ticket.getReconsiderationRequestCount(),
+                ticket.getStaffReviewCount(),
+                ticket.getAdminReviewCount(),
                 assignmentHistory);
     }
 
