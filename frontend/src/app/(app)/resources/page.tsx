@@ -130,34 +130,45 @@ const [selectedLocation, setSelectedLocation] = useState("");
         </div>
       </div>
       <div style={styles.filterRow}>
-  {/* CATEGORY FILTER */}
-  <select
-    value={selectedCategory}
-    onChange={(e) => setSelectedCategory(e.target.value)}
-    style={styles.filter}
-  >
-    <option value="">All Categories</option>
-    {[...new Set(resources.map((r: any) => r.categoryName))].map(
-      (cat, i) => (
-        <option key={i} value={cat}>{cat}</option>
-      )
-    )}
-  </select>
+        <div style={styles.filterLeft}>
+          {/* CATEGORY FILTER */}
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            style={styles.filter}
+          >
+            <option value="">All Categories</option>
+            {[...new Set(resources.map((r: any) => r.categoryName))].map(
+              (cat, i) => (
+                <option key={i} value={cat}>{cat}</option>
+              )
+            )}
+          </select>
 
-  {/* LOCATION FILTER */}
-  <select
-    value={selectedLocation}
-    onChange={(e) => setSelectedLocation(e.target.value)}
-    style={styles.filter}
-  >
-    <option value="">All Locations</option>
-    {[...new Set(resources.map((r: any) => r.locationName))].map(
-      (loc, i) => (
-        <option key={i} value={loc}>{loc}</option>
-      )
-    )}
-  </select>
-</div>
+          {/* LOCATION FILTER */}
+          <select
+            value={selectedLocation}
+            onChange={(e) => setSelectedLocation(e.target.value)}
+            style={styles.filter}
+          >
+            <option value="">All Locations</option>
+            {[...new Set(resources.map((r: any) => r.locationName))].map(
+              (loc, i) => (
+                <option key={i} value={loc}>{loc}</option>
+              )
+            )}
+          </select>
+        </div>
+
+        <div style={styles.filterRight}>
+          <button
+            style={styles.analysisBtn}
+            onClick={() => router.push("/resources/analysis")}
+          >
+            Resource Analysis
+          </button>
+        </div>
+      </div>
 
       {/* LIST */}
       {filteredResources.length === 0 ? (
@@ -349,9 +360,33 @@ const styles: any = {
 
   filterRow: {
   display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
   gap: "10px",
   marginBottom: "15px",
 },
+
+  filterLeft: {
+    display: "flex",
+    gap: "10px",
+    alignItems: "center",
+  },
+
+  filterRight: {
+    display: "flex",
+    gap: "10px",
+    alignItems: "center",
+  },
+
+  analysisBtn: {
+    background: "#7c3aed",
+    color: "#fff",
+    padding: "10px 14px",
+    borderRadius: 8,
+    border: "none",
+    cursor: "pointer",
+    fontWeight: 600,
+  },
 
 filter: {
   padding: "10px",
