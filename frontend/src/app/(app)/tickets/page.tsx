@@ -10,8 +10,14 @@ import {
   listTicketsServer,
 } from "@/lib/tickets/server";
 
-export default async function TicketsPage() {
+export default async function TicketsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ticketId?: string }>;
+}) {
   const currentUser = await requireRole(["STUDENT", "STAFF", "ADMIN"]);
+  const resolvedSearchParams = await searchParams;
+  const requestedTicketId = Number(resolvedSearchParams.ticketId);
 
   const [tickets, categories, locations, resources, activeStaffUsers, reporterUsers] = await Promise.all([
     listTicketsServer(),
@@ -22,8 +28,12 @@ export default async function TicketsPage() {
     currentUser.role === "ADMIN" ? listTicketReporterUsersServer() : Promise.resolve([]),
   ]);
 
+  const selectedTicketId =
+    Number.isFinite(requestedTicketId) && tickets.some((ticket) => ticket.id === requestedTicketId)
+      ? requestedTicketId
+      : tickets[0]?.id;
   const initialSelectedBundle =
-    tickets.length > 0 ? await getTicketBundleServer(tickets[0].id) : null;
+    selectedTicketId != null ? await getTicketBundleServer(selectedTicketId) : null;
 
   return (
     <TicketWorkspacePage
