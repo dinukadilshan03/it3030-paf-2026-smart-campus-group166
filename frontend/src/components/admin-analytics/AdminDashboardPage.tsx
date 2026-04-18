@@ -53,7 +53,7 @@ export function AdminDashboardPage({
               </h1>
               <p className="mt-4 max-w-4xl text-base leading-8 text-slate-600">
                 Track demand, auth health, ticket pressure, and notification backlog from one
-                place, with Gemini-ready insights layered on top of trusted backend metrics.
+                place, with AI-ready insights layered on top of trusted backend metrics.
               </p>
               <p className="mt-6 text-sm font-medium text-slate-700">
                 Signed in as {displayName}
@@ -104,7 +104,7 @@ export function AdminDashboardPage({
                 AI briefing
               </p>
               <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-                Gemini insight layer
+                AI insight layer
               </h2>
             </div>
             <Link
