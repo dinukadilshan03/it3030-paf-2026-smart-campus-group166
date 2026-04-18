@@ -55,6 +55,11 @@ button {
   font: inherit;
 }
 
+.ticketing-workspace button:not(:disabled),
+.ticketing-workspace [role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
 .hero-glow {
   position: absolute;
   inset-block-start: 8%;
