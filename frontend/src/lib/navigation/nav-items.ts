@@ -32,6 +32,12 @@ const NAV_ITEMS: NavItem[] = [
     description: "Admin user management",
   },
   {
+    title: "Analytics",
+    href: "/analytics",
+    roles: ["ADMIN"],
+    description: "Admin intelligence workspace",
+  },
+  {
     title: "Notifications",
     href: "/notifications",
     roles: ["STUDENT", "STAFF", "ADMIN"],
