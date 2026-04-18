@@ -30,9 +30,7 @@ export const getResources = async (search?: string) => {
 
 export const getCategories = async () => {
   try {
-    const res = await fetch(`${BASE_URL}/resource-categories`, {
-      credentials: "include",
-    });
+    const res = await clientApiFetch("/api/v1/resource-categories");
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       console.warn('GET categories error:', res.status, text);
@@ -47,9 +45,7 @@ export const getCategories = async () => {
 
 export const getLocations = async () => {
   try {
-    const res = await fetch(`${BASE_URL}/locations`, {
-      credentials: "include",
-    });
+    const res = await clientApiFetch("/api/v1/locations");
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       console.warn('GET locations error:', res.status, text);
