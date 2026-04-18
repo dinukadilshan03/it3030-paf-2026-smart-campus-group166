@@ -35,7 +35,7 @@ import org.springframework.stereotype.Service;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class GeminiAnalyticsAiService implements AnalyticsAiService {
+public class ConfigurableAnalyticsAiService implements AnalyticsAiService {
 
     private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder().build();
 
@@ -45,10 +45,10 @@ public class GeminiAnalyticsAiService implements AnalyticsAiService {
     @Value("${app.analytics.ai.enabled:true}")
     private boolean aiEnabled;
 
-    @Value("${app.analytics.ai.provider:gemini}")
+    @Value("${app.analytics.ai.provider:groq}")
     private String provider;
 
-    @Value("${app.analytics.ai.model:gemini-2.5-flash-lite}")
+    @Value("${app.analytics.ai.model:llama-3.1-8b-instant}")
     private String model;
 
     @Value("${app.analytics.ai.timeout-ms:8000}")
@@ -337,11 +337,34 @@ public class GeminiAnalyticsAiService implements AnalyticsAiService {
     }
 
     private String normalizedProvider() {
-        return provider == null ? "gemini" : provider.trim().toLowerCase(Locale.ENGLISH);
+        return provider == null ? "groq" : provider.trim().toLowerCase(Locale.ENGLISH);
     }
 
     private String providerDisplayName() {
-        return isGroqProvider() ? "Groq" : "Gemini";
+        String normalized = normalizedProvider();
+        return switch (normalized) {
+            case "groq" -> "Groq";
+            case "gemini", "google", "google-genai" -> "Google AI";
+            case "" -> "AI";
+            default -> formatProviderName(normalized);
+        };
+    }
+
+    private String formatProviderName(String normalizedProvider) {
+        StringBuilder builder = new StringBuilder(normalizedProvider.length());
+        boolean capitalizeNext = true;
+        for (char ch : normalizedProvider.toCharArray()) {
+            if (ch == '-' || ch == '_' || ch == ' ') {
+                if (builder.length() > 0 && builder.charAt(builder.length() - 1) != ' ') {
+                    builder.append(' ');
+                }
+                capitalizeNext = true;
+                continue;
+            }
+            builder.append(capitalizeNext ? Character.toUpperCase(ch) : ch);
+            capitalizeNext = false;
+        }
+        return builder.length() == 0 ? "AI" : builder.toString();
     }
 
     private String stripCodeFences(String value) {
