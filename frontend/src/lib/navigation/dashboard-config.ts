@@ -85,6 +85,12 @@ const DASHBOARD_CARDS: Record<RoleCode, DashboardCard[]> = {
       roles: ["ADMIN"],
     },
     {
+      title: "Analytics",
+      href: "/analytics",
+      description: "Inspect usage analytics, auth health, and AI-generated operational insights.",
+      roles: ["ADMIN"],
+    },
+    {
       title: "Notifications",
       href: "/notifications",
       description: "Review booking decisions, ticket updates, and new comments.",

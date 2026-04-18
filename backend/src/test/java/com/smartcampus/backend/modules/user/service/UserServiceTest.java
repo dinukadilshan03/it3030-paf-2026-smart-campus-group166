@@ -14,7 +14,9 @@ import com.smartcampus.backend.common.entity.LocalAuthCredential;
 import com.smartcampus.backend.common.enums.UserLoginMethod;
 import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.UserStatus;
+import com.smartcampus.backend.common.service.AuditLogService;
 import com.smartcampus.backend.modules.auth.repository.LocalAuthCredentialRepository;
+import com.smartcampus.backend.modules.auth.service.AuthEventService;
 import com.smartcampus.backend.modules.user.dto.UpdateUserRequest;
 import com.smartcampus.backend.modules.user.dto.UserSummaryResponse;
 import com.smartcampus.backend.modules.user.mapper.UserMapper;
@@ -39,6 +41,8 @@ class UserServiceTest {
     @Mock private UserRoleRepository userRoleRepository;
     @Mock private LocalAuthCredentialRepository localAuthCredentialRepository;
     @Mock private PasswordEncoder passwordEncoder;
+    @Mock private AuditLogService auditLogService;
+    @Mock private AuthEventService authEventService;
 
     private UserService userService;
 
@@ -51,7 +55,9 @@ class UserServiceTest {
                         userRoleRepository,
                         localAuthCredentialRepository,
                         passwordEncoder,
-                        new UserMapper());
+                        new UserMapper(),
+                        auditLogService,
+                        authEventService);
     }
 
     @Test

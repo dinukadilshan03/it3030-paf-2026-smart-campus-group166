@@ -2,6 +2,7 @@ package com.smartcampus.backend.modules.booking.repository;
 
 import com.smartcampus.backend.common.enums.BookingStatus;
 import com.smartcampus.backend.modules.booking.entity.Booking;
+import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Collection;
@@ -61,6 +62,34 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             @Param("resourceId") Long resourceId,
             @Param("requesterUserId") Long requesterUserId,
             @Param("bookingDate") LocalDate bookingDate);
+
+    @Query(
+            """
+            select b
+            from Booking b
+            join fetch b.resource r
+            join fetch r.location l
+            join fetch b.requesterUser ru
+            where b.bookingDate >= :startDate
+              and b.bookingDate <= :endDate
+            order by b.bookingDate asc, b.startTime asc, b.id asc
+            """)
+    List<Booking> findScheduledBetween(
+            @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    @Query(
+            """
+            select b
+            from Booking b
+            join fetch b.resource r
+            join fetch r.location l
+            join fetch b.requesterUser ru
+            where b.createdAt >= :start
+              and b.createdAt < :end
+            order by b.createdAt asc, b.id asc
+            """)
+    List<Booking> findCreatedBetween(
+            @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     @Query(
             """

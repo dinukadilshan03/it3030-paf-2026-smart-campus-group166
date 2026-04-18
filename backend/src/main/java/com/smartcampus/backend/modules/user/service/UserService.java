@@ -4,12 +4,15 @@ import com.smartcampus.backend.common.entity.LocalAuthCredential;
 import com.smartcampus.backend.common.entity.Role;
 import com.smartcampus.backend.common.entity.User;
 import com.smartcampus.backend.common.entity.UserRole;
+import com.smartcampus.backend.common.enums.AuthEventType;
 import com.smartcampus.backend.common.enums.UserLoginMethod;
 import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.UserStatus;
 import com.smartcampus.backend.common.exception.ResourceConflictException;
 import com.smartcampus.backend.common.exception.ResourceNotFoundException;
+import com.smartcampus.backend.common.service.AuditLogService;
 import com.smartcampus.backend.modules.auth.repository.LocalAuthCredentialRepository;
+import com.smartcampus.backend.modules.auth.service.AuthEventService;
 import com.smartcampus.backend.modules.user.dto.CreateUserRequest;
 import com.smartcampus.backend.modules.user.dto.UpdateUserRequest;
 import com.smartcampus.backend.modules.user.dto.UserDetailResponse;
@@ -19,6 +22,7 @@ import com.smartcampus.backend.modules.user.repository.RoleRepository;
 import com.smartcampus.backend.modules.user.repository.UserRepository;
 import com.smartcampus.backend.modules.user.repository.UserRoleRepository;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -37,6 +41,8 @@ public class UserService {
     private final LocalAuthCredentialRepository localAuthCredentialRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
+    private final AuditLogService auditLogService;
+    private final AuthEventService authEventService;
 
     @Transactional(readOnly = true)
     public List<UserSummaryResponse> getUsers(RoleCode role, UserStatus status, String search) {
@@ -109,6 +115,17 @@ public class UserService {
                         .build();
         User savedUser = userRepository.save(user);
         userRoleRepository.save(UserRole.builder().user(savedUser).role(role).isActive(true).build());
+        Map<String, Object> createdState = new LinkedHashMap<>();
+        createdState.put("email", savedUser.getEmail());
+        createdState.put("displayName", savedUser.getDisplayName());
+        createdState.put("role", role.getCode().name());
+        createdState.put("status", savedUser.getStatus().name());
+        auditLogService.log(
+                "USER",
+                savedUser.getId(),
+                "CREATED",
+                null,
+                createdState);
 
         return toUserDetail(savedUser, role.getCode());
     }
@@ -116,6 +133,7 @@ public class UserService {
     @Transactional
     public UserDetailResponse updateUser(Long id, UpdateUserRequest request) {
         User user = getManagedUser(id);
+        Map<String, Object> previousState = buildUserSnapshot(user);
         userMapper.applyUpdates(
                 user,
                 request.firstName(),
@@ -125,6 +143,7 @@ public class UserService {
                 request.profileImageUrl());
 
         User savedUser = userRepository.save(user);
+        auditLogService.log("USER", savedUser.getId(), "PROFILE_UPDATED", previousState, buildUserSnapshot(savedUser));
         UserRole activeRole = getActiveRole(savedUser.getId());
         return toUserDetail(savedUser, activeRole.getRole().getCode());
     }
@@ -135,6 +154,7 @@ public class UserService {
         validateManagedRole(roleCode);
         UserRole currentRole = getActiveRole(user.getId());
         if (currentRole.getRole().getCode() != roleCode) {
+            String previousRole = currentRole.getRole().getCode().name();
             currentRole.setIsActive(false);
             currentRole.setEndedAt(LocalDateTime.now());
             userRoleRepository.save(currentRole);
@@ -144,6 +164,12 @@ public class UserService {
                             .findByCode(roleCode)
                             .orElseThrow(() -> new ResourceNotFoundException("Role not found for code: " + roleCode));
             userRoleRepository.save(UserRole.builder().user(user).role(role).isActive(true).build());
+            auditLogService.log(
+                    "USER",
+                    user.getId(),
+                    "ROLE_CHANGED",
+                    Map.of("role", previousRole),
+                    Map.of("role", roleCode.name()));
         }
 
         UserRole refreshedRole = getActiveRole(user.getId());
@@ -155,8 +181,17 @@ public class UserService {
         User user = getManagedUser(id);
         UserRole activeRole = getActiveRole(user.getId());
         validateAdminAvailability(user, activeRole.getRole().getCode(), status);
+        UserStatus previousStatus = user.getStatus();
         user.setStatus(status);
         User savedUser = userRepository.save(user);
+        if (previousStatus != status) {
+            auditLogService.log(
+                    "USER",
+                    savedUser.getId(),
+                    "STATUS_CHANGED",
+                    Map.of("status", previousStatus.name()),
+                    Map.of("status", status.name()));
+        }
         return toUserDetail(savedUser, activeRole.getRole().getCode());
     }
 
@@ -176,6 +211,12 @@ public class UserService {
                         .mustChangePassword(true)
                         .lastPasswordChangedAt(LocalDateTime.now())
                         .build());
+        authEventService.record(
+                user,
+                normalizeRequiredEmail(user.getEmail()),
+                AuthEventType.LOCAL_CREDENTIALS_CREATED,
+                UserLoginMethod.LOCAL,
+                null);
 
         return toUserDetail(user, activeRole.getRole().getCode());
     }
@@ -196,6 +237,12 @@ public class UserService {
         credential.setLockedUntil(null);
         credential.setLastPasswordChangedAt(LocalDateTime.now());
         localAuthCredentialRepository.save(credential);
+        authEventService.record(
+                user,
+                normalizeRequiredEmail(user.getEmail()),
+                AuthEventType.LOCAL_PASSWORD_RESET,
+                UserLoginMethod.LOCAL,
+                null);
 
         return toUserDetail(user, activeRole.getRole().getCode());
     }
@@ -204,7 +251,16 @@ public class UserService {
     public UserDetailResponse deleteLocalCredentials(Long id) {
         User user = getManagedUser(id);
         UserRole activeRole = getActiveRole(user.getId());
+        boolean hadCredentials = localAuthCredentialRepository.existsByUserId(user.getId());
         localAuthCredentialRepository.deleteByUserId(user.getId());
+        if (hadCredentials) {
+            authEventService.record(
+                    user,
+                    normalizeRequiredEmail(user.getEmail()),
+                    AuthEventType.LOCAL_CREDENTIALS_DELETED,
+                    UserLoginMethod.LOCAL,
+                    null);
+        }
         return toUserDetail(user, activeRole.getRole().getCode());
     }
 
@@ -241,6 +297,18 @@ public class UserService {
 
     private String normalizeRequiredEmail(String email) {
         return email == null ? null : email.trim().toLowerCase();
+    }
+
+    private Map<String, Object> buildUserSnapshot(User user) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("email", user.getEmail());
+        snapshot.put("firstName", user.getFirstName());
+        snapshot.put("lastName", user.getLastName());
+        snapshot.put("displayName", user.getDisplayName());
+        snapshot.put("phone", user.getPhone());
+        snapshot.put("profileImageUrl", user.getProfileImageUrl());
+        snapshot.put("status", user.getStatus() == null ? null : user.getStatus().name());
+        return snapshot;
     }
 
     private String trimToNull(String value) {
