@@ -6,6 +6,7 @@ import type { CurrentUser } from "@/types/auth";
 import type { Resource } from "@/lib/resources/types";
 import { getResources } from "@/lib/resources/api";
 import NLBookingInput from "@/components/booking/NLBookingInput";
+import { BookingAnalytics } from "./BookingAnalytics";
 import { CreateBookingForm } from "./CreateBookingForm";
 import { BookingCalendar } from "./BookingCalendar";
 
