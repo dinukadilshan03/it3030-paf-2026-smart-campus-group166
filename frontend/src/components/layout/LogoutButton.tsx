@@ -26,7 +26,7 @@ export function LogoutButton() {
     <button
       type="button"
       onClick={handleLogout}
-      className="inline-flex items-center justify-center rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
+      className="inline-flex items-center justify-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-50"
     >
       {isPending ? "Signing out..." : "Logout"}
     </button>
