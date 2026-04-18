@@ -84,6 +84,7 @@ public class BookingService {
 
         validateTimeRange(request.bookingDate(), request.startTime(), request.endTime());
         Resource resource = resourceService.getManagedResource(request.resourceId());
+        validateCapacity(resource, request.expectedAttendees());
         validateResourceBookable(resource, request.bookingDate(), request.startTime(), request.endTime());
         validateOverlap(resource.getId(), request.bookingDate(), request.startTime(), request.endTime(), null);
 
@@ -244,6 +245,19 @@ public class BookingService {
         if (!fitsAvailableWindow) {
             throw new ResourceConflictException(
                     "Requested booking time is outside the configured availability windows");
+        }
+    }
+
+    private void validateCapacity(Resource resource, Integer expectedAttendees) {
+        if (expectedAttendees == null || resource.getCapacity() == null) {
+            return;
+        }
+
+        if (expectedAttendees > resource.getCapacity()) {
+            throw new IllegalArgumentException(
+                    "Exceeded capacity for this resource. Maximum allowed is "
+                            + resource.getCapacity()
+                            + " attendees.");
         }
     }
 

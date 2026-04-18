@@ -275,6 +275,32 @@ class BookingServiceTest {
     }
 
     @Test
+    void createRejectsWhenExpectedAttendeesExceedResourceCapacity() {
+        User student = buildUser(50L, "student6@example.com", "Student Six");
+        UserRole membership = buildMembership(student, RoleCode.STUDENT);
+        Resource resource = buildResource(17L, true, ResourceStatus.ACTIVE);
+        resource.setCapacity(20);
+        CreateBookingRequest request =
+                new CreateBookingRequest(
+                        17L,
+                        LocalDate.now().plusDays(1),
+                        LocalTime.of(11, 0),
+                        LocalTime.of(12, 0),
+                        "Workshop",
+                        25,
+                        null);
+
+        when(currentUserService.getCurrentUserRole()).thenReturn(Optional.of(membership));
+        when(resourceService.getManagedResource(17L)).thenReturn(resource);
+
+        assertThatThrownBy(() -> bookingService.create(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Exceeded capacity")
+                .hasMessageContaining("20");
+        verify(bookingRepository, never()).save(any(Booking.class));
+    }
+
+    @Test
     void studentCannotReadAnotherUsersBooking() {
         User requester = buildUser(6L, "owner@example.com", "Owner");
         User viewer = buildUser(7L, "viewer@example.com", "Viewer");

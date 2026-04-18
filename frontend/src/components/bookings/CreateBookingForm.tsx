@@ -97,6 +97,9 @@ export function CreateBookingForm({
       r.resourceCode.toLowerCase().includes(resourceSearch.toLowerCase())
   );
 
+  const selectedResource =
+    resources.find((resource) => resource.id === formData.resourceId) ?? null;
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
@@ -128,6 +131,16 @@ export function CreateBookingForm({
       // Validate booking date is not in the past
       if (isPastDate(formData.bookingDate)) {
         throw new Error("Cannot book for past dates. Please select a future date.");
+      }
+
+      if (
+        selectedResource?.capacity != null &&
+        formData.expectedAttendees != null &&
+        formData.expectedAttendees > selectedResource.capacity
+      ) {
+        throw new Error(
+          `Exceeded capacity for this resource. Maximum allowed is ${selectedResource.capacity} attendees.`
+        );
       }
 
       // Prepare the request
@@ -204,7 +217,7 @@ export function CreateBookingForm({
                 ))}
               </select>
               {filteredResources.length === 0 && resourceSearch && (
-                <p className="no-results">No resources found matching "{resourceSearch}"</p>
+                <p className="no-results">No resources found matching &quot;{resourceSearch}&quot;</p>
               )}
             </>
           )}
@@ -265,7 +278,13 @@ export function CreateBookingForm({
             onChange={handleChange}
             placeholder="Number of expected attendees"
             min="1"
+            max={selectedResource?.capacity ?? undefined}
           />
+          {selectedResource?.capacity != null && (
+            <p className="capacity-hint">
+              Maximum allowed for this resource: {selectedResource.capacity} attendees
+            </p>
+          )}
         </div>
 
         <div className="form-group">
@@ -449,6 +468,13 @@ export function CreateBookingForm({
           border-radius: 0.5rem;
           border-left: 3px solid #ff6b35;
           font-weight: 600;
+        }
+
+        .capacity-hint {
+          margin: 0;
+          color: #64748b;
+          font-size: 0.85rem;
+          font-weight: 500;
         }
       `}</style>
     </form>
