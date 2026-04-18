@@ -5,10 +5,10 @@ import type { BookingSummaryResponse } from "@/lib/bookings/types";
 import type { CurrentUser } from "@/types/auth";
 import type { Resource } from "@/lib/resources/types";
 import { getResources } from "@/lib/resources/api";
+import NLBookingInput from "@/components/booking/NLBookingInput";
 import { CreateBookingForm } from "./CreateBookingForm";
 import { BookingCalendar } from "./BookingCalendar";
 import { BookingAnalytics } from "./BookingAnalytics";
-import styles from "./BookingManagementPage.module.css";
 
 interface ReviewAction {
   bookingId: number;
@@ -459,6 +459,28 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
 
           {showCreateForm && (
             <div className="create-form-container">
+              <div className="ai-booking-section">
+                <NLBookingInput
+                  onSuccess={(message) => {
+                    setSuccessMessage(message);
+                    setShowCreateForm(false);
+                    setCalendarSelection(null);
+                    loadBookings();
+                    setTimeout(() => setSuccessMessage(""), 3000);
+                  }}
+                  onError={(err) => setError(err)}
+                  onSubmit={() => {
+                    setShowCreateForm(false);
+                    setCalendarSelection(null);
+                    loadBookings();
+                  }}
+                />
+              </div>
+
+              <div className="form-divider">
+                <span>Or fill the booking manually</span>
+              </div>
+
               <CreateBookingForm
                 initialDate={calendarSelection?.date}
                 initialStartTime={calendarSelection?.startTime}
@@ -490,7 +512,7 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
               onSlotClick={handleCalendarSlotClick}
             />
           ) : bookings.length === 0 ? (
-            <p className="muted">You haven't created any bookings yet.</p>
+            <p className="muted">You haven&apos;t created any bookings yet.</p>
           ) : (
             <div className="bookings-grid">
               {bookings.map((booking) => (
@@ -992,6 +1014,30 @@ export function BookingManagementPage({ user }: BookingManagementPageProps) {
           padding: 2rem;
           margin-bottom: 2rem;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .ai-booking-section {
+          margin-bottom: 2rem;
+        }
+
+        .form-divider {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          margin: 0 0 2rem;
+          color: #64748b;
+          font-size: 0.9rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+
+        .form-divider::before,
+        .form-divider::after {
+          content: "";
+          flex: 1;
+          height: 1px;
+          background: #e2e8f0;
         }
 
         .student-header-actions {
