@@ -25,9 +25,19 @@ export type TicketSummary = {
   priority: TicketPriority;
   status: TicketStatus;
   createdAt: string;
+  updatedAt: string;
   firstRespondedAt: string | null;
   resolvedAt: string | null;
+  reconsiderationRequestCount: number;
+  staffReviewCount: number;
+  adminReviewCount: number;
 };
+
+export type TicketReportType = "SUMMARY" | "DETAIL";
+
+export type TicketReportFormat = "PDF" | "CSV";
+
+export type TicketReportStatus = "READY";
 
 export type TicketAssignment = {
   id: number;
@@ -71,12 +81,18 @@ export type TicketDetail = {
   preferredContactPhone: string | null;
   resolutionSummary: string | null;
   rejectionReason: string | null;
+  reconsiderationNote: string | null;
   firstRespondedAt: string | null;
   resolvedAt: string | null;
   rejectedAt: string | null;
   closedAt: string | null;
+  reconsiderationRequestedAt: string | null;
+  reconsiderationReviewedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  reconsiderationRequestCount: number;
+  staffReviewCount: number;
+  adminReviewCount: number;
   assignmentHistory: TicketAssignment[];
 };
 
@@ -195,6 +211,10 @@ export type UpdateTicketStatusRequest = {
   rejectionReason?: string;
 };
 
+export type RequestTicketReconsiderationRequest = {
+  note: string;
+};
+
 export type CreateTicketCommentRequest = {
   body: string;
   commentType: Extract<CommentType, "PUBLIC_REPLY" | "INTERNAL_NOTE">;
@@ -290,4 +310,97 @@ export type ApiErrorResponse = {
   message?: string;
   code?: string;
   validationErrors?: Record<string, string>;
+};
+
+export type TicketReportRecord = {
+  id: number;
+  generatedByUserId: number;
+  generatedByDisplayName: string;
+  reportType: TicketReportType;
+  format: TicketReportFormat;
+  status: TicketReportStatus;
+  recordCount: number;
+  fileName: string;
+  mimeType: string;
+  filterSummary: string | null;
+  summaryText: string | null;
+  naturalLanguageRequest: string | null;
+  generatedAt: string;
+};
+
+export type GenerateTicketReportRequest = {
+  ticketId?: number;
+  ticketNumber?: string;
+  reportType: TicketReportType;
+  format: TicketReportFormat;
+  status?: TicketStatus;
+  priority?: TicketPriority;
+  ticketCategoryId?: number;
+  locationId?: number;
+  resourceId?: number;
+  assignedStaffUserId?: number;
+  reporterUserId?: number;
+  startDate?: string;
+  endDate?: string;
+  naturalLanguageRequest?: string;
+};
+
+export type TicketReportAssistantInterpretRequest = {
+  message: string;
+};
+
+export type TicketReportAssistantResponse = {
+  assistantEnabled: boolean;
+  needsClarification: boolean;
+  clarificationQuestion: string | null;
+  interpretationSummary: string | null;
+  interpretedRequest: GenerateTicketReportRequest | null;
+};
+
+export type TicketAssistantIntent =
+  | "STATUS_QUERY"
+  | "HISTORY_SUMMARY"
+  | "FAQ"
+  | "CREATION_HELP"
+  | "DUPLICATE_CHECK"
+  | "PRIORITY_RECOMMENDATION"
+  | "CATEGORY_RECOMMENDATION"
+  | "REMINDER"
+  | "RESOLUTION_EXPLANATION"
+  | "COMMENT_ASSISTANT"
+  | "REPORT_HELP"
+  | "INSIGHTS"
+  | "UNKNOWN";
+
+export type TicketAssistantQueryRequest = {
+  message: string;
+  selectedTicketId?: number;
+};
+
+export type RefineTicketDescriptionRequest = {
+  title?: string;
+  description: string;
+};
+
+export type RefineTicketDescriptionResponse = {
+  assistantEnabled: boolean;
+  improvedDescription: string;
+};
+
+export type TicketAssistantResponse = {
+  assistantEnabled: boolean;
+  intent: TicketAssistantIntent;
+  title: string;
+  message: string;
+  highlights: string[];
+  suggestedActions: string[];
+  relatedTickets: TicketSummary[];
+  suggestedComment: string | null;
+  improvedDescription: string | null;
+  recommendedPriority: TicketPriority | null;
+  recommendedCategoryId: number | null;
+  recommendedCategoryCode: string | null;
+  recommendedCategoryName: string | null;
+  reportSuggestion: GenerateTicketReportRequest | null;
+  reportSuggestionSummary: string | null;
 };

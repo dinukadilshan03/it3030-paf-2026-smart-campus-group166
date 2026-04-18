@@ -30,6 +30,20 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     @Query(
             """
+            select t
+            from Ticket t
+            join fetch t.ticketCategory tc
+            join fetch t.reporterUser ru
+            left join fetch t.assignedStaffUser asu
+            left join fetch t.resource r
+            left join fetch t.location l
+            where lower(t.ticketNumber) = lower(:ticketNumber)
+            """)
+    Optional<Ticket> findDetailedByTicketNumberIgnoreCase(
+            @Param("ticketNumber") String ticketNumber);
+
+    @Query(
+            """
             select distinct t
             from Ticket t
             join fetch t.ticketCategory tc

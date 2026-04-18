@@ -4,10 +4,12 @@ import { useState } from "react";
 
 import { TicketAttachmentDraftCard } from "@/components/tickets/TicketAttachmentDraftCard";
 import { TicketDialog } from "@/components/tickets/TicketDialog";
+import { refineTicketDescriptionClient } from "@/lib/tickets/client";
 import {
   getActiveTicketCategories,
   getLocationLabel,
   getResourceLabel,
+  getTicketErrorMessage,
   TicketApiError,
   toIdNumber,
 } from "@/lib/tickets/shared";
@@ -86,6 +88,9 @@ export function CreateTicketForm({
   const [values, setValues] = useState<CreateTicketFormValues>(getInitialValues());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [isRefiningDescription, setIsRefiningDescription] = useState(false);
+  const [refineError, setRefineError] = useState<string | null>(null);
+  const [refineMessage, setRefineMessage] = useState<string | null>(null);
 
   const activeCategories = getActiveTicketCategories(categories);
   const filteredResources = values.locationId
@@ -240,7 +245,50 @@ export function CreateTicketForm({
           </label>
 
           <label className="grid gap-2 text-sm font-medium text-slate-700">
-            Description
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span>Description</span>
+              <button
+                type="button"
+                disabled={busy || isRefiningDescription}
+                onClick={async () => {
+                  const nextDescription = values.description.trim();
+                  if (!nextDescription) {
+                    setRefineError("Type your issue first, then use AI to polish the description.");
+                    setRefineMessage(null);
+                    return;
+                  }
+
+                  setRefineError(null);
+                  setRefineMessage(null);
+                  setIsRefiningDescription(true);
+                  try {
+                    const response = await refineTicketDescriptionClient({
+                      title: values.title.trim() || undefined,
+                      description: nextDescription,
+                    });
+
+                    setValues((current) => ({
+                      ...current,
+                      description: response.improvedDescription,
+                    }));
+                    setRefineMessage(
+                      response.assistantEnabled
+                        ? "AI polished the description. You can still edit it before submitting."
+                        : "A clearer description was prepared. You can still edit it before submitting.",
+                    );
+                  } catch (error) {
+                    setRefineError(
+                      getTicketErrorMessage(error, "Could not polish the description right now."),
+                    );
+                  } finally {
+                    setIsRefiningDescription(false);
+                  }
+                }}
+                className="inline-flex items-center justify-center rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-800 transition hover:border-sky-300 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isRefiningDescription ? "AI refining..." : "AI polish"}
+              </button>
+            </div>
             <textarea
               rows={5}
               value={values.description}
@@ -253,6 +301,10 @@ export function CreateTicketForm({
               className={`${inputClassName} min-h-36 resize-y`}
               placeholder="Describe the fault, when it started, and any visible impact on classes or staff operations."
             />
+            {refineMessage ? (
+              <span className="text-xs text-emerald-700">{refineMessage}</span>
+            ) : null}
+            {refineError ? <span className="text-xs text-rose-600">{refineError}</span> : null}
             {errors.description ? (
               <span className="text-xs text-rose-600">{errors.description}</span>
             ) : null}

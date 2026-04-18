@@ -14,6 +14,7 @@ import com.smartcampus.backend.modules.resource.entity.Resource;
 import com.smartcampus.backend.modules.resource.service.LocationService;
 import com.smartcampus.backend.modules.resource.service.ResourceService;
 import com.smartcampus.backend.modules.ticket.dto.CreateTicketRequest;
+import com.smartcampus.backend.modules.ticket.dto.RequestTicketReconsiderationRequest;
 import com.smartcampus.backend.modules.ticket.dto.TicketAssignmentResponse;
 import com.smartcampus.backend.modules.ticket.dto.TicketDetailResponse;
 import com.smartcampus.backend.modules.ticket.dto.TicketSummaryResponse;
@@ -167,12 +168,13 @@ public class TicketService {
         }
 
         Ticket ticket = getManagedTicket(id);
-        if (ticket.getStatus() == TicketStatus.CLOSED || ticket.getStatus() == TicketStatus.REJECTED) {
-            throw new IllegalArgumentException("Closed or rejected tickets cannot be assigned");
+        if (ticket.getStatus() == TicketStatus.CLOSED) {
+            throw new IllegalArgumentException("Closed tickets cannot be assigned");
         }
 
         User assignedUser = validateAssignedStaff(request.assignedStaffUserId());
         TicketAssignment activeAssignment = ticketAssignmentRepository.findActiveByTicketId(id).orElse(null);
+        boolean wasRejected = ticket.getStatus() == TicketStatus.REJECTED;
 
         if (activeAssignment != null && activeAssignment.getAssignedToUser().getId().equals(assignedUser.getId())) {
             return getTicketById(id);
@@ -185,6 +187,13 @@ public class TicketService {
         }
 
         ticket.setAssignedStaffUser(assignedUser);
+        if (wasRejected) {
+            ticket.setStatus(TicketStatus.OPEN);
+            ticket.setResolvedAt(null);
+            ticket.setClosedAt(null);
+            ticket.setReconsiderationReviewedAt(LocalDateTime.now());
+        }
+        incrementAdminReviewCount(ticket);
         ticketSlaService.markFirstResponseIfNeeded(ticket);
         ticketRepository.save(ticket);
 
@@ -199,12 +208,15 @@ public class TicketService {
         ticketAssignmentRepository.save(newAssignment);
 
         String noteBody =
-                activeAssignment == null
-                        ? "Ticket assigned to " + resolveDisplayName(assignedUser)
-                        : "Ticket reassigned from "
-                                + resolveDisplayName(activeAssignment.getAssignedToUser())
-                                + " to "
-                                + resolveDisplayName(assignedUser);
+                wasRejected
+                        ? "Rejected ticket reopened for reconsideration and assigned to "
+                                + resolveDisplayName(assignedUser)
+                        : activeAssignment == null
+                                ? "Ticket assigned to " + resolveDisplayName(assignedUser)
+                                : "Ticket reassigned from "
+                                        + resolveDisplayName(activeAssignment.getAssignedToUser())
+                                        + " to "
+                                        + resolveDisplayName(assignedUser);
         ticketCommentService.createSystemStatusNote(ticket, noteBody, membership.getUser());
 
         return getTicketById(id);
@@ -355,6 +367,7 @@ public class TicketService {
             case IN_PROGRESS -> {
                 ticket.setRejectionReason(null);
                 ticket.setRejectedAt(null);
+                incrementStaffReviewCount(ticket);
             }
             case RESOLVED -> {
                 if (request.resolutionSummary() == null || request.resolutionSummary().isBlank()) {
@@ -365,8 +378,12 @@ public class TicketService {
                 ticket.setRejectionReason(null);
                 ticket.setRejectedAt(null);
                 ticket.setClosedAt(null);
+                incrementStaffReviewCount(ticket);
             }
-            case CLOSED -> ticket.setClosedAt(LocalDateTime.now());
+            case CLOSED -> {
+                ticket.setClosedAt(LocalDateTime.now());
+                incrementAdminReviewCount(ticket);
+            }
             case REJECTED -> {
                 if (request.rejectionReason() == null || request.rejectionReason().isBlank()) {
                     throw new IllegalArgumentException("Rejection reason is required when rejecting a ticket");
@@ -376,6 +393,10 @@ public class TicketService {
                 ticket.setResolutionSummary(null);
                 ticket.setResolvedAt(null);
                 ticket.setClosedAt(null);
+                ticket.setReconsiderationNote(null);
+                ticket.setReconsiderationRequestedAt(null);
+                ticket.setReconsiderationReviewedAt(null);
+                incrementAdminReviewCount(ticket);
             }
             case OPEN -> {
             }
@@ -398,6 +419,31 @@ public class TicketService {
                 membership.getUser());
         notificationService.notifyTicketStatusChanged(
                 ticket, request.status(), membership.getUser(), assignedStaffSnapshot);
+
+        return getTicketById(id);
+    }
+
+    @Transactional
+    public TicketDetailResponse requestReconsideration(Long id, RequestTicketReconsiderationRequest request) {
+        UserRole membership = ticketAccessService.getRequiredCurrentMembership();
+        Ticket ticket = getManagedTicket(id);
+
+        if (ticket.getStatus() != TicketStatus.REJECTED) {
+            throw new IllegalArgumentException("Only rejected tickets can be submitted for reconsideration");
+        }
+        if (!ticket.getReporterUser().getId().equals(membership.getUser().getId())) {
+            throw new AccessDeniedException(
+                    "Only the original reporter can ask admin to reconsider a rejected ticket");
+        }
+
+        ticket.setReconsiderationNote(request.note().trim());
+        ticket.setReconsiderationRequestedAt(LocalDateTime.now());
+        ticket.setReconsiderationReviewedAt(null);
+        ticket.setReconsiderationRequestCount(defaultCount(ticket.getReconsiderationRequestCount()) + 1);
+        ticketRepository.save(ticket);
+
+        ticketCommentService.createSystemStatusNote(
+                ticket, "Reporter requested reconsideration review", membership.getUser());
 
         return getTicketById(id);
     }
@@ -460,5 +506,17 @@ public class TicketService {
             return user.getDisplayName();
         }
         return user.getEmail();
+    }
+
+    private void incrementStaffReviewCount(Ticket ticket) {
+        ticket.setStaffReviewCount(defaultCount(ticket.getStaffReviewCount()) + 1);
+    }
+
+    private void incrementAdminReviewCount(Ticket ticket) {
+        ticket.setAdminReviewCount(defaultCount(ticket.getAdminReviewCount()) + 1);
+    }
+
+    private int defaultCount(Integer value) {
+        return value == null ? 0 : value;
     }
 }

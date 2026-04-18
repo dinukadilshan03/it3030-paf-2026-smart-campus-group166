@@ -58,8 +58,12 @@ class TicketControllerTest {
                         TicketPriority.HIGH,
                         TicketStatus.OPEN,
                         LocalDateTime.now(),
+                        LocalDateTime.now(),
                         null,
-                        null);
+                        null,
+                        0,
+                        0,
+                        0);
         when(ticketService.getTickets(TicketStatus.OPEN, TicketPriority.HIGH, 6L, "projector"))
                 .thenReturn(List.of(summary));
 
