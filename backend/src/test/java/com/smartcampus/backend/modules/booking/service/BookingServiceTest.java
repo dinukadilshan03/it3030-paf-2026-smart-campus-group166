@@ -26,6 +26,7 @@ import com.smartcampus.backend.modules.booking.dto.ReviewBookingRequest;
 import com.smartcampus.backend.modules.booking.entity.Booking;
 import com.smartcampus.backend.modules.booking.mapper.BookingMapper;
 import com.smartcampus.backend.modules.booking.repository.BookingRepository;
+import com.smartcampus.backend.modules.notification.service.NotificationService;
 import com.smartcampus.backend.modules.resource.entity.Location;
 import com.smartcampus.backend.modules.resource.entity.Resource;
 import com.smartcampus.backend.modules.resource.entity.ResourceAvailabilityWindow;
@@ -52,6 +53,7 @@ class BookingServiceTest {
     @Mock private ResourceAvailabilityWindowRepository resourceAvailabilityWindowRepository;
     @Mock private CurrentUserService currentUserService;
     @Mock private BookingMapper bookingMapper;
+    @Mock private NotificationService notificationService;
 
     private BookingService bookingService;
 
@@ -63,7 +65,8 @@ class BookingServiceTest {
                         resourceService,
                         resourceAvailabilityWindowRepository,
                         currentUserService,
-                        bookingMapper);
+                        bookingMapper,
+                        notificationService);
     }
 
     @Test
@@ -378,6 +381,114 @@ class BookingServiceTest {
 
         assertThat(cancelled.status()).isEqualTo(BookingStatus.CANCELLED);
         assertThat(booking.getCancelledByUser()).isEqualTo(requester);
+    }
+
+    @Test
+    void reviewApprovalCreatesRequesterNotification() {
+        User admin = buildUser(11L, "admin@example.com", "Admin");
+        User requester = buildUser(12L, "student@example.com", "Student");
+        UserRole membership = buildMembership(admin, RoleCode.ADMIN);
+        Booking booking = buildBooking(203L, requester, buildResource(17L, true, ResourceStatus.ACTIVE));
+
+        when(currentUserService.getCurrentUserRole()).thenReturn(Optional.of(membership));
+        when(bookingRepository.findById(203L)).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(booking)).thenReturn(booking);
+        when(bookingMapper.toDetail(booking))
+                .thenReturn(
+                        new BookingDetailResponse(
+                                203L,
+                                17L,
+                                "RES-17",
+                                "Resource 17",
+                                20L,
+                                "Building A",
+                                12L,
+                                requester.getEmail(),
+                                requester.getDisplayName(),
+                                booking.getBookingDate(),
+                                booking.getStartTime(),
+                                booking.getEndTime(),
+                                booking.getPurpose(),
+                                booking.getExpectedAttendees(),
+                                booking.getRequestNotes(),
+                                BookingStatus.APPROVED,
+                                admin.getId(),
+                                admin.getDisplayName(),
+                                LocalDateTime.now(),
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                LocalDateTime.now(),
+                                LocalDateTime.now()));
+
+        bookingService.reviewBooking(203L, new ReviewBookingRequest(BookingReviewDecision.APPROVE, null));
+
+        verify(notificationService).notifyBookingReviewed(booking);
+    }
+
+    @Test
+    void autoApprovedCreateDoesNotCreateNotification() {
+        User admin = buildUser(13L, "admin3@example.com", "Admin Three");
+        UserRole membership = buildMembership(admin, RoleCode.ADMIN);
+        Resource resource = buildResource(18L, false, ResourceStatus.ACTIVE);
+        CreateBookingRequest request =
+                new CreateBookingRequest(
+                        18L,
+                        LocalDate.now().plusDays(3),
+                        LocalTime.of(8, 0),
+                        LocalTime.of(9, 0),
+                        "Setup",
+                        2,
+                        null);
+
+        when(currentUserService.getCurrentUserRole()).thenReturn(Optional.of(membership));
+        when(resourceService.getManagedResource(18L)).thenReturn(resource);
+        when(resourceAvailabilityWindowRepository.findByResource_IdOrderByDayOfWeekAscStartTimeAsc(18L))
+                .thenReturn(List.of());
+        when(bookingRepository.countOverlappingBookings(
+                        eq(18L),
+                        eq(request.bookingDate()),
+                        eq(request.startTime()),
+                        eq(request.endTime()),
+                        any(),
+                        eq(null)))
+                .thenReturn(0L);
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(bookingMapper.toDetail(any(Booking.class)))
+                .thenReturn(
+                        new BookingDetailResponse(
+                                204L,
+                                18L,
+                                "RES-18",
+                                "Resource 18",
+                                20L,
+                                "Building A",
+                                admin.getId(),
+                                admin.getEmail(),
+                                admin.getDisplayName(),
+                                request.bookingDate(),
+                                request.startTime(),
+                                request.endTime(),
+                                request.purpose(),
+                                request.expectedAttendees(),
+                                request.requestNotes(),
+                                BookingStatus.APPROVED,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                LocalDateTime.now(),
+                                LocalDateTime.now()));
+
+        bookingService.create(request);
+
+        verify(notificationService, never()).notifyBookingReviewed(any());
     }
 
     private User buildUser(Long id, String email, String displayName) {

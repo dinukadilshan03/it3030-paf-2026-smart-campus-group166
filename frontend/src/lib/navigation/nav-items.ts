@@ -34,8 +34,8 @@ const NAV_ITEMS: NavItem[] = [
   {
     title: "Notifications",
     href: "/notifications",
-    roles: ["ADMIN"],
-    description: "Admin notification area",
+    roles: ["STUDENT", "STAFF", "ADMIN"],
+    description: "In-app notification history",
   },
   {
     title: "Profile",

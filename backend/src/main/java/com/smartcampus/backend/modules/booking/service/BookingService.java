@@ -17,6 +17,7 @@ import com.smartcampus.backend.modules.booking.dto.ReviewBookingRequest;
 import com.smartcampus.backend.modules.booking.entity.Booking;
 import com.smartcampus.backend.modules.booking.mapper.BookingMapper;
 import com.smartcampus.backend.modules.booking.repository.BookingRepository;
+import com.smartcampus.backend.modules.notification.service.NotificationService;
 import com.smartcampus.backend.modules.resource.entity.Resource;
 import com.smartcampus.backend.modules.resource.entity.ResourceAvailabilityWindow;
 import com.smartcampus.backend.modules.resource.repository.ResourceAvailabilityWindowRepository;
@@ -42,6 +43,7 @@ public class BookingService {
     private final ResourceAvailabilityWindowRepository resourceAvailabilityWindowRepository;
     private final CurrentUserService currentUserService;
     private final BookingMapper bookingMapper;
+    private final NotificationService notificationService;
 
     @Transactional(readOnly = true)
     public List<BookingSummaryResponse> getBookings(
@@ -147,7 +149,9 @@ public class BookingService {
             booking.setReviewReason(request.reason().trim());
         }
 
-        return bookingMapper.toDetail(bookingRepository.save(booking));
+        Booking savedBooking = bookingRepository.save(booking);
+        notificationService.notifyBookingReviewed(savedBooking);
+        return bookingMapper.toDetail(savedBooking);
     }
 
     @Transactional

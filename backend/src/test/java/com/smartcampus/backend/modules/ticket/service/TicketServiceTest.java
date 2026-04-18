@@ -15,6 +15,7 @@ import com.smartcampus.backend.common.enums.TicketPriority;
 import com.smartcampus.backend.common.enums.TicketStatus;
 import com.smartcampus.backend.common.enums.UserStatus;
 import com.smartcampus.backend.common.exception.ResourceConflictException;
+import com.smartcampus.backend.modules.notification.service.NotificationService;
 import com.smartcampus.backend.modules.resource.entity.Location;
 import com.smartcampus.backend.modules.resource.entity.Resource;
 import com.smartcampus.backend.modules.resource.service.LocationService;
@@ -55,6 +56,7 @@ class TicketServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private UserRoleRepository userRoleRepository;
     @Mock private TicketSlaService ticketSlaService;
+    @Mock private NotificationService notificationService;
 
     private TicketService ticketService;
 
@@ -73,7 +75,8 @@ class TicketServiceTest {
                         userRepository,
                         userRoleRepository,
                         ticketSlaService,
-                        new TicketMapper());
+                        new TicketMapper(),
+                        notificationService);
     }
 
     @Test
@@ -211,6 +214,7 @@ class TicketServiceTest {
         assertThat(response.status()).isEqualTo(TicketStatus.IN_PROGRESS);
         verify(ticketSlaService).markFirstResponseIfNeeded(ticket);
         verify(ticketCommentService).createSystemStatusNote(any(Ticket.class), any(String.class), any(User.class));
+        verify(notificationService).notifyTicketStatusChanged(ticket, TicketStatus.IN_PROGRESS, staff, staff);
     }
 
     @Test
@@ -359,6 +363,37 @@ class TicketServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("open tickets");
         verify(ticketRepository, never()).delete(any(Ticket.class));
+    }
+
+    @Test
+    void closingTicketNotifiesPreCloseAssignedStaff() {
+        User admin = buildUser(40L, "admin-close@example.com", "Admin Close");
+        User staff = buildUser(41L, "staff-close@example.com", "Staff Close");
+        User reporter = buildUser(42L, "reporter-close@example.com", "Reporter Close");
+        UserRole membership = buildMembership(admin, RoleCode.ADMIN);
+        Ticket ticket = buildTicket(160L, reporter);
+        ticket.setStatus(TicketStatus.RESOLVED);
+        ticket.setAssignedStaffUser(staff);
+        TicketAssignment activeAssignment =
+                TicketAssignment.builder()
+                        .id(200L)
+                        .ticket(ticket)
+                        .assignedToUser(staff)
+                        .assignedByUser(admin)
+                        .isActive(true)
+                        .build();
+
+        when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
+        when(ticketRepository.findById(160L)).thenReturn(Optional.of(ticket));
+        when(ticketAssignmentRepository.findActiveByTicketId(160L)).thenReturn(Optional.of(activeAssignment));
+        when(ticketRepository.save(ticket)).thenReturn(ticket);
+        when(ticketRepository.findDetailedById(160L)).thenReturn(Optional.of(ticket));
+        when(ticketAssignmentRepository.findByTicketIdOrderByAssignedAtDesc(160L))
+                .thenReturn(List.of(activeAssignment));
+
+        ticketService.updateStatus(160L, new UpdateTicketStatusRequest(TicketStatus.CLOSED, null, null));
+
+        verify(notificationService).notifyTicketStatusChanged(ticket, TicketStatus.CLOSED, admin, staff);
     }
 
     private User buildUser(Long id, String email, String displayName) {

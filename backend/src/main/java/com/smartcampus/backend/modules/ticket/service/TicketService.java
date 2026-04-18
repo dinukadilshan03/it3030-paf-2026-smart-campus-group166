@@ -8,6 +8,7 @@ import com.smartcampus.backend.common.enums.TicketStatus;
 import com.smartcampus.backend.common.enums.UserStatus;
 import com.smartcampus.backend.common.exception.ResourceConflictException;
 import com.smartcampus.backend.common.exception.ResourceNotFoundException;
+import com.smartcampus.backend.modules.notification.service.NotificationService;
 import com.smartcampus.backend.modules.resource.entity.Location;
 import com.smartcampus.backend.modules.resource.entity.Resource;
 import com.smartcampus.backend.modules.resource.service.LocationService;
@@ -53,6 +54,7 @@ public class TicketService {
     private final UserRoleRepository userRoleRepository;
     private final TicketSlaService ticketSlaService;
     private final TicketMapper ticketMapper;
+    private final NotificationService notificationService;
 
     @Transactional(readOnly = true)
     public List<TicketSummaryResponse> getTickets(
@@ -347,6 +349,7 @@ public class TicketService {
         validateStatusPermission(membership, ticket, request.status());
         validateStatusTransition(ticket.getStatus(), request.status());
         TicketAssignment activeAssignment = ticketAssignmentRepository.findActiveByTicketId(id).orElse(null);
+        User assignedStaffSnapshot = ticket.getAssignedStaffUser();
 
         switch (request.status()) {
             case IN_PROGRESS -> {
@@ -393,6 +396,8 @@ public class TicketService {
                 ticket,
                 "Ticket status changed to " + request.status().name().replace('_', ' '),
                 membership.getUser());
+        notificationService.notifyTicketStatusChanged(
+                ticket, request.status(), membership.getUser(), assignedStaffSnapshot);
 
         return getTicketById(id);
     }

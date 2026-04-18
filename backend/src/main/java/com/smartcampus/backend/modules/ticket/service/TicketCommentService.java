@@ -6,6 +6,7 @@ import com.smartcampus.backend.common.enums.CommentType;
 import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.exception.ResourceConflictException;
 import com.smartcampus.backend.common.exception.ResourceNotFoundException;
+import com.smartcampus.backend.modules.notification.service.NotificationService;
 import com.smartcampus.backend.modules.ticket.dto.CreateTicketCommentRequest;
 import com.smartcampus.backend.modules.ticket.dto.TicketCommentResponse;
 import com.smartcampus.backend.modules.ticket.dto.UpdateTicketCommentRequest;
@@ -28,6 +29,7 @@ public class TicketCommentService {
     private final TicketAccessService ticketAccessService;
     private final TicketSlaService ticketSlaService;
     private final TicketMapper ticketMapper;
+    private final NotificationService notificationService;
 
     @Transactional(readOnly = true)
     public List<TicketCommentResponse> getComments(Ticket ticket) {
@@ -81,6 +83,7 @@ public class TicketCommentService {
         if (membership.getRole().getCode() != RoleCode.STUDENT) {
             ticketSlaService.markFirstResponseIfNeeded(ticket.getId());
         }
+        notificationService.notifyTicketCommentAdded(ticket, savedComment);
         return ticketMapper.toCommentResponse(savedComment);
     }
 
