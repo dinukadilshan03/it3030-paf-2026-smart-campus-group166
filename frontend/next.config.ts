@@ -2,7 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   async rewrites() {
-    const backendOrigin = process.env.NEXT_PUBLIC_API_BASE_URL?.trim().replace(/\/$/, "");
+    const backendOrigin = (
+      process.env.BACKEND_INTERNAL_URL?.trim() ||
+      process.env.NEXT_PUBLIC_API_BASE_URL?.trim()
+    )?.replace(/\/$/, "");
 
     if (!backendOrigin) {
       return [];
