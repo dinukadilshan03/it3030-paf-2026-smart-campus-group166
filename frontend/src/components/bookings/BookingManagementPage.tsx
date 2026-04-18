@@ -431,7 +431,7 @@ export function BookingManagementPage({
                       <span className={`status-badge status-${booking.status.toLowerCase()}`}>
                         {booking.status}
                       </span>
-                      {(booking.status === "PENDING" || booking.status === "APPROVED" || booking.status === "REJECTED") && (
+                      {(booking.status === "PENDING" || booking.status === "APPROVED" || booking.status === "REJECTED" || booking.status === "CANCELLED") && (
                         <>
                           <button
                             className="icon-button delete-icon"
@@ -624,7 +624,7 @@ export function BookingManagementPage({
                       <span className={`status-badge status-${booking.status.toLowerCase()}`}>
                         {booking.status}
                       </span>
-                      {(booking.status === "PENDING" || booking.status === "APPROVED" || booking.status === "REJECTED") && (
+                      {(booking.status === "PENDING" || booking.status === "APPROVED" || booking.status === "REJECTED" || booking.status === "CANCELLED") && (
                         <>
                           <button
                             className="icon-button delete-icon"
