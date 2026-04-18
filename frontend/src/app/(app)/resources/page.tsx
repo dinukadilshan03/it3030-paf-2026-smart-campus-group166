@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getResources, deleteResource } from "@/lib/resources/api";
 import { useRouter } from "next/navigation";
+import { clientApiFetch } from "@/lib/api/client";
 
 export default function ResourcePage() {
   const router = useRouter();
@@ -26,9 +27,7 @@ const [selectedLocation, setSelectedLocation] = useState("");
   useEffect(() => {
     loadResources();
 
-    fetch("http://localhost:8080/api/v1/auth/me", {
-      credentials: "include",
-    })
+    clientApiFetch("/api/v1/auth/me")
       .then((res) => res.json())
       .then((data) => setUser(data));
   }, []);
