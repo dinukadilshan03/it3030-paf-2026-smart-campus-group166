@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import type { BookingSummaryResponse } from "@/lib/bookings/types";
 import type { CurrentUser } from "@/types/auth";
 import type { Resource } from "@/lib/resources/types";
 import { getResources } from "@/lib/resources/api";
+import NLBookingInput from "@/components/booking/NLBookingInput";
+import { BookingAnalytics } from "./BookingAnalytics";
 import { CreateBookingForm } from "./CreateBookingForm";
 import { BookingCalendar } from "./BookingCalendar";
 
@@ -59,6 +60,15 @@ export function BookingManagementPage({
 
   // State for create booking form
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [calendarSelection, setCalendarSelection] = useState<{
+    date: string;
+    startTime: string;
+    endTime: string;
+    resourceId?: number;
+  } | null>(null);
+
+  // State for analytics
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   // Check if user is admin
   const isAdmin = user.role === "ADMIN";
@@ -254,6 +264,12 @@ export function BookingManagementPage({
     resourceId?: number
   ) => {
     // Pre-fill the form with calendar selection
+    setCalendarSelection({
+      date,
+      startTime,
+      endTime,
+      resourceId,
+    });
     setShowCreateForm(true);
   };
 
@@ -282,26 +298,6 @@ export function BookingManagementPage({
 
   return (
     <div className="admin-bookings-page">
-      <header className="admin-topbar">
-        <div>
-          <span className="eyebrow">{isAdmin ? "Admin" : "Student"}</span>
-          <h1>{isAdmin ? "Booking Management" : "My Bookings"}</h1>
-          <p>Signed in as {user.displayName} ({user.role})</p>
-        </div>
-        <div className="button-row">
-          <Link className="secondary-button" href="/dashboard">
-            Dashboard
-          </Link>
-          <button
-            className="secondary-button"
-            onClick={loadBookings}
-            disabled={isLoading}
-          >
-            Refresh
-          </button>
-        </div>
-      </header>
-
       {error && <div className="status-banner error">{error}</div>}
       {successMessage && <div className="status-banner success">{successMessage}</div>}
 
@@ -333,33 +329,54 @@ export function BookingManagementPage({
           <div className="tabs-container">
             <button
               className={`tab-button ${activeTab === "pending" ? "active" : ""}`}
-              onClick={() => setActiveTab("pending")}
+              onClick={() => {
+                setActiveTab("pending");
+                setShowAnalytics(false);
+              }}
             >
               Pending ({stats.pending})
             </button>
             <button
               className={`tab-button ${activeTab === "approved" ? "active" : ""}`}
-              onClick={() => setActiveTab("approved")}
+              onClick={() => {
+                setActiveTab("approved");
+                setShowAnalytics(false);
+              }}
             >
               Approved ({stats.approved})
             </button>
             <button
               className={`tab-button ${activeTab === "rejected" ? "active" : ""}`}
-              onClick={() => setActiveTab("rejected")}
+              onClick={() => {
+                setActiveTab("rejected");
+                setShowAnalytics(false);
+              }}
             >
               Rejected ({stats.rejected})
             </button>
             <button
               className={`tab-button ${activeTab === "cancelled" ? "active" : ""}`}
-              onClick={() => setActiveTab("cancelled")}
+              onClick={() => {
+                setActiveTab("cancelled");
+                setShowAnalytics(false);
+              }}
             >
               Cancelled ({stats.cancelled})
             </button>
             <button
               className={`tab-button ${activeTab === "all" ? "active" : ""}`}
-              onClick={() => setActiveTab("all")}
+              onClick={() => {
+                setActiveTab("all");
+                setShowAnalytics(false);
+              }}
             >
               All ({stats.total})
+            </button>
+            <button
+              className={`tab-button analytics-tab ${showAnalytics ? "active" : ""}`}
+              onClick={() => setShowAnalytics(!showAnalytics)}
+            >
+              📊 Analytics
             </button>
           </div>
         </>
@@ -367,7 +384,9 @@ export function BookingManagementPage({
 
       {isAdmin ? (
         <section className="bookings-section">
-          {isLoading ? (
+          {showAnalytics ? (
+            <BookingAnalytics bookings={bookings} resources={resources} />
+          ) : isLoading ? (
             <p className="muted">Loading bookings...</p>
           ) : filteredBookings.length === 0 ? (
             <p className="muted">No {activeTab !== "all" ? activeTab : ""} bookings found.</p>
@@ -472,7 +491,12 @@ export function BookingManagementPage({
               </div>
               <button
                 className="primary-button"
-                onClick={() => setShowCreateForm(!showCreateForm)}
+                onClick={() => {
+                  setShowCreateForm(!showCreateForm);
+                  if (showCreateForm) {
+                    setCalendarSelection(null);
+                  }
+                }}
               >
                 {showCreateForm ? "Hide Form" : "+ Create New Booking"}
               </button>
@@ -481,16 +505,44 @@ export function BookingManagementPage({
 
           {showCreateForm && (
             <div className="create-form-container">
+              <div className="ai-booking-section">
+                <NLBookingInput
+                  onSuccess={(message) => {
+                    setSuccessMessage(message);
+                    setShowCreateForm(false);
+                    setCalendarSelection(null);
+                    loadBookings();
+                    setTimeout(() => setSuccessMessage(""), 3000);
+                  }}
+                  onError={(err) => setError(err)}
+                  onSubmit={() => {
+                    setShowCreateForm(false);
+                    setCalendarSelection(null);
+                    loadBookings();
+                  }}
+                />
+              </div>
+
+              <div className="form-divider">
+                <span>Or fill the booking manually</span>
+              </div>
+
               <CreateBookingForm
+                initialDate={calendarSelection?.date}
+                initialStartTime={calendarSelection?.startTime}
+                initialEndTime={calendarSelection?.endTime}
+                initialResourceId={calendarSelection?.resourceId}
                 onSuccess={(message) => {
                   setSuccessMessage(message);
                   setShowCreateForm(false);
+                  setCalendarSelection(null);
                   loadBookings();
                   setTimeout(() => setSuccessMessage(""), 3000);
                 }}
                 onError={(err) => setError(err)}
                 onSubmit={() => {
                   setShowCreateForm(false);
+                  setCalendarSelection(null);
                   loadBookings();
                 }}
               />
@@ -506,7 +558,7 @@ export function BookingManagementPage({
               onSlotClick={handleCalendarSlotClick}
             />
           ) : bookings.length === 0 ? (
-            <p className="muted">You haven't created any bookings yet.</p>
+            <p className="muted">You haven&apos;t created any bookings yet.</p>
           ) : (
             <div className="bookings-grid">
               {bookings.map((booking) => (
@@ -1038,6 +1090,30 @@ export function BookingManagementPage({
           padding: 2rem;
           margin-bottom: 2rem;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .ai-booking-section {
+          margin-bottom: 2rem;
+        }
+
+        .form-divider {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          margin: 0 0 2rem;
+          color: #64748b;
+          font-size: 0.9rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+
+        .form-divider::before,
+        .form-divider::after {
+          content: "";
+          flex: 1;
+          height: 1px;
+          background: #e2e8f0;
         }
 
         .student-header-actions {

@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import type { BookingSummaryResponse, BookingStatus } from "@/lib/bookings/types";
 
 const SLOT_START = 8;
 const SLOT_END = 18;
-const SLOT_DURATION = 2;
+const SLOT_DURATION = 1;
 const SLOTS: number[] = [];
-for (let h = SLOT_START; h < SLOT_END; h += SLOT_DURATION) SLOTS.push(h);
+for (let hour = SLOT_START; hour < SLOT_END; hour += SLOT_DURATION) {
+  SLOTS.push(hour);
+}
 
 const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAYS_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -29,26 +31,50 @@ interface BookingCalendarProps {
   onSlotClick?: (date: string, startTime: string, endTime: string, resourceId?: number) => void;
 }
 
-function dateKey(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function dateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function addDays(d: Date, n: number) {
-  const r = new Date(d);
-  r.setDate(r.getDate() + n);
-  return r;
+function addDays(date: Date, amount: number) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + amount);
+  return result;
 }
 
-function getWeekStart(d: Date) {
-  const r = new Date(d);
-  r.setDate(r.getDate() - r.getDay());
-  return r;
+function getWeekStart(date: Date) {
+  const result = new Date(date);
+  result.setDate(result.getDate() - result.getDay());
+  return result;
 }
 
-function fmt12(h: number) {
-  const suffix = h >= 12 ? "PM" : "AM";
-  const hh = h > 12 ? h - 12 : h === 0 ? 12 : h;
-  return `${hh}:00 ${suffix}`;
+function fmt12(hour: number) {
+  const suffix = hour >= 12 ? "PM" : "AM";
+  const normalizedHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+  return `${normalizedHour}:00 ${suffix}`;
+}
+
+function formatClockTime(time: string) {
+  const [rawHours, rawMinutes] = time.split(":").map(Number);
+  const suffix = rawHours >= 12 ? "PM" : "AM";
+  const hours = rawHours % 12 || 12;
+  return `${hours}:${String(rawMinutes).padStart(2, "0")} ${suffix}`;
+}
+
+function timeToMinutes(time: string) {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function bookingOverlapsSlot(
+  booking: BookingSummaryResponse,
+  slotStartHour: number,
+  slotEndHour: number
+) {
+  const bookingStart = timeToMinutes(booking.startTime);
+  const bookingEnd = timeToMinutes(booking.endTime);
+  const slotStart = slotStartHour * 60;
+  const slotEnd = slotEndHour * 60;
+  return bookingStart < slotEnd && bookingEnd > slotStart;
 }
 
 function getStatusStyles(status: BookingStatus): { chip: string; dot: string } {
@@ -87,45 +113,61 @@ export function BookingCalendar({
   onSlotClick,
 }: BookingCalendarProps) {
   const today = useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
+    const current = new Date();
+    current.setHours(0, 0, 0, 0);
+    return current;
   }, []);
 
   const [view, setView] = useState<"weekly" | "daily">("weekly");
   const [anchor, setAnchor] = useState<Date>(new Date(today));
 
-  const bookingMap = useMemo(() => {
-    const map = new Map<string, BookingSummaryResponse>();
-    bookings.forEach((b) => {
-      if (!b.startTime) return;
-      const startHour = b.startTime.slice(0, 2);
-      map.set(`${b.resourceId}_${b.bookingDate}_${startHour}`, b);
+  const bookingsByResourceAndDate = useMemo(() => {
+    const map = new Map<string, BookingSummaryResponse[]>();
+
+    bookings.forEach((booking) => {
+      const key = `${booking.resourceId}_${booking.bookingDate}`;
+      const existing = map.get(key) ?? [];
+      existing.push(booking);
+      map.set(key, existing);
     });
+
+    map.forEach((items) =>
+      items.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))
+    );
+
     return map;
   }, [bookings]);
 
-  function getBooking(resourceId: number, date: string, startHour: number) {
-    return bookingMap.get(`${resourceId}_${date}_${String(startHour).padStart(2, "0")}`);
+  function getBookingsForSlot(resourceId: number, date: string, startHour: number) {
+    const slotEndHour = startHour + SLOT_DURATION;
+    const dayBookings = bookingsByResourceAndDate.get(`${resourceId}_${date}`) ?? [];
+    return dayBookings.filter((booking) =>
+      bookingOverlapsSlot(booking, startHour, slotEndHour)
+    );
+  }
+
+  function isPastDate(date: string): boolean {
+    const [year, month, day] = date.split("-").map(Number);
+    const selectedDate = new Date(year, month - 1, day);
+    selectedDate.setHours(0, 0, 0, 0);
+    return selectedDate < today;
   }
 
   function handleSlotClick(date: string, startHour: number, resourceId?: number) {
-    if (!onSlotClick) return;
+    if (isPastDate(date) || !onSlotClick) return;
     const startTime = `${String(startHour).padStart(2, "0")}:00`;
     const endTime = `${String(startHour + SLOT_DURATION).padStart(2, "0")}:00`;
     onSlotClick(date, startTime, endTime, resourceId);
   }
 
   const weekStart = getWeekStart(anchor);
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const weekDays = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
 
   const todayKey = dateKey(today);
   const anchorKey = dateKey(anchor);
-
-  // Stats
   const totalBookings = bookings.length;
-  const pendingCount = bookings.filter((b) => b.status === "PENDING").length;
-  const approvedCount = bookings.filter((b) => b.status === "APPROVED").length;
+  const pendingCount = bookings.filter((booking) => booking.status === "PENDING").length;
+  const approvedCount = bookings.filter((booking) => booking.status === "APPROVED").length;
 
   if (!resources || resources.length === 0) {
     return (
@@ -140,8 +182,6 @@ export function BookingCalendar({
 
   return (
     <div className="flex flex-col gap-4">
-
-      {/* ── Top stat pills ── */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-slate-100 shadow-sm">
           <span className="w-2 h-2 rounded-full bg-slate-400" />
@@ -160,22 +200,17 @@ export function BookingCalendar({
         </div>
       </div>
 
-      {/* ── Calendar card ── */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-
-        {/* Toolbar */}
         <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-slate-100 flex-wrap">
-
-          {/* Nav */}
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setAnchor((a) => addDays(a, view === "weekly" ? -7 : -1))}
+              onClick={() => setAnchor((current) => addDays(current, view === "weekly" ? -7 : -1))}
               className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 transition-all text-sm font-medium"
             >
               ‹
             </button>
             <button
-              onClick={() => setAnchor((a) => addDays(a, view === "weekly" ? 7 : 1))}
+              onClick={() => setAnchor((current) => addDays(current, view === "weekly" ? 7 : 1))}
               className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 transition-all text-sm font-medium"
             >
               ›
@@ -183,7 +218,7 @@ export function BookingCalendar({
 
             <h2 className="text-base font-semibold text-slate-800 ml-2 min-w-[200px]">
               {view === "weekly"
-                ? `${MONTHS[weekStart.getMonth()]} ${weekStart.getDate()} – ${addDays(weekStart, 6).getDate()}, ${weekStart.getFullYear()}`
+                ? `${MONTHS[weekStart.getMonth()]} ${weekStart.getDate()} - ${addDays(weekStart, 6).getDate()}, ${weekStart.getFullYear()}`
                 : `${DAYS_FULL[anchor.getDay()]}, ${MONTHS[anchor.getMonth()]} ${anchor.getDate()}`}
             </h2>
 
@@ -195,14 +230,11 @@ export function BookingCalendar({
             </button>
           </div>
 
-          {/* View toggle */}
           <div className="flex items-center bg-slate-100 rounded-lg p-0.5 gap-0.5">
             <button
               onClick={() => setView("weekly")}
               className={`px-4 h-7 text-xs font-semibold rounded-md transition-all ${
-                view === "weekly"
-                  ? "bg-white text-slate-800 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                view === "weekly" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"
               }`}
             >
               Week
@@ -210,9 +242,7 @@ export function BookingCalendar({
             <button
               onClick={() => setView("daily")}
               className={`px-4 h-7 text-xs font-semibold rounded-md transition-all ${
-                view === "daily"
-                  ? "bg-white text-slate-800 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                view === "daily" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"
               }`}
             >
               Day
@@ -220,26 +250,24 @@ export function BookingCalendar({
           </div>
         </div>
 
-        {/* Grid */}
         <div className="overflow-x-auto">
           <div
             className="grid"
             style={{
               gridTemplateColumns:
                 view === "weekly"
-                  ? `72px repeat(7, minmax(100px, 1fr))`
+                  ? "72px repeat(7, minmax(100px, 1fr))"
                   : `72px repeat(${resources.length}, minmax(120px, 1fr))`,
             }}
           >
-            {/* ── Header row ── */}
             <div className="sticky left-0 z-10 bg-slate-50 border-b border-r border-slate-100 h-12" />
 
             {view === "weekly"
-              ? weekDays.map((day, i) => {
+              ? weekDays.map((day, index) => {
                   const isToday = dateKey(day) === todayKey;
                   return (
                     <div
-                      key={i}
+                      key={index}
                       className={`flex flex-col items-center justify-center h-12 border-b border-r border-slate-100 last:border-r-0 ${
                         isToday ? "bg-indigo-50" : "bg-slate-50"
                       }`}
@@ -259,60 +287,59 @@ export function BookingCalendar({
                     </div>
                   );
                 })
-              : resources.map((r) => (
+              : resources.map((resource) => (
                   <div
-                    key={r.id}
+                    key={resource.id}
                     className="flex flex-col items-center justify-center h-12 border-b border-r border-slate-100 last:border-r-0 bg-slate-50 px-2"
                   >
-                    <span className="text-xs font-semibold text-slate-600 truncate max-w-full">{r.name}</span>
-                    {(r.resourceCode ?? r.code) && (
-                      <span className="text-xs text-slate-400 mt-0.5">{r.resourceCode ?? r.code}</span>
+                    <span className="text-xs font-semibold text-slate-600 truncate max-w-full">{resource.name}</span>
+                    {(resource.resourceCode ?? resource.code) && (
+                      <span className="text-xs text-slate-400 mt-0.5">{resource.resourceCode ?? resource.code}</span>
                     )}
                   </div>
                 ))}
 
-            {/* ── Slot rows ── */}
             {SLOTS.map((startHour) => (
-              <>
-                {/* Time label */}
+              <React.Fragment key={`slot-${startHour}`}>
                 <div
-                  key={`t-${startHour}`}
                   className="sticky left-0 z-10 bg-white border-b border-r border-slate-100 flex items-start justify-end pr-3 pt-2"
                   style={{ minHeight: "72px" }}
                 >
                   <span className="text-xs font-medium text-slate-400">{fmt12(startHour)}</span>
                 </div>
 
-                {/* Slot cells */}
                 {view === "weekly"
-                  ? weekDays.map((day, i) => {
-                      const dKey = dateKey(day);
-                      const isToday = dKey === todayKey;
-                      const slotBookings = resources
-                        .map((r) => getBooking(r.id, dKey, startHour))
-                        .filter((b): b is BookingSummaryResponse => Boolean(b));
+                  ? weekDays.map((day, index) => {
+                      const dayKey = dateKey(day);
+                      const isToday = dayKey === todayKey;
+                      const isPast = isPastDate(dayKey);
+                      const slotBookings = resources.flatMap((resource) =>
+                        getBookingsForSlot(resource.id, dayKey, startHour)
+                      );
 
                       return (
                         <div
-                          key={`week-${i}-${startHour}`}
+                          key={`week-${index}-${startHour}`}
                           style={{ minHeight: "72px" }}
-                          className={`border-b border-r border-slate-100 last:border-r-0 p-1 group transition-colors cursor-pointer ${
-                            isToday ? "hover:bg-indigo-50/50" : "hover:bg-slate-50"
+                          className={`border-b border-r border-slate-100 last:border-r-0 p-1 group transition-colors ${
+                            isPast
+                              ? "bg-slate-50/40 opacity-50 cursor-not-allowed"
+                              : `cursor-pointer ${isToday ? "hover:bg-indigo-50/50" : "hover:bg-slate-50"}`
                           }`}
-                          onClick={() => handleSlotClick(dKey, startHour)}
+                          onClick={() => handleSlotClick(dayKey, startHour)}
                         >
                           {slotBookings.length === 0 && (
                             <div className="hidden group-hover:flex items-center justify-center h-full opacity-60">
                               <span className="text-xs text-indigo-500 font-medium">+ Book</span>
                             </div>
                           )}
-                          {slotBookings.map((b) => {
-                            const s = getStatusStyles(b.status);
+                          {slotBookings.map((booking) => {
+                            const styles = getStatusStyles(booking.status);
                             return (
-                              <div key={b.id} className={`rounded-md px-2 py-1.5 ${s.chip} w-full mb-1`}>
-                                <p className="text-xs font-semibold truncate leading-tight">{b.resourceName}</p>
+                              <div key={booking.id} className={`rounded-md px-2 py-1.5 ${styles.chip} w-full mb-1`}>
+                                <p className="text-xs font-semibold truncate leading-tight">{booking.resourceName}</p>
                                 <p className="text-xs opacity-70 leading-tight mt-0.5">
-                                  {fmt12(startHour)}–{fmt12(startHour + SLOT_DURATION)}
+                                  {formatClockTime(booking.startTime)}-{formatClockTime(booking.endTime)}
                                 </p>
                               </div>
                             );
@@ -320,34 +347,38 @@ export function BookingCalendar({
                         </div>
                       );
                     })
-                  : resources.map((r) => {
-                      const dKey = anchorKey;
-                      const booking = getBooking(r.id, dKey, startHour);
-                      const s = booking ? getStatusStyles(booking.status) : null;
+                  : resources.map((resource) => {
+                      const isPast = isPastDate(anchorKey);
+                      const booking = getBookingsForSlot(resource.id, anchorKey, startHour)[0];
+                      const styles = booking ? getStatusStyles(booking.status) : null;
 
                       return (
                         <div
-                          key={`day-${r.id}-${startHour}`}
+                          key={`day-${resource.id}-${startHour}`}
                           style={{ minHeight: "72px" }}
-                          className="border-b border-r border-slate-100 last:border-r-0 p-1.5 group transition-colors cursor-pointer hover:bg-slate-50"
-                          onClick={() => handleSlotClick(dKey, startHour, r.id)}
+                          className={`border-b border-r border-slate-100 last:border-r-0 p-1.5 group transition-colors ${
+                            isPast
+                              ? "bg-slate-50/40 opacity-50 cursor-not-allowed"
+                              : "cursor-pointer hover:bg-slate-50"
+                          }`}
+                          onClick={() => handleSlotClick(anchorKey, startHour, resource.id)}
                         >
                           {!booking && (
                             <div className="hidden group-hover:flex items-center justify-center h-full opacity-60">
                               <span className="text-xs text-indigo-500 font-medium">+ Book</span>
                             </div>
                           )}
-                          {booking && s && (
-                            <div className={`rounded-md px-2 py-2 ${s.chip} w-full h-full`}>
+                          {booking && styles && (
+                            <div className={`rounded-md px-2 py-2 ${styles.chip} w-full h-full`}>
                               <div className="flex items-center gap-1.5 mb-1">
-                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.dot}`} />
+                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${styles.dot}`} />
                                 <p className="text-xs font-semibold truncate leading-tight capitalize">
                                   {booking.status.toLowerCase()}
                                 </p>
                               </div>
                               <p className="text-xs font-medium truncate leading-tight">{booking.requesterDisplayName}</p>
                               <p className="text-xs opacity-60 leading-tight mt-0.5">
-                                {fmt12(startHour)} – {fmt12(startHour + SLOT_DURATION)}
+                                {formatClockTime(booking.startTime)} - {formatClockTime(booking.endTime)}
                               </p>
                               {booking.expectedAttendees && (
                                 <p className="text-xs opacity-60 leading-tight mt-0.5">
@@ -359,12 +390,11 @@ export function BookingCalendar({
                         </div>
                       );
                     })}
-              </>
+              </React.Fragment>
             ))}
           </div>
         </div>
 
-        {/* Legend */}
         <div className="flex items-center gap-6 px-6 py-3 border-t border-slate-100 bg-slate-50 flex-wrap">
           <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">Legend</span>
           {[
