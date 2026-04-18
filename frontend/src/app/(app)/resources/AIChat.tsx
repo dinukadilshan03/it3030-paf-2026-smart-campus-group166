@@ -1,112 +1,319 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-type Message = {
-  id: string;
-  role: "user" | "ai";
-  text: string;
-  suggestions?: any[];
-};
+interface Props {
+  onResult?: (data: any[]) => void;
+  isAdmin?: boolean;
+  onUse?: (name: string) => void;
+}
 
-export default function AIChat({ isAdmin, onUse }: { isAdmin: boolean; onUse: (name: string) => void; }) {
-  const router = useRouter();
-  const [input, setInput] = useState("");
+export default function AIChat({ onResult, isAdmin, onUse }: Props) {
+  const [message, setMessage] = useState("");
+  const [messages, setMessages] = useState<
+    { text: string; sender: "user" | "bot" }[]
+  >([]);
+  const [suggestedResults, setSuggestedResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const welcome = { id: "welcome-ai", role: "ai", text: "Hi — I can help find rooms, labs, and equipment. Try: \"meeting room for 20 people\" or \"computer lab with 30 PCs\"." } as Message;
-  const [messages, setMessages] = useState<Message[]>([welcome]);
 
-  const clearChat = () => setMessages([welcome]);
+  const suggestions = [
+    "meeting room for 20 people",
+    "computer lab with 30 PCs",
+    "seminar room near Engineering Block for 15",
+  ];
 
-  const send = async () => {
-    const q = input.trim();
-    if (!q) return;
-    const userMsg: Message = { id: Date.now().toString(), role: "user", text: q };
-    setMessages((m) => [...m, userMsg]);
-    setInput("");
+  const sendMessage = async (customMsg?: string) => {
+    const query = customMsg || message;
+    if (!query.trim()) return;
+
+    // add user message
+    setMessages((prev) => [...prev, { text: query, sender: "user" }]);
+    setMessage("");
     setLoading(true);
 
     try {
       const res = await fetch("http://localhost:8080/api/ai/recommendations", {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: q }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query }),
       });
-      if (!res.ok) throw new Error(await res.text());
+
+      if (!res.ok) {
+        const txt = await res.text();
+        try {
+          const j = JSON.parse(txt);
+          throw new Error(j.message || txt || "AI request failed");
+        } catch (e) {
+          throw new Error(txt || "AI request failed");
+        }
+      }
+
       const data = await res.json();
 
-      const aiText = data && data.length > 0 ? `I found ${data.length} suggestion(s). Tap Use to filter the list.` : "I couldn't find any matching resources. Try widening location or lowering capacity.";
-      const aiMsg: Message = { id: Date.now().toString() + "-ai", role: "ai", text: aiText, suggestions: Array.isArray(data) ? data : [] };
-      setMessages((m) => [...m, aiMsg]);
-    } catch (err: any) {
-      const errMsg: Message = { id: Date.now().toString() + "-err", role: "ai", text: `Error: ${err?.message || err}` };
-      setMessages((m) => [...m, errMsg]);
+      // Normalize response shapes to an array of results
+      let results: any[] = [];
+      if (Array.isArray(data)) results = data;
+      else if (Array.isArray(data.resources)) results = data.resources;
+      else if (Array.isArray(data.content)) results = data.content;
+      else if (Array.isArray(data.data)) results = data.data;
+      else if (Array.isArray(data.items)) results = data.items;
+      else results = [];
+
+      // store structured suggestions for UI
+      setSuggestedResults(results);
+
+      // send to parent
+      if (onResult) onResult(results);
+
+      // show bot message summarizing results
+      setMessages((prev) => [
+        ...prev,
+        {
+          text:
+            results.length > 0
+              ? `I found ${results.length} suggestion(s). See below and tap Use to apply.`
+              : "I couldn't find any matching resources. Try widening location or lowering capacity.",
+          sender: "bot",
+        },
+      ]);
+
+    } catch (err) {
+      console.error(err);
+      setMessages((prev) => [
+        ...prev,
+        { text: "⚠️ Something went wrong", sender: "bot" },
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
+  const clearChat = () => {
+    setMessages([]);
+    setSuggestedResults([]);
+    setMessage("");
+    setLoading(false);
+    if (onResult) onResult([]);
+  };
+
   return (
-    <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, marginTop: 10 }}>
-      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+    <div style={styles.container}>
+      {/* header is provided by the page wrapper */}
+
+      {/* INPUT */}
+      <div style={styles.inputRow}>
         <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
+          type="text"
           placeholder="Ask AI: e.g. 'meeting room for 20 people'"
-          style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
-          onKeyDown={(e) => { if (e.key === "Enter") send(); }}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          style={styles.input}
         />
-        <button onClick={send} disabled={loading} style={{ padding: "10px 12px", borderRadius: 8, background: "#10b981", color: "#fff", border: "none" }}>
-          {loading ? "Loading..." : "Ask"}
+
+        <button onClick={() => sendMessage()} style={styles.askBtn}>
+          Ask
         </button>
-        <button onClick={clearChat} disabled={messages.length === 0} style={{ padding: "10px 12px", borderRadius: 8, background: "#ef4444", color: "#fff", border: "none" }}>
+
+        <button onClick={clearChat} style={styles.clearBtn}>
           Clear
         </button>
       </div>
 
-      {/* Quick examples */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-        {[
-          "meeting room for 20 people",
-          "computer lab with 30 PCs",
-          "seminar room near Engineering Block for 15"
-        ].map((ex) => (
-          <button key={ex} onClick={() => { setInput(ex); }} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff" }}>{ex}</button>
+      {/* SUGGESTIONS */}
+      <div style={styles.suggestions}>
+        {suggestions.map((s, i) => (
+          <span key={i} style={styles.chip} onClick={() => sendMessage(s)}>
+            {s}
+          </span>
         ))}
       </div>
 
-      <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 8 }}>Tip: include capacity and location for better results. Editing is restricted to admins.</div>
+      {/* CHAT */}
+      <div style={styles.chatBox}>
+        {messages.length === 0 && (
+          <div style={styles.botMsg}>
+            Hi — I can help find rooms, labs, and equipment.
+          </div>
+        )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {messages.map((m) => (
-          <div key={m.id} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: 560 }}>
-            <div style={{ background: m.role === "user" ? "#eef2ff" : "#f8fafc", padding: 10, borderRadius: 8 }}>
-              <div style={{ fontSize: 14, whiteSpace: "pre-wrap" }}>{m.text}</div>
-            </div>
-
-            {m.suggestions && m.suggestions.length > 0 && (
-              <div style={{ marginTop: 8, display: "flex", gap: 10, overflowX: "auto" }}>
-                {m.suggestions.map((s: any) => (
-                  <div key={s.id} style={{ minWidth: 260, background: "#fff", padding: 12, borderRadius: 8, boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-                    <strong>{s.name} {s.resourceCode ? `(${s.resourceCode})` : ""}</strong>
-                    <div style={{ fontSize: 13, marginTop: 6 }}>
-                      <div>Category: {s.categoryName}</div>
-                      <div>Location: {s.locationName}</div>
-                      <div>Capacity: {s.capacity ?? 'N/A'}</div>
-                    </div>
-                    <div style={{ marginTop: 8 }}>
-                      {isAdmin && <button onClick={() => router.push(`/resources/edit/${s.id}`)} style={{ marginRight: 8 }}>Open</button>}
-                      <button onClick={() => { onUse(s.name || ""); window.scrollTo({ top: 400, behavior: 'smooth' }); }}>Use</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+        {messages.map((msg, i) => (
+          <div
+            key={i}
+            style={msg.sender === "user" ? styles.userMsg : styles.botMsg}
+          >
+            {msg.text}
           </div>
         ))}
+
+        {/* Render structured suggestion cards when present */}
+        {suggestedResults.length > 0 && (
+          <div style={styles.resultsGrid}>
+            {suggestedResults.map((r: any, idx: number) => (
+              <div key={idx} style={styles.resultCard}>
+                <div style={styles.resultTitle}>{r.name || r.categoryName || "Resource"}</div>
+                <div style={styles.resultMeta}>
+                  {r.locationName ? `${r.locationName}` : "Unknown location"}
+                  {r.capacity ? ` • capacity ${r.capacity}` : ""}
+                </div>
+                <div style={styles.resultActions}>
+                  <button
+                    style={styles.useBtn}
+                    onClick={() => {
+                      const name = r.name || r.categoryName || "";
+                      if (onUse) onUse(name);
+                      // apply as a user-visible action
+                      setMessages((m) => [...m, { text: `Using: ${name}`, sender: "user" }]);
+                    }}
+                  >
+                    Use
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {loading && <div style={styles.botMsg}>Thinking...</div>}
       </div>
     </div>
   );
 }
+
+const styles: any = {
+  container: {
+    background: "#fff",
+    borderRadius: "16px",
+    padding: "20px",
+    boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+    marginBottom: "20px",
+  },
+
+  header: {
+    fontSize: "18px",
+    fontWeight: "600",
+  },
+
+  sub: {
+    fontSize: "13px",
+    color: "#6b7280",
+    marginTop: "4px",
+  },
+
+  inputRow: {
+    display: "flex",
+    gap: "10px",
+    marginTop: "12px",
+  },
+
+  input: {
+    flex: 1,
+    padding: "12px",
+    borderRadius: "10px",
+    border: "1px solid #ddd",
+  },
+
+  askBtn: {
+    background: "#10b981",
+    color: "#fff",
+    border: "none",
+    padding: "10px 16px",
+    borderRadius: "10px",
+    cursor: "pointer",
+  },
+
+  clearBtn: {
+    background: "#ef4444",
+    color: "#fff",
+    border: "none",
+    padding: "10px 16px",
+    borderRadius: "10px",
+    cursor: "pointer",
+  },
+
+  suggestions: {
+    marginTop: "10px",
+    display: "flex",
+    gap: "8px",
+    flexWrap: "wrap",
+  },
+
+  chip: {
+    background: "#f1f5f9",
+    padding: "6px 10px",
+    borderRadius: "20px",
+    fontSize: "12px",
+    cursor: "pointer",
+    border: "1px solid #e5e7eb",
+  },
+
+  chatBox: {
+    marginTop: "15px",
+    maxHeight: "250px",
+    overflowY: "auto",
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+  },
+
+  resultsGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: 12,
+    marginTop: 8,
+  },
+
+  resultCard: {
+    background: "#ffffff",
+    border: "1px solid #eef2ff",
+    padding: 12,
+    borderRadius: 10,
+    boxShadow: "0 6px 18px rgba(15,23,42,0.03)",
+  },
+
+  resultTitle: {
+    fontWeight: 600,
+    marginBottom: 6,
+  },
+
+  resultMeta: {
+    fontSize: 13,
+    color: "#6b7280",
+    marginBottom: 8,
+  },
+
+  resultActions: {
+    display: "flex",
+    gap: 8,
+  },
+
+  userMsg: {
+    alignSelf: "flex-end",
+    background: "#6366f1",
+    color: "#fff",
+    padding: "10px 14px",
+    borderRadius: "14px",
+    maxWidth: "70%",
+  },
+
+  botMsg: {
+    alignSelf: "flex-start",
+    background: "#f3f4f6",
+    padding: "10px 14px",
+    borderRadius: "14px",
+    maxWidth: "70%",
+  },
+
+  useBtn: {
+    marginTop: "5px",
+    padding: "5px 10px",
+    background: "#3b82f6",
+    color: "#fff",
+    border: "none",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "12px",
+  },
+};
