@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from "@/lib/config/env";
+import { getFrontendApiBaseUrl } from "@/lib/config/env";
 import type { AdminUserSummary } from "@/lib/users/types";
 import type { RoleCode } from "@/types/auth";
 
@@ -150,7 +150,7 @@ export function formatFileSize(bytes: number | null | undefined) {
 }
 
 export function getTicketAttachmentContentUrl(ticketId: number, attachmentId: number) {
-  return `${getApiBaseUrl()}/api/v1/tickets/${ticketId}/attachments/${attachmentId}/content`;
+  return `${getFrontendApiBaseUrl()}/api/v1/tickets/${ticketId}/attachments/${attachmentId}/content`;
 }
 
 export function getTicketAttachmentFormatLabel(mimeType: string | null | undefined, fileName: string) {
