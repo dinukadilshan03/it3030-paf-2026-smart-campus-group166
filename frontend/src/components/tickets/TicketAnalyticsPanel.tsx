@@ -8,6 +8,8 @@ import {
   getResolutionTimerState,
   getSlaRiskTicketCount,
   getUnassignedTicketCount,
+  isArchivedTicket,
+  isOldTicket,
 } from "@/lib/tickets/shared";
 import type { TicketCategorySummary, TicketPriority, TicketStatus, TicketSummary } from "@/lib/tickets/types";
 import type { CurrentUser } from "@/types/auth";
@@ -716,6 +718,115 @@ function InsightList({
   );
 }
 
+function AdminTicketReviewPanel({
+  tickets,
+  nowMs,
+}: {
+  tickets: TicketSummary[];
+  nowMs: number;
+}) {
+  const reporterCounts = toCountMap(tickets.map((ticket) => ticket.reporterDisplayName));
+  const createdByUsers = getTopEntries(reporterCounts, 6).map(([label, value], index) => ({
+    label,
+    value,
+    tone:
+      index % 3 === 0 ? "bg-slate-800" : index % 3 === 1 ? "bg-sky-500" : "bg-emerald-500",
+    softTone:
+      index % 3 === 0 ? "bg-slate-100" : index % 3 === 1 ? "bg-sky-100" : "bg-emerald-100",
+  }));
+  const rejectedTickets = tickets.filter((ticket) => ticket.status === "REJECTED");
+  const rejectedTicketPreview = rejectedTickets
+    .sort((left, right) => (parseDateMs(right.updatedAt) ?? 0) - (parseDateMs(left.updatedAt) ?? 0))
+    .slice(0, 6);
+  const newRejectedTickets = rejectedTickets.filter((ticket) => !isOldTicket(ticket, nowMs)).length;
+  const oldRejectedTickets = rejectedTickets.filter((ticket) => isOldTicket(ticket, nowMs)).length;
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <HorizontalBarList
+        title="Created tickets by users"
+        subtitle="See which reporters are generating the most ticket volume inside the current admin history."
+        items={
+          createdByUsers.length > 0
+            ? createdByUsers
+            : [{ label: "No user-created tickets yet", value: 0, tone: "bg-slate-300", softTone: "bg-slate-100" }]
+        }
+      />
+
+      <div className="rounded-[1.7rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,241,242,0.92))] p-6 shadow-[0_18px_55px_rgba(15,23,42,0.06)]">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-950">Rejected ticket review</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Review the rejected queue alongside the age split for rejected tickets only.
+            </p>
+          </div>
+          <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">
+            {rejectedTickets.length} currently rejected
+          </span>
+        </div>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-[1.2rem] border border-slate-200 bg-white/84 p-4">
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              New rejected
+            </p>
+            <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+              {newRejectedTickets}
+            </p>
+          </div>
+          <div className="rounded-[1.2rem] border border-slate-200 bg-white/84 p-4">
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Old rejected
+            </p>
+            <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+              {oldRejectedTickets}
+            </p>
+          </div>
+          <div className="rounded-[1.2rem] border border-slate-200 bg-white/84 p-4">
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Rejected tickets
+            </p>
+            <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+              {rejectedTickets.length}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          {rejectedTicketPreview.length === 0 ? (
+            <div className="rounded-[1.2rem] border border-dashed border-slate-300 bg-white/84 px-4 py-5 text-sm leading-7 text-slate-600">
+              No tickets are currently rejected in this admin view.
+            </div>
+          ) : (
+            rejectedTicketPreview.map((ticket) => (
+              <div
+                key={ticket.id}
+                className="rounded-[1.2rem] border border-slate-200 bg-white/84 p-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-500">
+                      {ticket.ticketNumber}
+                    </p>
+                    <p className="mt-2 text-base font-semibold text-slate-950">{ticket.title}</p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Reporter: {ticket.reporterDisplayName}
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700">
+                    Updated {formatDays(Math.max(0, Math.round((nowMs - (parseDateMs(ticket.updatedAt) ?? nowMs)) / DAY_MS)))}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function getRoleSpotlightData(
   role: NonNullable<CurrentUser["role"]>,
   currentUserId: number | null,
@@ -821,18 +932,21 @@ export function TicketAnalyticsPanel({
   const [trendMode, setTrendMode] = useState<TrendMode>("both");
   const [nowMs] = useState(() => Date.now());
   const role = currentUser.role ?? "STUDENT";
-  const totalTickets = tickets.length;
-  const awaitingResponse = getAwaitingFirstResponseCount(tickets);
-  const unassignedCount = getUnassignedTicketCount(tickets);
-  const slaRiskCount = getSlaRiskTicketCount(tickets, nowMs);
-  const firstResponseRiskCount = tickets.filter(
+  const liveScopeTickets = tickets.filter((ticket) => !isArchivedTicket(ticket));
+  const archivedClosedCount = tickets.length - liveScopeTickets.length;
+  const totalTickets = liveScopeTickets.length;
+  const totalTicketHistory = tickets.length;
+  const awaitingResponse = getAwaitingFirstResponseCount(liveScopeTickets);
+  const unassignedCount = getUnassignedTicketCount(liveScopeTickets);
+  const slaRiskCount = getSlaRiskTicketCount(liveScopeTickets, nowMs);
+  const firstResponseRiskCount = liveScopeTickets.filter(
     (ticket) => getFirstResponseTimerState(ticket, nowMs).tone === "danger",
   ).length;
-  const resolutionRiskCount = tickets.filter(
+  const resolutionRiskCount = liveScopeTickets.filter(
     (ticket) => getResolutionTimerState(ticket, nowMs).tone === "danger",
   ).length;
-  const categoriesInUseCount = new Set(tickets.map((ticket) => ticket.ticketCategoryId)).size;
-  const oldestOpenTicketDays = getOldestOpenTicketDays(tickets, nowMs);
+  const categoriesInUseCount = new Set(liveScopeTickets.map((ticket) => ticket.ticketCategoryId)).size;
+  const oldestOpenTicketDays = getOldestOpenTicketDays(liveScopeTickets, nowMs);
   const avgFirstResponseHours = getAverageDurationHours(tickets, (ticket) => ticket.firstRespondedAt);
   const avgResolutionHours = getAverageDurationHours(tickets, (ticket) => ticket.resolvedAt);
   const weeklySeries = buildWeeklySeries(tickets);
@@ -845,10 +959,10 @@ export function TicketAnalyticsPanel({
   const resolvedOrClosedCount = tickets.filter(
     (ticket) => ticket.status === "RESOLVED" || ticket.status === "CLOSED",
   ).length;
-  const activeWorkCount = tickets.filter(
+  const activeWorkCount = liveScopeTickets.filter(
     (ticket) => ticket.status === "OPEN" || ticket.status === "IN_PROGRESS",
   ).length;
-  const completionRate = formatPercentage(resolvedOrClosedCount, totalTickets);
+  const completionRate = formatPercentage(resolvedOrClosedCount, totalTicketHistory);
   const weeklyCreatedTotal = weeklySeries.reduce((sum, point) => sum + point.created, 0);
   const weeklyResolvedTotal = weeklySeries.reduce((sum, point) => sum + point.resolved, 0);
   const combinedReviews = totalStaffReviews + totalAdminReviews;
@@ -856,13 +970,13 @@ export function TicketAnalyticsPanel({
   const statusSeries = (Object.keys(STATUS_META) as TicketStatus[]).map((status) => ({
     key: status,
     label: STATUS_META[status].label,
-    value: tickets.filter((ticket) => ticket.status === status).length,
+    value: liveScopeTickets.filter((ticket) => ticket.status === status).length,
     tone: STATUS_META[status].tone,
     softTone: STATUS_META[status].softTone,
     textTone: STATUS_META[status].textTone,
   }));
 
-  const priorityCounts = toCountMap(tickets.map((ticket) => ticket.priority));
+  const priorityCounts = toCountMap(liveScopeTickets.map((ticket) => ticket.priority));
   const prioritySeries = (Object.keys(PRIORITY_META) as TicketPriority[]).map((priority) => ({
     key: priority,
     label: PRIORITY_META[priority].label,
@@ -873,7 +987,7 @@ export function TicketAnalyticsPanel({
   }));
 
   const categoryCounts = toCountMap(
-    tickets.map((ticket) => ticket.ticketCategoryName || "Uncategorized"),
+    liveScopeTickets.map((ticket) => ticket.ticketCategoryName || "Uncategorized"),
   );
   const categorySeries = getTopEntries(categoryCounts, 6).map(([label, value], index) => ({
     label,
@@ -887,14 +1001,14 @@ export function TicketAnalyticsPanel({
   const spotlight = getRoleSpotlightData(
     role,
     currentUser.id,
-    tickets,
+    liveScopeTickets,
     awaitingResponse,
     slaRiskCount,
   );
   const topCategory = categorySeries[0]?.label ?? null;
   const insights = buildInsights({
     role,
-    totalTickets,
+    totalTickets: totalTicketHistory,
     awaitingResponse,
     slaRiskCount,
     unassignedCount,
@@ -970,7 +1084,7 @@ export function TicketAnalyticsPanel({
           {
             label: "Tickets in scope",
             value: totalTickets,
-            detail: "Every ticket currently returned by your active role scope and filters.",
+            detail: "Active tickets currently returned by your role scope. Closed archived tickets are excluded.",
             accent: "bg-slate-900",
           },
           {
@@ -995,9 +1109,9 @@ export function TicketAnalyticsPanel({
       : role === "STAFF"
         ? [
             {
-              label: "Tickets in scope",
+              label: "Active tickets in scope",
               value: totalTickets,
-              detail: "Your assigned tickets plus the issues you have reported yourself.",
+              detail: "Your assigned tickets plus the issues you have reported yourself, excluding archived closed work.",
               accent: "bg-slate-900",
             },
             {
@@ -1021,9 +1135,9 @@ export function TicketAnalyticsPanel({
           ]
         : [
             {
-              label: "Reported tickets",
+              label: "Active reported tickets",
               value: totalTickets,
-              detail: "Every ticket you have reported in the current support workspace.",
+              detail: "Tickets you have reported that are still in the active analytics scope.",
               accent: "bg-slate-900",
             },
             {
@@ -1088,10 +1202,10 @@ export function TicketAnalyticsPanel({
               </div>
               <div className="rounded-[1.25rem] border border-white/90 bg-white/82 p-4 shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
                 <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Completion rate
+                  Archived closed
                 </p>
                 <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-                  {completionRate}
+                  {archivedClosedCount}
                 </p>
               </div>
             </div>
@@ -1174,23 +1288,27 @@ export function TicketAnalyticsPanel({
           <div className="space-y-4">
             <SegmentedDistribution
               title="Status distribution"
-              subtitle="A quick view of how the current ticket scope is spread across the full workflow."
+              subtitle="A quick view of how the current active ticket scope is spread across the live workflow."
               series={statusSeries}
             />
             <SegmentedDistribution
               title="Priority mix"
-              subtitle="Useful for spotting whether the workspace is leaning toward urgent or routine maintenance work."
+              subtitle="Useful for spotting whether the active workspace is leaning toward urgent or routine maintenance work."
               series={prioritySeries}
             />
           </div>
         </div>
 
         <ReviewOversightPanel
-          totalTickets={totalTickets}
+          totalTickets={totalTicketHistory}
           totalStaffReviews={totalStaffReviews}
           totalAdminReviews={totalAdminReviews}
           totalReconsiderationRequests={totalReconsiderationRequests}
         />
+
+        {role === "ADMIN" ? (
+          <AdminTicketReviewPanel tickets={tickets} nowMs={nowMs} />
+        ) : null}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.95fr)]">
           <HorizontalBarList
