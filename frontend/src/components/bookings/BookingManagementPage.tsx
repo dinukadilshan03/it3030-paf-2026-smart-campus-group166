@@ -465,7 +465,7 @@ export function BookingManagementPage({
                           </>
                         ) : (
                           <>
-                            <X size={18} className="flex-shrink-0" />
+                            <XCircle size={18} className="flex-shrink-0" />
                             Reject
                           </>
                         )}
