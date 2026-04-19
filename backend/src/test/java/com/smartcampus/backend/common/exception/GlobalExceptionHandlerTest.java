@@ -42,4 +42,22 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().message()).isEqualTo("Attachment image must be 5 MB or smaller");
     }
+
+    @Test
+    void preservesClearStorageFailureMessageForAttachmentUploads() {
+        MockHttpServletRequest request =
+                new MockHttpServletRequest("POST", "/api/v1/tickets/8/attachments");
+
+        var response =
+                handler.handleIllegalState(
+                        new IllegalStateException(
+                                "Could not upload the attachment image. Confirm the ticket attachments bucket exists and Supabase storage is configured."),
+                        request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().message())
+                .isEqualTo(
+                        "Could not upload the attachment image. Confirm the ticket attachments bucket exists and Supabase storage is configured.");
+    }
 }
