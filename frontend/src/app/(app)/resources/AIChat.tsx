@@ -32,7 +32,8 @@ export default function AIChat({ onResult, isAdmin, onUse }: Props) {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:8080/api/ai/recommendations", {
+      const endpoint = '/api/ai/recommendations';
+      const res = await fetch(endpoint, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -43,12 +44,15 @@ export default function AIChat({ onResult, isAdmin, onUse }: Props) {
 
       if (!res.ok) {
         const txt = await res.text();
+        // include status for easier debugging
+        let msg = `AI request failed (${res.status} ${res.statusText})`;
         try {
           const j = JSON.parse(txt);
-          throw new Error(j.message || txt || "AI request failed");
-        } catch (e) {
-          throw new Error(txt || "AI request failed");
+          msg = j.message || txt || msg;
+        } catch (_) {
+          msg = txt || msg;
         }
+        throw new Error(msg);
       }
 
       const data = await res.json();
