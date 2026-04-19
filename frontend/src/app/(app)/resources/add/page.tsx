@@ -10,6 +10,7 @@ import {
   createLocation,
 } from "@/lib/resources/api";
 import { useRouter } from "next/navigation";
+import FormMessages from "../../../components/ui/FormMessages";
 
 export default function AddResourcePage() {
   const router = useRouter();
@@ -30,6 +31,8 @@ export default function AddResourcePage() {
 
   const [preview, setPreview] = useState("");
   const [tempImage, setTempImage] = useState("");
+  const [errors, setErrors] = useState<string[]>([]);
+  const [success, setSuccess] = useState<string | null>(null);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryCode, setNewCategoryCode] = useState("");
   const [newLocationName, setNewLocationName] = useState("");
@@ -80,30 +83,72 @@ export default function AddResourcePage() {
   };
 
   const handleCreateCategory = async () => {
-    if (!newCategoryName.trim()) return alert('Enter category name');
-    if (!newCategoryCode.trim()) return alert('Enter category code');
+    setErrors([]);
+    setSuccess(null);
+    if (!newCategoryName.trim()) {
+      setErrors(["Enter category name"]);
+      return;
+    }
+    if (!newCategoryCode.trim()) {
+      setErrors(["Enter category code"]);
+      return;
+    }
     try {
       await createResourceCategory({ name: newCategoryName.trim(), code: newCategoryCode.trim() });
       setNewCategoryName('');
       setNewCategoryCode('');
       await loadData();
-      alert('Category added');
+      setSuccess('Category added');
+      setTimeout(() => setSuccess(null), 2500);
     } catch (e: any) {
-      alert(e.message || 'Failed to add category');
+      try {
+        const parsed = JSON.parse(e.message || e || '{}');
+        if (parsed.validationErrors) {
+          const arr = Object.entries(parsed.validationErrors).map(([k, v]: any) => `${k}: ${v}`);
+          setErrors(arr as string[]);
+        } else if (parsed.message) {
+          setErrors([parsed.message]);
+        } else {
+          setErrors([e.message || 'Failed to add category']);
+        }
+      } catch (_) {
+        setErrors([e.message || 'Failed to add category']);
+      }
     }
   };
 
   const handleCreateLocation = async () => {
-    if (!newLocationName.trim()) return alert('Enter location name');
-    if (!newLocationCode.trim()) return alert('Enter location code');
+    setErrors([]);
+    setSuccess(null);
+    if (!newLocationName.trim()) {
+      setErrors(["Enter location name"]);
+      return;
+    }
+    if (!newLocationCode.trim()) {
+      setErrors(["Enter location code"]);
+      return;
+    }
     try {
       await createLocation({ name: newLocationName.trim(), code: newLocationCode.trim() });
       setNewLocationName('');
       setNewLocationCode('');
       await loadData();
-      alert('Location added');
+      setSuccess('Location added');
+      setTimeout(() => setSuccess(null), 2500);
     } catch (e: any) {
-      alert(e.message || 'Failed to add location');
+      try {
+        const parsed = JSON.parse(e.message || e || '{}');
+        if (parsed.validationErrors) {
+          const arr = Object.entries(parsed.validationErrors).map(([k, v]: any) => `${k}: ${v}`);
+          setErrors(arr as string[]);
+        } else if (parsed.message) {
+          setErrors([parsed.message]);
+        } else {
+          setErrors([e.message || 'Failed to add location']);
+        }
+      } catch (_) {
+        setErrors([e.message || 'Failed to add location']);
+      }
     }
   };
 
@@ -156,10 +201,23 @@ export default function AddResourcePage() {
         );
       }
 
-      alert("Added ✅");
-      router.push("/resources");
+      // show success briefly then navigate
+      setSuccess('Added ✅');
+      setTimeout(() => router.push("/resources"), 400);
     } catch (err: any) {
-      alert(err.message);
+      try {
+        const parsed = JSON.parse(err.message || err || '{}');
+        if (parsed.validationErrors) {
+          const arr = Object.entries(parsed.validationErrors).map(([k, v]: any) => `${k}: ${v}`);
+          setErrors(arr as string[]);
+        } else if (parsed.message) {
+          setErrors([parsed.message]);
+        } else {
+          setErrors([err.message || 'Save failed']);
+        }
+      } catch (_) {
+        setErrors([err.message || 'Save failed']);
+      }
     }
   };
 
@@ -169,6 +227,8 @@ export default function AddResourcePage() {
         <h2 style={styles.title}>➕ Add Resource</h2>
 
         
+
+        <FormMessages errors={errors} success={success} onClose={() => { setErrors([]); setSuccess(null); }} />
 
         <div style={styles.grid}>
           <input
