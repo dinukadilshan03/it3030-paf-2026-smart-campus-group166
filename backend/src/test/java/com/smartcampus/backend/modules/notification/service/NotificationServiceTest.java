@@ -63,6 +63,23 @@ class NotificationServiceTest {
     }
 
     @Test
+    void ticketStatusNotificationSkipsNullAssignedStaffSnapshot() {
+        User reporter = buildUser(3L, "reporter@example.com", "Reporter");
+        User admin = buildUser(4L, "admin@example.com", "Admin");
+        Ticket ticket = buildTicket(13L, reporter);
+
+        notificationService.notifyTicketStatusChanged(ticket, TicketStatus.REJECTED, admin, null);
+
+        ArgumentCaptor<List<Notification>> captor = ArgumentCaptor.forClass(List.class);
+        verify(notificationRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).singleElement().satisfies(notification -> {
+            assertThat(notification.getUser()).isEqualTo(reporter);
+            assertThat(notification.getType()).isEqualTo(NotificationType.TICKET);
+            assertThat(notification.getTitle()).isEqualTo("Ticket status updated");
+        });
+    }
+
+    @Test
     void publicCommentNotifiesReporterAndAssignedStaffExceptAuthor() {
         User reporter = buildUser(1L, "reporter@example.com", "Reporter");
         User staff = buildUser(2L, "staff@example.com", "Staff");

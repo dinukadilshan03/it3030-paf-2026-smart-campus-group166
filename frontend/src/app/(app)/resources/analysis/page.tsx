@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
+import { listBookingsClient } from "@/lib/bookings/client";
 import { getResources } from "@/lib/resources/api";
 import ResourceDemands from "@/components/resources/ResourceDemands";
 
@@ -35,9 +36,7 @@ export default function ResourceAnalysisPage() {
         setStatusBreakdown(breakdown);
 
         // bookings -> utilization trend
-        const resp = await fetch('/api/v1/bookings');
-        let bookings: any[] = [];
-        if (resp.ok) bookings = (await resp.json()) || [];
+        const bookings = await listBookingsClient();
         setBookings(bookings);
 
         // compute bookings per day for last 14 days

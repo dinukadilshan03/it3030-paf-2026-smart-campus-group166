@@ -1,21 +1,18 @@
-const BASE_URL = "http://localhost:8080/api/v1";
+import { clientApiFetch } from "@/lib/api/client";
+import { getFrontendApiBaseUrl } from "@/lib/config/env";
 
-// ✅ GET RESOURCES
 export const getResources = async (search?: string) => {
   try {
-    let url = `${BASE_URL}/resources`;
-
+    const params = new URLSearchParams();
     if (search && search.trim() !== "") {
-      url += `?search=${search}`;
+      params.set("search", search);
     }
 
-    const res = await fetch(url, {
-      credentials: "include",
-    });
+    const query = params.toString();
+    const res = await clientApiFetch(`/api/v1/resources${query ? `?${query}` : ""}`);
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      // Avoid printing console.error in server components (dev overlay). Handle 401 quietly.
       if (res.status === 401) {
         console.warn('GET resources: authentication required');
         return [];
@@ -31,12 +28,9 @@ export const getResources = async (search?: string) => {
   }
 };
 
-// ✅ GET CATEGORIES
 export const getCategories = async () => {
   try {
-    const res = await fetch(`${BASE_URL}/resource-categories`, {
-      credentials: "include",
-    });
+    const res = await clientApiFetch("/api/v1/resource-categories");
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       console.warn('GET categories error:', res.status, text);
@@ -49,12 +43,9 @@ export const getCategories = async () => {
   }
 };
 
-// ✅ GET LOCATIONS
 export const getLocations = async () => {
   try {
-    const res = await fetch(`${BASE_URL}/locations`, {
-      credentials: "include",
-    });
+    const res = await clientApiFetch("/api/v1/locations");
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       console.warn('GET locations error:', res.status, text);
@@ -67,11 +58,9 @@ export const getLocations = async () => {
   }
 };
 
-// ✅ CREATE
-export const createResource = async (data: any) => {
-  const res = await fetch(`${BASE_URL}/resources`, {
+export const createResource = async (data: unknown) => {
+  const res = await clientApiFetch("/api/v1/resources", {
     method: "POST",
-    credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
@@ -82,11 +71,9 @@ export const createResource = async (data: any) => {
   return res.json();
 };
 
-// ✅ UPDATE
-export const updateResource = async (id: number, data: any) => {
-  const res = await fetch(`${BASE_URL}/resources/${id}`, {
+export const updateResource = async (id: number, data: unknown) => {
+  const res = await clientApiFetch(`/api/v1/resources/${id}`, {
     method: "PATCH",
-    credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
@@ -97,21 +84,30 @@ export const updateResource = async (id: number, data: any) => {
   return res.json();
 };
 
-// ✅ DELETE
+export const uploadResourceImage = async (id: number, file: File) => {
+  const formData = new FormData();
+  formData.set("file", file);
+
+  const res = await clientApiFetch(`/api/v1/resources/${id}/image`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
 export const deleteResource = async (id: number) => {
-  const res = await fetch(`${BASE_URL}/resources/${id}`, {
+  const res = await clientApiFetch(`/api/v1/resources/${id}`, {
     method: "DELETE",
-    credentials: "include",
   });
 
   if (!res.ok) throw new Error(await res.text());
 };
 
-// ✅ CREATE CATEGORY
-export const createResourceCategory = async (data: any) => {
-  const res = await fetch(`${BASE_URL}/resource-categories`, {
+export const createResourceCategory = async (data: unknown) => {
+  const res = await clientApiFetch("/api/v1/resource-categories", {
     method: "POST",
-    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
@@ -120,15 +116,29 @@ export const createResourceCategory = async (data: any) => {
   return res.json();
 };
 
-// ✅ CREATE LOCATION
-export const createLocation = async (data: any) => {
-  const res = await fetch(`${BASE_URL}/locations`, {
+export const createLocation = async (data: unknown) => {
+  const res = await clientApiFetch("/api/v1/locations", {
     method: "POST",
-    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
 
   if (!res.ok) throw new Error(await res.text());
   return res.json();
+};
+
+export const resolveResourceImageUrl = (imageUrl?: string | null) => {
+  if (!imageUrl) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(imageUrl) || imageUrl.startsWith("data:")) {
+    return imageUrl;
+  }
+
+  if (imageUrl.startsWith("/")) {
+    return `${getFrontendApiBaseUrl()}${imageUrl}`;
+  }
+
+  return imageUrl;
 };

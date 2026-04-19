@@ -45,6 +45,7 @@ import {
   getTicketErrorMessage,
   getUnassignedTicketCount,
   isArchivedTicket,
+  parseTicketDateValue,
   resolveSelectedTicketId,
   TicketApiError,
 } from "@/lib/tickets/shared";
@@ -263,9 +264,14 @@ function isTicketWorkspaceSection(
 
 function formatTicketSelectorDate(value: string) {
   try {
+    const parsedDate = parseTicketDateValue(value);
+    if (parsedDate == null) {
+      return value;
+    }
+
     return new Intl.DateTimeFormat("en-LK", {
       dateStyle: "medium",
-    }).format(new Date(value));
+    }).format(new Date(parsedDate));
   } catch {
     return value;
   }

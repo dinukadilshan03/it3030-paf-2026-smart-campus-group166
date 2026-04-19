@@ -7,6 +7,8 @@ import {
   updateResource,
   getCategories,
   getLocations,
+  uploadResourceImage,
+  resolveResourceImageUrl,
 } from "@/lib/resources/api";
 
 export default function EditResourcePage() {
@@ -27,6 +29,7 @@ export default function EditResourcePage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [preview, setPreview] = useState("");
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
 
   useEffect(() => {
     loadData();
@@ -61,8 +64,7 @@ export default function EditResourcePage() {
       requiresApproval: resource.requiresApproval ?? true,
     });
 
-    const localImg = localStorage.getItem("resource_image_" + id);
-    setPreview(localImg || resource.imageUrl || "");
+    setPreview(resolveResourceImageUrl(resource.imageUrl) || "");
   };
 
   const handleChange = (e: any) => {
@@ -79,12 +81,13 @@ export default function EditResourcePage() {
     const file = e.target.files[0];
     if (!file) return;
 
+    setSelectedImageFile(file);
+
     const reader = new FileReader();
 
     reader.onloadend = () => {
       const base64 = reader.result as string;
       setPreview(base64);
-      localStorage.setItem("resource_image_" + id, base64);
     };
 
     reader.readAsDataURL(file);
@@ -104,6 +107,10 @@ export default function EditResourcePage() {
       };
 
       await updateResource(Number(id), payload);
+
+      if (selectedImageFile) {
+        await uploadResourceImage(Number(id), selectedImageFile);
+      }
 
       alert("Updated successfully ✅");
       router.push("/resources");

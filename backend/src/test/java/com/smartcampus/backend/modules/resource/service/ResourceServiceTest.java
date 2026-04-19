@@ -14,6 +14,7 @@ import com.smartcampus.backend.common.enums.ResourceStatus;
 import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.UserStatus;
 import com.smartcampus.backend.common.exception.ResourceConflictException;
+import com.smartcampus.backend.common.service.SupabaseStorageService;
 import com.smartcampus.backend.modules.auth.service.CurrentUserService;
 import com.smartcampus.backend.modules.resource.dto.CreateResourceRequest;
 import com.smartcampus.backend.modules.resource.dto.ResourceDetailResponse;
@@ -43,6 +44,7 @@ class ResourceServiceTest {
     @Mock private CurrentUserService currentUserService;
     @Mock private ResourceMapper resourceMapper;
     @Mock private EntityManager entityManager;
+    @Mock private SupabaseStorageService storageService;
     @Mock private TypedQuery<Long> bookingCountQuery;
     @Mock private TypedQuery<Long> ticketCountQuery;
 
@@ -58,7 +60,8 @@ class ResourceServiceTest {
                         locationService,
                         currentUserService,
                         resourceMapper,
-                        entityManager);
+                        entityManager,
+                        storageService);
     }
 
     @Test

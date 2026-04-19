@@ -5,9 +5,9 @@ import {
   createResource,
   getCategories,
   getLocations,
-  getResources,
   createResourceCategory,
   createLocation,
+  uploadResourceImage,
 } from "@/lib/resources/api";
 import { useRouter } from "next/navigation";
 import FormMessages from "../../../components/ui/FormMessages";
@@ -165,12 +165,13 @@ export default function AddResourcePage() {
     const file = e.target.files[0];
     if (!file) return;
 
+    setSelectedImageFile(file);
+
     const reader = new FileReader();
 
     reader.onloadend = () => {
       const base64 = reader.result as string;
       setPreview(base64);
-      setTempImage(base64);
     };
 
     reader.readAsDataURL(file);
@@ -189,7 +190,7 @@ export default function AddResourcePage() {
         requiresApproval: form.requiresApproval,
       };
 
-      await createResource(payload);
+      const createdResource = await createResource(payload);
 
       const resources = await getResources();
       const latest = resources[resources.length - 1];

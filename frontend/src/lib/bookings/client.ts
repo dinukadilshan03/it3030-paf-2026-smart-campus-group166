@@ -1,4 +1,4 @@
-import { clientApiFetch } from "@/lib/api/client";
+import { frontendRouteFetch } from "@/lib/api/client";
 import type {
   BookingDetailResponse,
   BookingFilters,
@@ -48,14 +48,14 @@ export async function listBookingsClient(filters: BookingFilters = {}) {
   const queryString = params.toString();
   const url = `/api/v1/bookings${queryString ? `?${queryString}` : ""}`;
 
-  const response = await clientApiFetch(url, { cache: "no-store" });
+  const response = await frontendRouteFetch(url, { cache: "no-store" });
   if (!response.ok) await throwBookingApiError(response);
 
   return ((await response.json()) as BookingSummaryResponse[]) ?? [];
 }
 
 export async function getBookingDetailClient(id: number) {
-  const response = await clientApiFetch(`/api/v1/bookings/${id}`, {
+  const response = await frontendRouteFetch(`/api/v1/bookings/${id}`, {
     cache: "no-store",
   });
   if (!response.ok) await throwBookingApiError(response);
@@ -64,7 +64,7 @@ export async function getBookingDetailClient(id: number) {
 }
 
 export async function createBookingClient(request: CreateBookingRequest) {
-  const response = await clientApiFetch("/api/v1/bookings", {
+  const response = await frontendRouteFetch("/api/v1/bookings", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -78,7 +78,7 @@ export async function createBookingClient(request: CreateBookingRequest) {
 }
 
 export async function reviewBookingClient(id: number, request: ReviewBookingRequest) {
-  const response = await clientApiFetch(`/api/v1/bookings/${id}/review`, {
+  const response = await frontendRouteFetch(`/api/v1/bookings/${id}/review`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -92,7 +92,7 @@ export async function reviewBookingClient(id: number, request: ReviewBookingRequ
 }
 
 export async function cancelBookingClient(id: number, request?: CancelBookingRequest) {
-  const response = await clientApiFetch(`/api/v1/bookings/${id}/cancel`, {
+  const response = await frontendRouteFetch(`/api/v1/bookings/${id}/cancel`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -103,4 +103,16 @@ export async function cancelBookingClient(id: number, request?: CancelBookingReq
   if (!response.ok) await throwBookingApiError(response);
 
   return (await response.json()) as BookingDetailResponse;
+}
+
+export async function deleteBookingClient(id: number, request?: CancelBookingRequest) {
+  const response = await frontendRouteFetch(`/api/v1/bookings/${id}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: request ? JSON.stringify(request) : undefined,
+  });
+
+  if (!response.ok) await throwBookingApiError(response);
 }

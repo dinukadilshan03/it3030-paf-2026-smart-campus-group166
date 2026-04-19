@@ -1,21 +1,27 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Trash2, XCircle } from "lucide-react";
-import type { BookingSummaryResponse } from "@/lib/bookings/types";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { CheckCircle, Trash2, XCircle } from "lucide-react";
+import type { BookingSummaryResponse, BookingFilters } from "@/lib/bookings/types";
 import type { CurrentUser } from "@/types/auth";
 import type { Resource } from "@/lib/resources/types";
+import {
+  cancelBookingClient,
+  deleteBookingClient,
+  listBookingsClient,
+  reviewBookingClient,
+} from "@/lib/bookings/client";
 import { getResources } from "@/lib/resources/api";
 import NLBookingInput from "@/components/booking/NLBookingInput";
 import { BookingAnalytics } from "./BookingAnalytics";
 import { CreateBookingForm } from "./CreateBookingForm";
 import { BookingCalendar } from "./BookingCalendar";
+import { BookingFiltersPanel } from "./BookingFiltersPanel";
 
 interface ReviewAction {
   bookingId: number;
   reason: string;
   decision: "APPROVE" | "REJECT" | "CANCEL" | "DELETE";
-  bookingStatus?: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
 }
 
 type TabType = "pending" | "approved" | "rejected" | "cancelled" | "all";
@@ -38,6 +44,14 @@ function getTabForStatus(status: BookingSummaryResponse["status"]): TabType {
     default:
       return "all";
   }
+}
+
+function canDeleteBooking(status: BookingSummaryResponse["status"]) {
+  return status === "PENDING";
+}
+
+function canCancelBooking(status: BookingSummaryResponse["status"]) {
+  return status === "APPROVED";
 }
 
 export function BookingManagementPage({
@@ -72,6 +86,9 @@ export function BookingManagementPage({
   // State for analytics
   const [showAnalytics, setShowAnalytics] = useState(false);
 
+  // State for advanced filters (admin only)
+  const [advancedFilters, setAdvancedFilters] = useState<BookingFilters>({});
+
   // Check if user is admin
   const isAdmin = user.role === "ADMIN";
 
@@ -105,27 +122,22 @@ export function BookingManagementPage({
     [bookings]
   );
 
-  const loadBookings = async () => {
-    setIsLoading(true);
-    setError("");
+  const loadBookings = useCallback(
+    async (filters?: BookingFilters) => {
+      setIsLoading(true);
+      setError("");
 
-    try {
-      const response = await fetch("/api/v1/bookings", {
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to load bookings");
+      try {
+        const data = await listBookingsClient(filters);
+        setBookings(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load bookings");
+      } finally {
+        setIsLoading(false);
       }
-
-      const data = (await response.json()) as BookingSummaryResponse[];
-      setBookings(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load bookings");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    },
+    []
+  );
 
   const loadResources = async () => {
     try {
@@ -138,9 +150,15 @@ export function BookingManagementPage({
   };
 
   useEffect(() => {
-    loadBookings();
+    if (isAdmin) {
+      // For admin, load with filters
+      loadBookings(advancedFilters);
+    } else {
+      // For students, load without filters
+      loadBookings();
+    }
     loadResources();
-  }, []);
+  }, [isAdmin, advancedFilters, loadBookings]);
 
   useEffect(() => {
     if (initialHighlightedBookingId == null || bookings.length === 0) {
@@ -198,12 +216,11 @@ export function BookingManagementPage({
     setShowReviewDialog(true);
   };
 
-  const handleDeleteClick = (bookingId: number, status: string) => {
+  const handleDeleteClick = (bookingId: number) => {
     setPendingAction({
       bookingId,
       reason: "",
       decision: "DELETE",
-      bookingStatus: status as any,
     });
     setShowReviewDialog(true);
   };
@@ -215,46 +232,26 @@ export function BookingManagementPage({
     setActionInProgress(pendingAction.bookingId);
 
     try {
-      let endpoint = "review";
-      
+      const reason = pendingAction.reason.trim() || undefined;
+
       if (pendingAction.decision === "CANCEL") {
-        endpoint = "cancel";
+        await cancelBookingClient(pendingAction.bookingId, {
+          reason,
+        });
       } else if (pendingAction.decision === "DELETE") {
-        endpoint = "delete";
-      }
-      
-      const requestBody: Record<string, unknown> = {};
-
-      // For review (approve/reject), include decision
-      if (pendingAction.decision !== "CANCEL" && pendingAction.decision !== "DELETE") {
-        requestBody.decision = pendingAction.decision;
-      }
-
-      // Only add reason if it exists and is not empty
-      if (pendingAction.reason && pendingAction.reason.trim()) {
-        requestBody.reason = pendingAction.reason;
-      }
-
-      const url = `/api/v1/bookings/${pendingAction.bookingId}/${endpoint}`;
-      const response = await fetch(url, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(requestBody),
-      });
-      if (!response.ok) {
-        const errorData = (await response.json().catch(() => ({}))) as { message?: string };
-        const actionName = pendingAction.decision === "DELETE" ? "delete" : pendingAction.decision === "CANCEL" ? "cancel" : "review";
-        throw new Error(errorData.message || `Failed to ${actionName} booking`);
+        await deleteBookingClient(pendingAction.bookingId, reason ? { reason } : undefined);
+      } else {
+        await reviewBookingClient(pendingAction.bookingId, {
+          decision: pendingAction.decision,
+          reason,
+        });
       }
 
       let message = "";
-      if (pendingAction.decision === "DELETE") {
-        message = "Booking deleted successfully!";
-      } else if (pendingAction.decision === "CANCEL") {
+      if (pendingAction.decision === "CANCEL") {
         message = "Booking cancelled successfully!";
+      } else if (pendingAction.decision === "DELETE") {
+        message = "Booking deleted successfully!";
       } else if (pendingAction.decision === "APPROVE") {
         message = "Booking approved successfully!";
       } else {
@@ -346,58 +343,65 @@ export function BookingManagementPage({
             </div>
           </section>
 
-          <div className="tabs-container">
-            <button
-              className={`tab-button ${activeTab === "pending" ? "active" : ""}`}
-              onClick={() => {
-                setActiveTab("pending");
-                setShowAnalytics(false);
-              }}
-            >
-              Pending ({stats.pending})
-            </button>
-            <button
-              className={`tab-button ${activeTab === "approved" ? "active" : ""}`}
-              onClick={() => {
-                setActiveTab("approved");
-                setShowAnalytics(false);
-              }}
-            >
-              Approved ({stats.approved})
-            </button>
-            <button
-              className={`tab-button ${activeTab === "rejected" ? "active" : ""}`}
-              onClick={() => {
-                setActiveTab("rejected");
-                setShowAnalytics(false);
-              }}
-            >
-              Rejected ({stats.rejected})
-            </button>
-            <button
-              className={`tab-button ${activeTab === "cancelled" ? "active" : ""}`}
-              onClick={() => {
-                setActiveTab("cancelled");
-                setShowAnalytics(false);
-              }}
-            >
-              Cancelled ({stats.cancelled})
-            </button>
-            <button
-              className={`tab-button ${activeTab === "all" ? "active" : ""}`}
-              onClick={() => {
-                setActiveTab("all");
-                setShowAnalytics(false);
-              }}
-            >
-              All ({stats.total})
-            </button>
-            <button
-              className={`tab-button analytics-tab ${showAnalytics ? "active" : ""}`}
-              onClick={() => setShowAnalytics(!showAnalytics)}
-            >
-              📊 Analytics
-            </button>
+          <div className="tabs-container-wrapper">
+            <div className="tabs-container">
+              <button
+                className={`tab-button ${activeTab === "pending" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveTab("pending");
+                  setShowAnalytics(false);
+                }}
+              >
+                Pending ({stats.pending})
+              </button>
+              <button
+                className={`tab-button ${activeTab === "approved" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveTab("approved");
+                  setShowAnalytics(false);
+                }}
+              >
+                Approved ({stats.approved})
+              </button>
+              <button
+                className={`tab-button ${activeTab === "rejected" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveTab("rejected");
+                  setShowAnalytics(false);
+                }}
+              >
+                Rejected ({stats.rejected})
+              </button>
+              <button
+                className={`tab-button ${activeTab === "cancelled" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveTab("cancelled");
+                  setShowAnalytics(false);
+                }}
+              >
+                Cancelled ({stats.cancelled})
+              </button>
+              <button
+                className={`tab-button ${activeTab === "all" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveTab("all");
+                  setShowAnalytics(false);
+                }}
+              >
+                All ({stats.total})
+              </button>
+              <button
+                className={`tab-button analytics-tab ${showAnalytics ? "active" : ""}`}
+                onClick={() => setShowAnalytics(!showAnalytics)}
+              >
+                📊 Analytics
+              </button>
+            </div>
+            <BookingFiltersPanel
+              resources={resources}
+              onFiltersChange={setAdvancedFilters}
+              isLoading={isLoading}
+            />
           </div>
         </>
       )}
@@ -431,17 +435,19 @@ export function BookingManagementPage({
                       <span className={`status-badge status-${booking.status.toLowerCase()}`}>
                         {booking.status}
                       </span>
-                      {(booking.status === "PENDING" || booking.status === "APPROVED" || booking.status === "REJECTED" || booking.status === "CANCELLED") && (
+                      {(canDeleteBooking(booking.status) || canCancelBooking(booking.status)) && (
                         <>
-                          <button
-                            className="icon-button delete-icon"
-                            onClick={() => handleDeleteClick(booking.id, booking.status)}
-                            title="Delete booking"
-                            disabled={actionInProgress === booking.id}
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                          {(booking.status === "APPROVED" || booking.status === "PENDING") && (
+                          {canDeleteBooking(booking.status) && (
+                            <button
+                              className="icon-button delete-icon"
+                              onClick={() => handleDeleteClick(booking.id)}
+                              title="Delete booking"
+                              disabled={actionInProgress === booking.id}
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
+                          {canCancelBooking(booking.status) && (
                             <button
                               className="icon-button cancel-icon"
                               onClick={() => handleStudentCancelClick(booking.id)}
@@ -489,20 +495,40 @@ export function BookingManagementPage({
 
                   {/* Action Buttons - Only for Pending */}
                   {activeTab === "pending" && (
-                    <div className="booking-actions">
+                    <div className="px-6 py-5 bg-gradient-to-r from-slate-50 to-slate-100 border-t-2 border-t-slate-200 flex gap-3">
                       <button
-                        className="primary-button"
                         onClick={() => handleApproveClick(booking.id)}
                         disabled={actionInProgress === booking.id}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-100 to-teal-100 border-2 border-emerald-300 text-emerald-800 rounded-lg font-semibold text-sm hover:from-emerald-200 hover:to-teal-200 hover:border-emerald-500 hover:shadow-md transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
-                        {actionInProgress === booking.id ? "Processing..." : "Approve"}
+                        {actionInProgress === booking.id ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-emerald-300 border-t-emerald-700 rounded-full animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle size={18} className="flex-shrink-0" />
+                            Approve
+                          </>
+                        )}
                       </button>
                       <button
-                        className="danger-button"
                         onClick={() => handleRejectClick(booking.id)}
                         disabled={actionInProgress === booking.id}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-red-100 to-rose-100 border-2 border-red-300 text-red-800 rounded-lg font-semibold text-sm hover:from-red-200 hover:to-rose-200 hover:border-red-500 hover:shadow-md transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
-                        {actionInProgress === booking.id ? "Processing..." : "Reject"}
+                        {actionInProgress === booking.id ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-red-300 border-t-red-700 rounded-full animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <XCircle size={18} className="flex-shrink-0" />
+                            Reject
+                          </>
+                        )}
                       </button>
                     </div>
                   )}
@@ -624,17 +650,19 @@ export function BookingManagementPage({
                       <span className={`status-badge status-${booking.status.toLowerCase()}`}>
                         {booking.status}
                       </span>
-                      {(booking.status === "PENDING" || booking.status === "APPROVED" || booking.status === "REJECTED" || booking.status === "CANCELLED") && (
+                      {(canDeleteBooking(booking.status) || canCancelBooking(booking.status)) && (
                         <>
-                          <button
-                            className="icon-button delete-icon"
-                            onClick={() => handleDeleteClick(booking.id, booking.status)}
-                            title="Delete booking"
-                            disabled={actionInProgress === booking.id}
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                          {(booking.status === "APPROVED" || booking.status === "PENDING") && (
+                          {canDeleteBooking(booking.status) && (
+                            <button
+                              className="icon-button delete-icon"
+                              onClick={() => handleDeleteClick(booking.id)}
+                              title="Delete booking"
+                              disabled={actionInProgress === booking.id}
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
+                          {canCancelBooking(booking.status) && (
                             <button
                               className="icon-button cancel-icon"
                               onClick={() => handleStudentCancelClick(booking.id)}
@@ -700,7 +728,7 @@ export function BookingManagementPage({
                 : pendingAction.decision === "REJECT"
                   ? "Are you sure you want to reject this booking?"
                   : pendingAction.decision === "DELETE"
-                    ? "Are you sure you want to delete this booking? This action cannot be undone."
+                    ? "Are you sure you want to delete this booking?"
                     : "Are you sure you want to cancel this booking?"}
             </p>
 
@@ -711,7 +739,7 @@ export function BookingManagementPage({
                   : pendingAction.decision === "REJECT"
                     ? "Rejection"
                     : pendingAction.decision === "DELETE"
-                      ? "Reason for deletion"
+                      ? "Deletion"
                       : "Cancellation"}{" "}
                 Reason (optional)
                 <textarea
@@ -726,7 +754,7 @@ export function BookingManagementPage({
                       : pendingAction.decision === "REJECT"
                         ? "Enter rejection reason..."
                         : pendingAction.decision === "DELETE"
-                          ? "Why are you deleting this booking?"
+                          ? "Enter deletion reason..."
                           : "Enter cancellation reason..."
                   }
                 />
@@ -747,7 +775,7 @@ export function BookingManagementPage({
                   : pendingAction.decision === "REJECT"
                     ? "Reject"
                     : pendingAction.decision === "DELETE"
-                      ? "Delete"
+                      ? "Delete booking"
                       : "Cancel booking"}
               </button>
               <button
@@ -766,7 +794,7 @@ export function BookingManagementPage({
           display: flex;
           flex-direction: column;
           min-height: 100vh;
-          background-color: #f5f5f5;
+          background: linear-gradient(180deg, rgba(248, 246, 244, 0.6) 0%, rgba(245, 243, 241, 0.4) 50%, rgba(255, 255, 255, 0.8) 100%);
         }
 
         .admin-topbar {
@@ -820,12 +848,15 @@ export function BookingManagementPage({
         }
 
         .primary-button {
-          background-color: #0066cc;
+          background: linear-gradient(135deg, #8B9DB5 0%, #7A92A8 100%);
           color: white;
+          box-shadow: 0 4px 12px rgba(139, 157, 181, 0.35);
         }
 
         .primary-button:hover:not(:disabled) {
-          background-color: #0052a3;
+          background: linear-gradient(135deg, #7A92A8 0%, #6B7F95 100%);
+          box-shadow: 0 6px 16px rgba(139, 157, 181, 0.4);
+          transform: translateY(-1px);
         }
 
         .danger-button {
@@ -859,11 +890,18 @@ export function BookingManagementPage({
         }
 
         .stat-card {
-          background: white;
+          background: linear-gradient(135deg, rgba(248, 246, 244, 0.6) 0%, rgba(245, 243, 241, 0.4) 100%);
           padding: 1.5rem;
-          border-radius: 8px;
-          border: 1px solid #e0e0e0;
+          border-radius: 12px;
+          border: 2px solid rgba(139, 157, 181, 0.3);
           text-align: center;
+          transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+          border-color: rgba(139, 157, 181, 0.6);
+          box-shadow: 0 6px 20px rgba(139, 157, 181, 0.1);
+          transform: translateY(-2px);
         }
 
         .stat-label {
@@ -898,37 +936,53 @@ export function BookingManagementPage({
 
         .tabs-container {
           display: flex;
-          gap: 1rem;
-          padding: 0 1.5rem 1rem;
-          border-bottom: 1px solid #e0e0e0;
-          background-color: white;
+          gap: 0.75rem;
+          padding: 1.5rem 1.5rem;
+          background: transparent;
+          flex-wrap: wrap;
+          border-radius: 8px;
+          margin: 0;
+          align-items: center;
+        }
+
+        .tabs-container-wrapper {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          gap: 1.5rem;
+          margin: 0 1.5rem 1.5rem;
           flex-wrap: wrap;
         }
 
         .tab-button {
-          padding: 0.75rem 1rem;
-          border: none;
-          background: none;
-          color: #666;
+          padding: 0.7rem 1.2rem;
+          border: 1px solid rgba(139, 157, 181, 0.4);
+          background: linear-gradient(135deg, rgba(248, 246, 244, 0.8) 0%, rgba(245, 243, 241, 0.8) 100%);
+          color: #6B7280;
           font-size: 0.95rem;
-          font-weight: 500;
+          font-weight: 600;
           cursor: pointer;
-          border-bottom: 3px solid transparent;
-          transition: all 0.2s ease;
+          border-radius: 8px;
+          transition: all 0.3s ease;
         }
 
         .tab-button:hover {
-          color: #333;
+          background: linear-gradient(135deg, rgba(245, 243, 241, 0.95) 0%, rgba(243, 241, 239, 0.95) 100%);
+          border-color: rgba(139, 157, 181, 0.7);
+          transform: translateY(-2px);
         }
 
         .tab-button.active {
-          color: #0066cc;
-          border-bottom-color: #0066cc;
+          background: linear-gradient(135deg, #8B9DB5 0%, #7A92A8 100%);
+          color: white;
+          border-color: #6B7F95;
+          box-shadow: 0 4px 12px rgba(139, 157, 181, 0.35);
         }
 
         .bookings-section {
-          padding: 2rem 1.5rem;
+          padding: 1rem 1.5rem 2rem;
           flex: 1;
+          background: transparent;
         }
 
         .bookings-grid {
@@ -938,18 +992,27 @@ export function BookingManagementPage({
         }
 
         .booking-card {
-          border: 1px solid #e0e0e0;
-          border-radius: 8px;
+          border: 2px solid rgba(139, 157, 181, 0.3);
+          border-radius: 12px;
           padding: 1.5rem;
-          background: white;
+          background: linear-gradient(135deg, rgba(248, 246, 244, 0.8) 0%, rgba(245, 243, 241, 0.8) 100%);
           display: flex;
           flex-direction: column;
           gap: 1rem;
+          transition: all 0.3s ease;
+          box-shadow: 0 4px 16px rgba(139, 157, 181, 0.08);
+        }
+
+        .booking-card:hover {
+          border-color: rgba(139, 157, 181, 0.6);
+          box-shadow: 0 8px 24px rgba(139, 157, 181, 0.12);
+          transform: translateY(-2px);
         }
 
         .booking-highlighted {
-          border-color: #14b8a6;
-          box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.15);
+          border-color: #8B9DB5;
+          box-shadow: 0 0 0 4px rgba(139, 157, 181, 0.15);
+          background: linear-gradient(135deg, rgba(245, 243, 241, 0.9) 0%, rgba(242, 240, 238, 0.9) 100%);
         }
 
         .booking-header {
@@ -957,7 +1020,7 @@ export function BookingManagementPage({
           justify-content: space-between;
           align-items: flex-start;
           gap: 1rem;
-          border-bottom: 1px solid #f0f0f0;
+          border-bottom: 2px solid rgba(139, 157, 181, 0.2);
           padding-bottom: 1rem;
         }
 
@@ -1022,23 +1085,27 @@ export function BookingManagementPage({
         }
 
         .status-pending {
-          background-color: #fff3cd;
-          color: #856404;
+          background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.2) 100%);
+          color: #92400e;
+          border: 1px solid rgba(245, 158, 11, 0.5);
         }
 
         .status-approved {
-          background-color: #d4edda;
-          color: #155724;
+          background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(16, 185, 129, 0.2) 100%);
+          color: #065f46;
+          border: 1px solid rgba(34, 197, 94, 0.5);
         }
 
         .status-rejected {
-          background-color: #f8d7da;
-          color: #721c24;
+          background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.2) 100%);
+          color: #7f1d1d;
+          border: 1px solid rgba(239, 68, 68, 0.5);
         }
 
         .status-cancelled {
-          background-color: #e2e3e5;
-          color: #383d41;
+          background: linear-gradient(135deg, rgba(107, 114, 128, 0.2) 0%, rgba(75, 85, 99, 0.2) 100%);
+          color: #1f2937;
+          border: 1px solid rgba(107, 114, 128, 0.5);
         }
 
         .booking-details {
@@ -1173,10 +1240,10 @@ export function BookingManagementPage({
           align-items: center;
           gap: 2rem;
           padding: 1.5rem;
-          background: white;
-          border-bottom: 1px solid #e0e0e0;
+          background: linear-gradient(135deg, rgba(248, 246, 244, 0.6) 0%, rgba(245, 243, 241, 0.4) 100%);
+          border: 2px solid rgba(139, 157, 181, 0.3);
           margin-bottom: 1.5rem;
-          border-radius: 8px;
+          border-radius: 12px;
         }
 
         .student-header h2 {
@@ -1192,12 +1259,13 @@ export function BookingManagementPage({
         }
 
         .create-form-container {
-          background: white;
-          border: 1px solid #e0e0e0;
-          border-radius: 8px;
+          background: linear-gradient(135deg, rgba(248, 246, 244, 0.6) 0%, rgba(245, 243, 241, 0.4) 100%);
+          border: 2px solid rgba(139, 157, 181, 0.3);
+          border-radius: 12px;
           padding: 2rem;
           margin-bottom: 2rem;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+          box-shadow: 0 4px 16px rgba(139, 157, 181, 0.08);
+        }
         }
 
         .ai-booking-section {

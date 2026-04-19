@@ -135,9 +135,12 @@ public class NotificationService {
         String message =
                 "%s is now %s"
                         .formatted(ticket.getTicketNumber(), toHumanReadableStatus(status.name()));
+        List<User> recipients = new ArrayList<>();
+        recipients.add(ticket.getReporterUser());
+        recipients.add(assignedStaffSnapshot);
 
         createNotifications(
-                List.of(ticket.getReporterUser(), assignedStaffSnapshot),
+                recipients,
                 actor,
                 NotificationType.TICKET,
                 title,

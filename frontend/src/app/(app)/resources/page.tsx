@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AIChat from "./AIChat";
-import { getResources, deleteResource } from "@/lib/resources/api";
+import { getResources, deleteResource, resolveResourceImageUrl } from "@/lib/resources/api";
 import { useRouter } from "next/navigation";
 import { clientApiFetch } from "@/lib/api/client";
 
@@ -175,13 +175,8 @@ const [selectedLocation, setSelectedLocation] = useState("");
       ) : (
         <div style={styles.grid}>
           {filteredResources.map((r: any) => {
-            const localImg = localStorage.getItem(
-              "resource_image_" + r.id
-            );
-
             const imageSrc =
-              localImg ||
-              r.imageUrl ||
+              resolveResourceImageUrl(r.imageUrl) ||
               "https://via.placeholder.com/300x200";
 
             return (
