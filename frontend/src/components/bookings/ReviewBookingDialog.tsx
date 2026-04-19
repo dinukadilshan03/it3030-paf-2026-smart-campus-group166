@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import type { BookingReviewDecision } from "@/lib/bookings/types";
 
 interface ReviewBookingDialogProps {
@@ -21,6 +22,7 @@ export function ReviewBookingDialog({
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [showErrorModal, setShowErrorModal] = useState(false);
 
   if (!isOpen) return null;
 
@@ -33,7 +35,9 @@ export function ReviewBookingDialog({
       setReason("");
       onCancel();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      const errorMsg = err instanceof Error ? err.message : "An error occurred";
+      setError(errorMsg);
+      setShowErrorModal(true);
     } finally {
       setIsSubmitting(false);
     }
@@ -48,13 +52,17 @@ export function ReviewBookingDialog({
   const buttonClass = isApprove ? "primary-button" : "danger-button";
 
   return (
-    <div className="modal-overlay" onClick={onCancel}>
+    <>
+      <ErrorAlert
+        isOpen={showErrorModal}
+        message={error}
+        onClose={() => setShowErrorModal(false)}
+      />
+      <div className="modal-overlay" onClick={onCancel}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <h2>{dialogTitle}</h2>
 
         <p className="modal-message">{dialogMessage}</p>
-
-        {error && <div className="status-banner error">{error}</div>}
 
         <div className="field">
           <label>
@@ -275,5 +283,6 @@ export function ReviewBookingDialog({
         }
       `}</style>
     </div>
+    </>
   );
 }

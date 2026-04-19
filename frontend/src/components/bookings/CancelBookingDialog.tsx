@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ErrorAlert } from "@/components/ui/ErrorAlert";
 
 interface CancelBookingDialogProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ export function CancelBookingDialog({
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [showErrorModal, setShowErrorModal] = useState(false);
 
   if (!isOpen) return null;
 
@@ -32,14 +34,22 @@ export function CancelBookingDialog({
       setReason("");
       onCancel();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      const errorMsg = err instanceof Error ? err.message : "An error occurred";
+      setError(errorMsg);
+      setShowErrorModal(true);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="modal-overlay" onClick={onCancel}>
+    <>
+      <ErrorAlert
+        isOpen={showErrorModal}
+        message={error}
+        onClose={() => setShowErrorModal(false)}
+      />
+      <div className="modal-overlay" onClick={onCancel}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <h2>Cancel Booking</h2>
 
@@ -47,8 +57,6 @@ export function CancelBookingDialog({
           Are you sure you want to cancel the booking for <strong>{resourceName}</strong>? This
           action cannot be undone.
         </p>
-
-        {error && <div className="status-banner error">{error}</div>}
 
         <div className="field">
           <label>
@@ -250,5 +258,6 @@ export function CancelBookingDialog({
         }
       `}</style>
     </div>
+    </>
   );
 }
