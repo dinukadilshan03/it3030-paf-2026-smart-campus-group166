@@ -15,9 +15,19 @@ import type {
   AdminAnalyticsHealth,
   AdminAnalyticsInsightResponse,
   AdminAnalyticsOverview,
+  AnalyticsNamedValue,
   AnalyticsRange,
+  AnalyticsSeriesPoint,
 } from "@/lib/admin-analytics/types";
-import { HorizontalBarList, TimelineBars } from "./ChartPrimitives";
+import {
+  DualLineTrendChart,
+  IntensityStrip,
+  RankedBarChart,
+  ShareBreakdown,
+  type IntensityPoint,
+  type ShareSlice,
+  type TrendPoint,
+} from "./ChartPrimitives";
 
 type AdminAnalyticsWorkspaceProps = {
   initialRange: AnalyticsRange;
@@ -28,6 +38,13 @@ type AdminAnalyticsWorkspaceProps = {
 };
 
 const RANGE_OPTIONS: AnalyticsRange[] = ["7D", "30D", "90D"];
+const MIX_OPTIONS = [
+  { id: "ticketCategories", label: "Ticket categories", href: "/tickets" },
+  { id: "notificationTypes", label: "Notification types", href: "/notifications" },
+  { id: "authEventsByType", label: "Auth events", href: "/analytics" },
+] as const;
+
+type MixOptionId = (typeof MIX_OPTIONS)[number]["id"];
 
 function getSeverityTone(severity: string) {
   switch (severity) {
@@ -55,6 +72,7 @@ export function AdminAnalyticsWorkspace({
   const [askResponse, setAskResponse] = useState<AdminAnalyticsAskResponse | null>(null);
   const [question, setQuestion] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [mixMode, setMixMode] = useState<MixOptionId>("ticketCategories");
   const [isPending, startTransition] = useTransition();
   const [isAsking, startAskTransition] = useTransition();
 
@@ -91,6 +109,17 @@ export function AdminAnalyticsWorkspace({
       }
     });
   };
+
+  const trendData = buildTrendData(charts);
+  const bookingIntensity = buildIntensityData(charts.peakBookingHours);
+  const mixOption = MIX_OPTIONS.find((option) => option.id === mixMode) ?? MIX_OPTIONS[0];
+  const mixData = buildShareSlices(charts[mixOption.id]);
+  const authSummary = getNamedValue(health.authHealth, "auth_success_logins");
+  const failedLogins = getNamedValue(health.authHealth, "auth_failed_logins");
+  const unreadBacklog = getNamedValue(health.notificationHealth, "notification_unread_backlog");
+  const readInWindow = getNamedValue(health.notificationHealth, "notification_read_activity");
+  const generatedInWindow = getNamedValue(health.notificationHealth, "notification_created_window");
+  const topLocations = charts.topLocations.map((item) => item.label);
 
   return (
     <section className="space-y-6">
@@ -142,141 +171,231 @@ export function AdminAnalyticsWorkspace({
             href={metric.href}
             className="rounded-[1.4rem] border border-white/70 bg-white/90 p-5 shadow-[0_18px_55px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5"
           >
-            <p className="text-sm font-medium text-slate-600">{metric.label}</p>
-            <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-              {metric.value}
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-slate-500">
+              {metric.label}
             </p>
+            <div className="mt-4 flex items-end justify-between gap-4">
+              <p className="text-3xl font-semibold tracking-tight text-slate-950">{metric.value}</p>
+              <span
+                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                  metric.trend === "up"
+                    ? "bg-emerald-50 text-emerald-800"
+                    : metric.trend === "down"
+                      ? "bg-rose-50 text-rose-800"
+                      : "bg-slate-100 text-slate-700"
+                }`}
+              >
+                {metric.trend}
+              </span>
+            </div>
             <p className="mt-3 text-sm font-medium text-slate-600">{metric.changeLabel}</p>
           </Link>
         ))}
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(21rem,0.85fr)]">
         <section className="space-y-6">
-          <TimelineBars
-            title="Bookings by day"
-            description="Scheduled demand over the selected window."
-            data={charts.bookingsByDay}
+          <DualLineTrendChart
+            title="Demand trend"
+            description="Bookings and ticket intake across the selected window, aligned on the same timeline."
+            data={trendData}
             href="/bookings"
           />
-          <TimelineBars
-            title="Tickets by day"
-            description="New issue reports entering the system each day."
-            data={charts.ticketsByDay}
-            href="/tickets"
-          />
-          <HorizontalBarList
-            title="Peak booking hours"
-            description="Most frequently requested start times."
-            data={charts.peakBookingHours}
+
+          <IntensityStrip
+            title="Booking hour intensity"
+            description="A compact read on where the day compresses into peak scheduling demand."
+            data={bookingIntensity}
             href="/bookings"
           />
-          <div className="grid gap-6 lg:grid-cols-2">
-            <HorizontalBarList
-              title="Top resources"
-              description="Most-booked spaces and assets."
-              data={charts.topResources}
-              href="/resources"
-            />
-            <HorizontalBarList
-              title="Top locations"
-              description="Buildings or areas drawing the most booking demand."
-              data={charts.topLocations}
-              href="/resources"
-            />
-          </div>
-          <div className="grid gap-6 lg:grid-cols-2">
-            <HorizontalBarList
-              title="Ticket categories"
-              description="Operational issue mix for the selected range."
-              data={charts.ticketCategories}
-              href="/tickets"
-            />
-            <HorizontalBarList
-              title="Notification types"
-              description="Platform activity split by notification source."
-              data={charts.notificationTypes}
-              href="/notifications"
-            />
-          </div>
-          <HorizontalBarList
-            title="Auth event mix"
-            description="Observed authentication and credential lifecycle events."
-            data={charts.authEventsByType}
-            href="/analytics"
+
+          <RankedBarChart
+            title="Top resources"
+            description="The most requested spaces and assets, with top locations folded in as supporting context."
+            data={charts.topResources}
+            href="/resources"
+            supportingLabels={topLocations}
           />
+
+          <section className="rounded-[1.6rem] border border-white/70 bg-white/92 p-5 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
+            <div className="flex flex-col gap-4 border-b border-slate-200 pb-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  Operational mix
+                </p>
+                <h2 className="mt-2 text-[1.28rem] font-semibold tracking-[-0.03em] text-slate-950">
+                  What is driving workload?
+                </h2>
+                <p className="mt-2 text-sm leading-7 text-slate-600">
+                  Switch between the dominant issue, notification, and auth patterns without
+                  adding more full-size charts.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {MIX_OPTIONS.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setMixMode(option.id)}
+                    className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                      mixMode === option.id
+                        ? "bg-slate-950 text-white"
+                        : "border border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mt-5">
+              <ShareBreakdown
+                title={mixOption.label}
+                description="Distribution and ranked composition for the current operational lens."
+                data={mixData}
+                href={mixOption.href}
+              />
+            </div>
+          </section>
+        </section>
+
+        <aside className="space-y-6">
+          <section className="rounded-[1.6rem] border border-white/70 bg-[linear-gradient(180deg,rgba(248,250,252,0.95),rgba(255,255,255,0.98))] p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
+            <div>
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                System posture
+              </p>
+              <h2 className="mt-2 text-[1.28rem] font-semibold tracking-[-0.03em] text-slate-950">
+                Auth and notification health
+              </h2>
+              <p className="mt-2 text-sm leading-7 text-slate-600">
+                One place to judge whether access and messaging systems are healthy enough for the
+                rest of the analytics to be trusted.
+              </p>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <HealthStatCard
+                label={authSummary?.label ?? "Successful logins"}
+                value={authSummary?.value ?? "0"}
+                tone="emerald"
+              />
+              <HealthStatCard
+                label={failedLogins?.label ?? "Failed logins"}
+                value={failedLogins?.value ?? "0"}
+                tone="rose"
+              />
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <MiniHealthRow label={unreadBacklog?.label ?? "Unread backlog"} value={unreadBacklog?.value ?? "0"} />
+              <MiniHealthRow label={readInWindow?.label ?? "Read in window"} value={readInWindow?.value ?? "0"} />
+              <MiniHealthRow
+                label={generatedInWindow?.label ?? "Generated in window"}
+                value={generatedInWindow?.value ?? "0"}
+              />
+            </div>
+
+            <div className="mt-5 border-t border-slate-200 pt-5">
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                Active flags
+              </p>
+              <div className="mt-3 space-y-3">
+                {health.flags.length > 0 ? (
+                  health.flags.map((flag) => (
+                    <Link
+                      key={flag.id}
+                      href={flag.href}
+                      className={`block rounded-[1rem] border px-4 py-4 text-sm leading-7 transition hover:shadow-sm ${getSeverityTone(flag.severity)}`}
+                    >
+                      <p className="font-semibold">{flag.title}</p>
+                      <p className="mt-1">{flag.message}</p>
+                    </Link>
+                  ))
+                ) : (
+                  <p className="rounded-[1rem] border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm leading-7 text-slate-600">
+                    No health flags are active in this window.
+                  </p>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-[1.6rem] border border-white/70 bg-white/92 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-slate-500">
+              Recent sign-ins
+            </p>
+            <div className="mt-4 space-y-3">
+              {health.recentSignIns.map((user) => (
+                <Link
+                  key={user.id}
+                  href={user.href}
+                  className="flex items-center justify-between gap-4 rounded-[1rem] border border-slate-200 bg-slate-50/70 px-4 py-3 transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900">{user.displayName}</p>
+                    <p className="truncate text-sm text-slate-600">{user.email}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      {user.role ?? "UNASSIGNED"}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {new Intl.DateTimeFormat(undefined, {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      }).format(new Date(user.lastLoginAt))}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+        <section className="rounded-[1.6rem] border border-white/70 bg-white/92 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                AI insights
+              </p>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+                AI summary layer
+              </h2>
+            </div>
+          </div>
+
+          {insights.available ? (
+            <div className="mt-5 space-y-5">
+              <p className="rounded-[1.2rem] border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm leading-7 text-emerald-900">
+                {insights.summary}
+              </p>
+              <div className="grid gap-4 lg:grid-cols-3">
+                <InsightColumn title="Highlights" items={insights.highlights.map((item) => item.text)} />
+                <InsightColumn
+                  title="Anomalies"
+                  items={
+                    insights.anomalies.length > 0
+                      ? insights.anomalies.map((item) => item.text)
+                      : ["No exceptional pattern was highlighted in this run."]
+                  }
+                />
+                <InsightColumn
+                  title="Recommendations"
+                  items={insights.recommendations.map((item) => item.text)}
+                />
+              </div>
+            </div>
+          ) : (
+            <p className="mt-5 rounded-[1.2rem] border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm leading-7 text-slate-600">
+              {insights.message}
+            </p>
+          )}
         </section>
 
         <section className="space-y-6">
-          <section className="rounded-[1.55rem] border border-white/70 bg-white/90 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                  AI insights
-                </p>
-                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-                  AI summary layer
-                </h2>
-              </div>
-            </div>
-
-            {insights.available ? (
-              <div className="mt-5 space-y-5">
-                <p className="rounded-[1.2rem] border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm leading-7 text-emerald-900">
-                  {insights.summary}
-                </p>
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                      Highlights
-                    </p>
-                    <div className="mt-3 space-y-3">
-                      {insights.highlights.map((item) => (
-                        <p key={item.text} className="text-sm leading-7 text-slate-700">
-                          {item.text}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                      Anomalies
-                    </p>
-                    <div className="mt-3 space-y-3">
-                      {insights.anomalies.length > 0 ? (
-                        insights.anomalies.map((item) => (
-                          <p key={item.text} className="text-sm leading-7 text-slate-700">
-                            {item.text}
-                          </p>
-                        ))
-                      ) : (
-                        <p className="text-sm leading-7 text-slate-600">
-                          No exceptional pattern was highlighted in this run.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                      Recommendations
-                    </p>
-                    <div className="mt-3 space-y-3">
-                      {insights.recommendations.map((item) => (
-                        <p key={item.text} className="text-sm leading-7 text-slate-700">
-                          {item.text}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <p className="mt-5 rounded-[1.2rem] border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm leading-7 text-slate-600">
-                {insights.message}
-              </p>
-            )}
-          </section>
-
           <section className="rounded-[1.55rem] border border-white/70 bg-white/90 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
               Ask the dashboard
@@ -350,77 +469,121 @@ export function AdminAnalyticsWorkspace({
 
           <section className="rounded-[1.55rem] border border-white/70 bg-white/90 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-              Auth and notification health
+              Supporting distributions
             </p>
-            <div className="mt-5 grid gap-3">
-              {[...health.authHealth, ...health.notificationHealth].map((item) => (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  className="flex items-center justify-between rounded-[1rem] border border-slate-200 bg-slate-50/70 px-4 py-3 transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  <span className="text-sm text-slate-700">{item.label}</span>
-                  <span className="text-sm font-semibold text-slate-950">{item.value}</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-[1.55rem] border border-white/70 bg-white/90 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-              Health flags
-            </p>
-            <div className="mt-4 space-y-3">
-              {health.flags.length > 0 ? (
-                health.flags.map((flag) => (
-                  <Link
-                    key={flag.id}
-                    href={flag.href}
-                    className={`block rounded-[1rem] border px-4 py-4 text-sm leading-7 transition hover:shadow-sm ${getSeverityTone(flag.severity)}`}
-                  >
-                    <p className="font-semibold">{flag.title}</p>
-                    <p className="mt-1">{flag.message}</p>
-                  </Link>
-                ))
-              ) : (
-                <p className="rounded-[1rem] border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm leading-7 text-slate-600">
-                  No health flags are active in this window.
-                </p>
-              )}
-            </div>
-          </section>
-
-          <section className="rounded-[1.55rem] border border-white/70 bg-white/90 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-              Recent sign-ins
-            </p>
-            <div className="mt-4 space-y-3">
-              {health.recentSignIns.map((user) => (
-                <Link
-                  key={user.id}
-                  href={user.href}
-                  className="flex items-center justify-between gap-4 rounded-[1rem] border border-slate-200 bg-slate-50/70 px-4 py-3 transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900">{user.displayName}</p>
-                    <p className="truncate text-sm text-slate-600">{user.email}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      {user.role ?? "UNASSIGNED"}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-600">
-                      {new Intl.DateTimeFormat(undefined, {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      }).format(new Date(user.lastLoginAt))}
-                    </p>
-                  </div>
-                </Link>
-              ))}
+            <div className="mt-4 grid gap-3">
+              <DistributionRow title="Role distribution" data={health.roleDistribution} />
+              <DistributionRow title="User status" data={health.statusDistribution} />
+              <DistributionRow title="Login methods" data={health.loginMethodDistribution} />
             </div>
           </section>
         </section>
+      </div>
+    </section>
+  );
+}
+
+function buildTrendData(charts: AdminAnalyticsChartBundle): TrendPoint[] {
+  return charts.bookingsByDay.map((bookingPoint, index) => {
+    const ticketPoint = charts.ticketsByDay[index];
+    return {
+      id: bookingPoint.id,
+      label: bookingPoint.label,
+      bookings: bookingPoint.value,
+      tickets: ticketPoint?.value ?? 0,
+      href: bookingPoint.href,
+    };
+  });
+}
+
+function buildIntensityData(points: AnalyticsSeriesPoint[]): IntensityPoint[] {
+  const maxValue = Math.max(...points.map((point) => point.value), 1);
+  return points.map((point) => ({
+    ...point,
+    intensity: point.value / maxValue,
+  }));
+}
+
+function buildShareSlices(points: AnalyticsSeriesPoint[]): ShareSlice[] {
+  return points.map((point) => ({
+    id: point.id,
+    label: point.label,
+    value: point.value,
+    href: point.href,
+  }));
+}
+
+function getNamedValue(items: AnalyticsNamedValue[], id: string) {
+  return items.find((item) => item.id === id);
+}
+
+function HealthStatCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "emerald" | "rose";
+}) {
+  return (
+    <div
+      className={`rounded-[1.2rem] border px-4 py-4 ${
+        tone === "emerald"
+          ? "border-emerald-200 bg-emerald-50"
+          : "border-rose-200 bg-rose-50"
+      }`}
+    >
+      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-slate-500">{label}</p>
+      <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function MiniHealthRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between rounded-[1rem] border border-slate-200 bg-white/80 px-4 py-3">
+      <span className="text-sm text-slate-700">{label}</span>
+      <span className="text-sm font-semibold text-slate-950">{value}</span>
+    </div>
+  );
+}
+
+function InsightColumn({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{title}</p>
+      <div className="mt-3 space-y-3">
+        {items.map((item) => (
+          <p key={item} className="text-sm leading-7 text-slate-700">
+            {item}
+          </p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DistributionRow({
+  title,
+  data,
+}: {
+  title: string;
+  data: AnalyticsNamedValue[];
+}) {
+  return (
+    <section className="rounded-[1rem] border border-slate-200 bg-slate-50/70 p-4">
+      <p className="text-sm font-semibold text-slate-900">{title}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {data.map((item) => (
+          <Link
+            key={item.id}
+            href={item.href}
+            className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            {item.label}: {item.value}
+          </Link>
+        ))}
       </div>
     </section>
   );
