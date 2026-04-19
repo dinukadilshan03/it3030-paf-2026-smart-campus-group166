@@ -3,20 +3,24 @@ package com.smartcampus.backend.modules.booking.service;
 import com.smartcampus.backend.common.entity.User;
 import com.smartcampus.backend.common.entity.UserRole;
 import com.smartcampus.backend.common.enums.BookingStatus;
+import com.smartcampus.backend.common.enums.NotificationReferenceType;
 import com.smartcampus.backend.common.enums.ResourceStatus;
 import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.exception.ResourceConflictException;
 import com.smartcampus.backend.common.exception.ResourceNotFoundException;
+import com.smartcampus.backend.common.service.AuditLogService;
 import com.smartcampus.backend.modules.auth.service.CurrentUserService;
 import com.smartcampus.backend.modules.booking.dto.BookingDetailResponse;
 import com.smartcampus.backend.modules.booking.dto.BookingReviewDecision;
 import com.smartcampus.backend.modules.booking.dto.BookingSummaryResponse;
 import com.smartcampus.backend.modules.booking.dto.CancelBookingRequest;
 import com.smartcampus.backend.modules.booking.dto.CreateBookingRequest;
+import com.smartcampus.backend.modules.booking.dto.DeleteBookingRequest;
 import com.smartcampus.backend.modules.booking.dto.ReviewBookingRequest;
 import com.smartcampus.backend.modules.booking.entity.Booking;
 import com.smartcampus.backend.modules.booking.mapper.BookingMapper;
 import com.smartcampus.backend.modules.booking.repository.BookingRepository;
+import com.smartcampus.backend.modules.notification.repository.NotificationRepository;
 import com.smartcampus.backend.modules.notification.service.NotificationService;
 import com.smartcampus.backend.modules.resource.entity.Resource;
 import com.smartcampus.backend.modules.resource.entity.ResourceAvailabilityWindow;
@@ -25,7 +29,9 @@ import com.smartcampus.backend.modules.resource.service.ResourceService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -44,6 +50,8 @@ public class BookingService {
     private final CurrentUserService currentUserService;
     private final BookingMapper bookingMapper;
     private final NotificationService notificationService;
+    private final NotificationRepository notificationRepository;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public List<BookingSummaryResponse> getBookings(
@@ -165,9 +173,8 @@ public class BookingService {
             throw new AccessDeniedException("You do not have permission to cancel this booking");
         }
 
-        if (booking.getStatus() != BookingStatus.PENDING
-                && booking.getStatus() != BookingStatus.APPROVED) {
-            throw new IllegalArgumentException("Only pending or approved bookings can be cancelled");
+        if (booking.getStatus() != BookingStatus.APPROVED) {
+            throw new IllegalArgumentException("Only approved bookings can be cancelled");
         }
 
         booking.setStatus(BookingStatus.CANCELLED);
@@ -177,6 +184,31 @@ public class BookingService {
                 request == null ? null : normalizeOptionalText(request.reason()));
 
         return bookingMapper.toDetail(bookingRepository.save(booking));
+    }
+
+    @Transactional
+    public void deleteBooking(Long id, DeleteBookingRequest request) {
+        UserRole membership = getRequiredCurrentMembership();
+        Booking booking = getDetailedBooking(id);
+
+        boolean isAdmin = membership.getRole().getCode() == RoleCode.ADMIN;
+        boolean isRequester = booking.getRequesterUser().getId().equals(membership.getUser().getId());
+        if (!isAdmin && !isRequester) {
+            throw new AccessDeniedException("You do not have permission to delete this booking");
+        }
+
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new IllegalArgumentException("Only pending bookings can be deleted");
+        }
+
+        String deletionReason = request == null ? null : normalizeOptionalText(request.reason());
+        Map<String, Object> previousState = buildBookingSnapshot(booking);
+        Map<String, Object> deletionMetadata = buildDeletionMetadata(deletionReason);
+
+        notificationRepository.deleteByReferenceTypeAndReferenceId(
+                NotificationReferenceType.BOOKING, booking.getId());
+        bookingRepository.delete(booking);
+        auditLogService.log("BOOKING", booking.getId(), "DELETED", previousState, deletionMetadata);
     }
 
     private Booking getManagedBooking(Long id) {
@@ -319,5 +351,31 @@ public class BookingService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private Map<String, Object> buildBookingSnapshot(Booking booking) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("resourceId", booking.getResource().getId());
+        snapshot.put("resourceName", booking.getResource().getName());
+        snapshot.put("requesterUserId", booking.getRequesterUser().getId());
+        snapshot.put("requesterEmail", booking.getRequesterUser().getEmail());
+        snapshot.put("bookingDate", booking.getBookingDate());
+        snapshot.put("startTime", booking.getStartTime());
+        snapshot.put("endTime", booking.getEndTime());
+        snapshot.put("purpose", booking.getPurpose());
+        snapshot.put("status", booking.getStatus() == null ? null : booking.getStatus().name());
+        snapshot.put("reviewReason", booking.getReviewReason());
+        snapshot.put("cancellationReason", booking.getCancellationReason());
+        return snapshot;
+    }
+
+    private Map<String, Object> buildDeletionMetadata(String reason) {
+        if (reason == null) {
+            return null;
+        }
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("reason", reason);
+        return metadata;
     }
 }

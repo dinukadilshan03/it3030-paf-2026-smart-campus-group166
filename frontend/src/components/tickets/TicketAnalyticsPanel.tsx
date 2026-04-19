@@ -10,6 +10,7 @@ import {
   getUnassignedTicketCount,
   isArchivedTicket,
   isOldTicket,
+  parseTicketDateValue,
 } from "@/lib/tickets/shared";
 import type { TicketCategorySummary, TicketPriority, TicketStatus, TicketSummary } from "@/lib/tickets/types";
 import type { CurrentUser } from "@/types/auth";
@@ -109,9 +110,7 @@ function getBarWidth(value: number, max: number) {
 }
 
 function parseDateMs(value: string | null | undefined) {
-  if (!value) return null;
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : null;
+  return parseTicketDateValue(value);
 }
 
 function startOfWeek(date: Date) {

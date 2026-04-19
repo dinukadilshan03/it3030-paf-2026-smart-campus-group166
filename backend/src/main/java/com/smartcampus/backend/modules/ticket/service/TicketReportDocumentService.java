@@ -10,6 +10,8 @@ import com.smartcampus.backend.modules.ticket.dto.TicketCommentResponse;
 import com.smartcampus.backend.modules.ticket.dto.TicketDetailResponse;
 import com.smartcampus.backend.modules.ticket.dto.TicketSummaryResponse;
 import java.awt.Color;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -18,6 +20,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import javax.imageio.ImageIO;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -27,6 +30,9 @@ import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.pdmodel.graphics.image.JPEGFactory;
+import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -59,7 +65,7 @@ public class TicketReportDocumentService {
             String filterSummary,
             TicketDetailResponse detail,
             List<TicketCommentResponse> comments,
-            List<TicketAttachmentResponse> attachments) {
+            List<AttachmentEvidence> attachments) {
         // Render the detailed report in the requested output format
         return switch (request.format()) {
             case PDF ->
@@ -243,7 +249,7 @@ public class TicketReportDocumentService {
             String filterSummary,
             TicketDetailResponse detail,
             List<TicketCommentResponse> comments,
-            List<TicketAttachmentResponse> attachments) {
+            List<AttachmentEvidence> attachments) {
 
         // Sanitize ticket number so it is safe to use in a file name
         String safeTicketNumber =
@@ -263,6 +269,11 @@ public class TicketReportDocumentService {
                             document,
                             "Ticket Detail Report",
                             "Full maintenance and incident ticket record")) {
+                List<PreparedAttachmentImage> preparedAttachmentImages =
+                        attachments.stream()
+                                .map(attachment -> prepareAttachmentImage(document, attachment))
+                                .filter(attachment -> attachment != null)
+                                .toList();
 
                 // Add the hero section for the detailed report
                 writer.writeHeroCard(
@@ -280,7 +291,10 @@ public class TicketReportDocumentService {
                                 new StatItem("Status", toTitleCase(detail.status().name()), toneForStatus(detail.status())),
                                 new StatItem("Priority", toTitleCase(detail.priority().name()), toneForPriority(detail.priority())),
                                 new StatItem("Comments", String.valueOf(comments.size()), PdfTone.SKY),
-                                new StatItem("Attachments", String.valueOf(attachments.size()), PdfTone.EMERALD)));
+                                new StatItem(
+                                        "Attachments",
+                                        String.valueOf(preparedAttachmentImages.size()),
+                                        PdfTone.EMERALD)));
 
                 // Add filter/scope summary
                 writer.writeParagraphCard("Reporting scope", safeValue(filterSummary), PdfTone.SKY);
@@ -380,27 +394,14 @@ public class TicketReportDocumentService {
                     }
                 }
 
-                // Add attachment list or a placeholder if there are none
-                if (attachments.isEmpty()) {
+                // Embed available attachment images directly into the PDF.
+                if (preparedAttachmentImages.isEmpty()) {
                     writer.writeParagraphCard(
                             "Attachments and evidence",
-                            "No image evidence or supporting attachments were uploaded for this ticket.",
+                            "No image evidence is currently available for this ticket. Removed or unreadable files were skipped.",
                             PdfTone.SLATE);
                 } else {
-                    writer.writeCard(
-                            "Attachments and evidence",
-                            attachments.stream()
-                                    .map(
-                                            attachment ->
-                                                    attachment.fileName()
-                                                            + " | "
-                                                            + safeValue(attachment.mimeType())
-                                                            + " | "
-                                                            + formatFileSize(attachment.fileSize())
-                                                            + " | Uploaded "
-                                                            + formatDateTime(attachment.createdAt()))
-                                    .toList(),
-                            PdfTone.SLATE);
+                    writer.writeAttachmentGallery(preparedAttachmentImages, PdfTone.SLATE);
                 }
             }
 
@@ -422,7 +423,7 @@ public class TicketReportDocumentService {
             String filterSummary,
             TicketDetailResponse detail,
             List<TicketCommentResponse> comments,
-            List<TicketAttachmentResponse> attachments) {
+            List<AttachmentEvidence> attachments) {
 
         // Sanitize ticket number for file naming
         String safeTicketNumber =
@@ -563,13 +564,13 @@ public class TicketReportDocumentService {
                 .orElse("");
     }
 
-    private String joinAttachments(List<TicketAttachmentResponse> attachments) {
+    private String joinAttachments(List<AttachmentEvidence> attachments) {
         // Join attachment file names into a single CSV-safe string
         if (attachments.isEmpty()) {
             return "";
         }
         return attachments.stream()
-                .map(TicketAttachmentResponse::fileName)
+                .map(attachment -> attachment.attachment().fileName())
                 .reduce((left, right) -> left + " | " + right)
                 .orElse("");
     }
@@ -591,12 +592,12 @@ public class TicketReportDocumentService {
         return "\"" + escaped + "\"";
     }
 
-    private String formatDateTime(LocalDateTime value) {
+    private static String formatDateTime(LocalDateTime value) {
         // Format LocalDateTime or return empty string when null
         return value == null ? "" : value.format(TIMESTAMP_FORMATTER);
     }
 
-    private String formatFileSize(Long bytes) {
+    private static String formatFileSize(Long bytes) {
         // Format raw byte size into B, KB, or MB
         if (bytes == null || bytes < 0) {
             return "Unknown size";
@@ -610,12 +611,12 @@ public class TicketReportDocumentService {
         return String.format(Locale.ROOT, "%.1f MB", bytes / (1024d * 1024d));
     }
 
-    private String safeValue(String value) {
+    private static String safeValue(String value) {
         // Replace null or blank text with a placeholder
         return value == null || value.isBlank() ? "Not provided" : value;
     }
 
-    private String toTitleCase(String value) {
+    private static String toTitleCase(String value) {
         // Convert enum-like uppercase text into readable title case
         String normalized = value.toLowerCase(Locale.ROOT).replace('_', ' ');
         String[] segments = normalized.split("\\s+");
@@ -638,6 +639,10 @@ public class TicketReportDocumentService {
     // Holds the generated report file and related metadata
     public record RenderedTicketReport(
             String fileName, String mimeType, byte[] fileData, int recordCount, String summaryText) {}
+
+    // Holds attachment metadata plus the stored file bytes needed for report rendering.
+    public record AttachmentEvidence(
+            TicketAttachmentResponse attachment, byte[] content, String contentType) {}
 
     // Predefined color themes used in PDF sections
     private enum PdfTone {
@@ -695,6 +700,58 @@ public class TicketReportDocumentService {
         // Count how many tickets match the given status
         return tickets.stream().filter(ticket -> ticket.status() == status).count();
     }
+
+    private PreparedAttachmentImage prepareAttachmentImage(
+            PDDocument document, AttachmentEvidence attachmentEvidence) {
+        if (attachmentEvidence == null
+                || attachmentEvidence.attachment() == null
+                || attachmentEvidence.content() == null
+                || attachmentEvidence.content().length == 0) {
+            return null;
+        }
+
+        try {
+            return new PreparedAttachmentImage(
+                    attachmentEvidence,
+                    createPdfImage(document, attachmentEvidence));
+        } catch (IOException ex) {
+            String fileName =
+                    attachmentEvidence.attachment().fileName() == null
+                            ? "unknown"
+                            : attachmentEvidence.attachment().fileName();
+            log.warn("Skipping attachment image {} while rendering PDF", fileName, ex);
+            return null;
+        }
+    }
+
+    private PDImageXObject createPdfImage(PDDocument document, AttachmentEvidence attachmentEvidence)
+            throws IOException {
+        String contentType =
+                attachmentEvidence.contentType() == null
+                        ? ""
+                        : attachmentEvidence.contentType().toLowerCase(Locale.ROOT);
+
+        if (contentType.contains("jpeg") || contentType.contains("jpg")) {
+            return JPEGFactory.createFromStream(
+                    document, new ByteArrayInputStream(attachmentEvidence.content()));
+        }
+
+        try {
+            return PDImageXObject.createFromByteArray(
+                    document,
+                    attachmentEvidence.content(),
+                    safeValue(attachmentEvidence.attachment().fileName()));
+        } catch (IOException ex) {
+            BufferedImage bufferedImage =
+                    ImageIO.read(new ByteArrayInputStream(attachmentEvidence.content()));
+            if (bufferedImage == null) {
+                throw ex;
+            }
+            return LosslessFactory.createFromImage(document, bufferedImage);
+        }
+    }
+
+    private record PreparedAttachmentImage(AttachmentEvidence attachment, PDImageXObject image) {}
 
     private static final class PdfWriter implements AutoCloseable {
 
@@ -1081,6 +1138,109 @@ public class TicketReportDocumentService {
                     textY - titleLines.size() * 17f - 8f,
                     LINE_GAP,
                     TEXT_COLOR);
+
+            cursorY = cardY - 14f;
+        }
+
+        private void writeAttachmentGallery(
+                List<PreparedAttachmentImage> attachments, PdfTone tone) throws IOException {
+            writeParagraphCard(
+                    "Attachments and evidence",
+                    "Evidence images that were still available at report generation time are embedded below.",
+                    tone);
+
+            for (PreparedAttachmentImage attachment : attachments) {
+                writeAttachmentImageCard(attachment, tone);
+            }
+        }
+
+        private void writeAttachmentImageCard(PreparedAttachmentImage attachmentImage, PdfTone tone)
+                throws IOException {
+            TicketAttachmentResponse attachment = attachmentImage.attachment().attachment();
+            PDImageXObject image = attachmentImage.image();
+            float cardWidth = page.getMediaBox().getWidth() - 2 * MARGIN;
+            float cardX = MARGIN;
+            float maxImageWidth = cardWidth - 42f;
+            float maxImageHeight = 220f;
+            float imageScale =
+                    Math.min(
+                            1f,
+                            Math.min(
+                                    maxImageWidth / Math.max(image.getWidth(), 1f),
+                                    maxImageHeight / Math.max(image.getHeight(), 1f)));
+            float drawWidth = image.getWidth() * imageScale;
+            float drawHeight = image.getHeight() * imageScale;
+
+            String heading =
+                    attachment.title() == null || attachment.title().isBlank()
+                            ? safeValue(attachment.fileName())
+                            : attachment.title();
+            String metadata =
+                    safeValue(attachment.fileName())
+                            + " | "
+                            + safeValue(attachmentImage.attachment().contentType())
+                            + " | "
+                            + formatFileSize(attachment.fileSize())
+                            + " | Uploaded "
+                            + formatDateTime(attachment.createdAt());
+
+            List<String> titleLines =
+                    wrapText(heading, headingFont, SECTION_FONT_SIZE, cardWidth - 30f);
+            List<String> metadataLines =
+                    wrapText(metadata, bodyFont, BODY_FONT_SIZE, cardWidth - 30f);
+            float cardHeight =
+                    28f
+                            + titleLines.size() * 17f
+                            + 8f
+                            + metadataLines.size() * LINE_GAP
+                            + 14f
+                            + drawHeight
+                            + 22f;
+
+            ensureSpace(cardHeight + 10f);
+
+            float cardY = cursorY - cardHeight;
+
+            stream.setNonStrokingColor(tone.surfaceColor());
+            stream.addRect(cardX, cardY, cardWidth, cardHeight);
+            stream.fill();
+            stream.setStrokingColor(BORDER_COLOR);
+            stream.setLineWidth(0.75f);
+            stream.addRect(cardX, cardY, cardWidth, cardHeight);
+            stream.stroke();
+
+            stream.setNonStrokingColor(tone.accentColor());
+            stream.addRect(cardX, cardY + cardHeight - 7f, cardWidth, 7f);
+            stream.fill();
+
+            float textX = cardX + 15f;
+            float textY = cardY + cardHeight - 22f;
+            drawTextBlock(titleLines, headingFont, SECTION_FONT_SIZE, textX, textY, 17f, TEXT_COLOR);
+            drawTextBlock(
+                    metadataLines,
+                    bodyFont,
+                    BODY_FONT_SIZE,
+                    textX,
+                    textY - titleLines.size() * 17f - 8f,
+                    LINE_GAP,
+                    MUTED_TEXT_COLOR);
+
+            float imageFrameX = cardX + 15f;
+            float imageFrameY = cardY + 15f;
+            float imageFrameWidth = cardWidth - 30f;
+            float imageFrameHeight = drawHeight + 12f;
+
+            stream.setNonStrokingColor(Color.WHITE);
+            stream.addRect(imageFrameX, imageFrameY, imageFrameWidth, imageFrameHeight);
+            stream.fill();
+            stream.setStrokingColor(new Color(226, 232, 240));
+            stream.setLineWidth(0.6f);
+            stream.addRect(imageFrameX, imageFrameY, imageFrameWidth, imageFrameHeight);
+            stream.stroke();
+
+            float imageX = cardX + (cardWidth - drawWidth) / 2f;
+            float imageY = imageFrameY + 6f;
+            stream.drawImage(image, imageX, imageY, drawWidth, drawHeight);
 
             cursorY = cardY - 14f;
         }
