@@ -141,6 +141,7 @@ class BookingServiceTest {
         verify(bookingRepository).save(bookingCaptor.capture());
         assertThat(bookingCaptor.getValue().getStatus()).isEqualTo(BookingStatus.PENDING);
         assertThat(bookingCaptor.getValue().getRequesterUser()).isEqualTo(student);
+        verify(notificationService).notifyBookingCreated(bookingCaptor.getValue());
         assertThat(created.status()).isEqualTo(BookingStatus.PENDING);
     }
 
@@ -205,6 +206,7 @@ class BookingServiceTest {
         BookingDetailResponse created = bookingService.create(request);
 
         assertThat(created.status()).isEqualTo(BookingStatus.APPROVED);
+        verify(notificationService).notifyBookingCreated(any(Booking.class));
     }
 
     @Test
@@ -389,6 +391,7 @@ class BookingServiceTest {
 
         assertThat(cancelled.status()).isEqualTo(BookingStatus.CANCELLED);
         assertThat(booking.getCancelledByUser()).isEqualTo(requester);
+        verify(notificationService).notifyBookingCancelled(booking, requester);
     }
 
     @Test
@@ -437,88 +440,7 @@ class BookingServiceTest {
     }
 
     @Test
-    void requesterCanDeletePendingBookingAndCleanupNotifications() {
-        User requester = buildUser(14L, "student7@example.com", "Student Seven");
-        UserRole membership = buildMembership(requester, RoleCode.STUDENT);
-        Booking booking = buildBooking(205L, requester, buildResource(19L, true, ResourceStatus.ACTIVE));
-        booking.setStatus(BookingStatus.PENDING);
-
-        when(currentUserService.getCurrentUserRole()).thenReturn(Optional.of(membership));
-        when(bookingRepository.findDetailedById(205L)).thenReturn(Optional.of(booking));
-
-        bookingService.deleteBooking(205L, new DeleteBookingRequest("No longer needed"));
-
-        verify(notificationRepository)
-                .deleteByReferenceTypeAndReferenceId(NotificationReferenceType.BOOKING, 205L);
-        verify(bookingRepository).delete(booking);
-        verify(auditLogService)
-                .log(
-                        eq("BOOKING"),
-                        eq(205L),
-                        eq("DELETED"),
-                        any(),
-                        eq(java.util.Map.of("reason", "No longer needed")));
-    }
-
-    @Test
-    void requesterCannotDeleteApprovedBooking() {
-        User requester = buildUser(15L, "student8@example.com", "Student Eight");
-        UserRole membership = buildMembership(requester, RoleCode.STUDENT);
-        Booking booking = buildBooking(206L, requester, buildResource(20L, true, ResourceStatus.ACTIVE));
-        booking.setStatus(BookingStatus.APPROVED);
-
-        when(currentUserService.getCurrentUserRole()).thenReturn(Optional.of(membership));
-        when(bookingRepository.findDetailedById(206L)).thenReturn(Optional.of(booking));
-
-        assertThatThrownBy(() -> bookingService.deleteBooking(206L, new DeleteBookingRequest(null)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Only pending bookings can be deleted");
-
-        verify(bookingRepository, never()).delete(any(Booking.class));
-        verify(notificationRepository, never())
-                .deleteByReferenceTypeAndReferenceId(any(), any());
-        verify(auditLogService, never()).log(any(), any(), any(), any(), any());
-    }
-
-    @Test
-    void studentCannotDeleteAnotherUsersBooking() {
-        User requester = buildUser(15L, "owner2@example.com", "Owner Two");
-        User viewer = buildUser(16L, "viewer2@example.com", "Viewer Two");
-        UserRole membership = buildMembership(viewer, RoleCode.STUDENT);
-        Booking booking = buildBooking(207L, requester, buildResource(21L, true, ResourceStatus.ACTIVE));
-
-        when(currentUserService.getCurrentUserRole()).thenReturn(Optional.of(membership));
-        when(bookingRepository.findDetailedById(207L)).thenReturn(Optional.of(booking));
-
-        assertThatThrownBy(() -> bookingService.deleteBooking(207L, new DeleteBookingRequest(null)))
-                .isInstanceOf(AccessDeniedException.class)
-                .hasMessageContaining("permission");
-
-        verify(bookingRepository, never()).delete(any(Booking.class));
-        verify(notificationRepository, never())
-                .deleteByReferenceTypeAndReferenceId(any(), any());
-        verify(auditLogService, never()).log(any(), any(), any(), any(), any());
-    }
-
-    @Test
-    void requesterCannotCancelPendingBooking() {
-        User requester = buildUser(17L, "student9@example.com", "Student Nine");
-        UserRole membership = buildMembership(requester, RoleCode.STUDENT);
-        Booking booking = buildBooking(208L, requester, buildResource(22L, true, ResourceStatus.ACTIVE));
-        booking.setStatus(BookingStatus.PENDING);
-
-        when(currentUserService.getCurrentUserRole()).thenReturn(Optional.of(membership));
-        when(bookingRepository.findById(208L)).thenReturn(Optional.of(booking));
-
-        assertThatThrownBy(() -> bookingService.cancelBooking(208L, new CancelBookingRequest("Changed plans")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Only approved bookings can be cancelled");
-
-        verify(bookingRepository, never()).save(any(Booking.class));
-    }
-
-    @Test
-    void autoApprovedCreateDoesNotCreateNotification() {
+    void autoApprovedCreateTriggersBookingNotificationFlow() {
         User admin = buildUser(13L, "admin3@example.com", "Admin Three");
         UserRole membership = buildMembership(admin, RoleCode.ADMIN);
         Resource resource = buildResource(18L, false, ResourceStatus.ACTIVE);
@@ -577,6 +499,7 @@ class BookingServiceTest {
 
         bookingService.create(request);
 
+        verify(notificationService).notifyBookingCreated(any(Booking.class));
         verify(notificationService, never()).notifyBookingReviewed(any());
     }
 

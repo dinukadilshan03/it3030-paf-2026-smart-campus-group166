@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Bell, CalendarRange, MessageSquareText, Ticket, type LucideIcon } from "lucide-react";
 
 import {
   listNotificationsClient,
@@ -12,12 +13,33 @@ import {
   formatNotificationDateTime,
   getNotificationHref,
 } from "@/lib/notifications/shared";
+import {
+  getNotificationDestinationLabel,
+  getNotificationOpenLabel,
+  getNotificationTypePresentation,
+} from "@/lib/notifications/presentation";
 import type { NotificationSummary } from "@/lib/notifications/types";
 
 type NotificationCenterPageProps = {
   initialNotifications: NotificationSummary[];
   initialUnreadCount: number;
 };
+
+function NotificationTypeIcon({
+  notification,
+}: {
+  notification: NotificationSummary;
+}) {
+  const iconByType: Record<NotificationSummary["type"], LucideIcon> = {
+    BOOKING: CalendarRange,
+    TICKET: Ticket,
+    COMMENT: MessageSquareText,
+    SYSTEM: Bell,
+  };
+  const Icon = iconByType[notification.type];
+
+  return <Icon className="h-4 w-4" aria-hidden="true" />;
+}
 
 export function NotificationCenterPage({
   initialNotifications,
@@ -131,8 +153,8 @@ export function NotificationCenterPage({
               Activity updates
             </h1>
             <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">
-              Track booking decisions, ticket status changes, and new ticket comments
-              from one place.
+              Track booking requests, booking updates, ticket triage, assignments,
+              status changes, reconsideration requests, and new comments from one place.
             </p>
           </div>
 
@@ -213,11 +235,20 @@ export function NotificationCenterPage({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start gap-3">
                       <div className="min-w-0 flex-1">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${getNotificationTypePresentation(notification.type).badgeClassName}`}
+                        >
+                          <NotificationTypeIcon notification={notification} />
+                          {getNotificationTypePresentation(notification.type).label}
+                        </span>
                         <h2 className="text-lg font-semibold text-slate-950">
                           {notification.title}
                         </h2>
                         <p className="mt-2 text-sm leading-7 text-slate-600">
                           {notification.message}
+                        </p>
+                        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Opens {getNotificationDestinationLabel(notification)}
                         </p>
                       </div>
                       {!notification.isRead ? (
@@ -245,7 +276,7 @@ export function NotificationCenterPage({
                       onClick={() => void handleOpenNotification(notification)}
                       className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
                     >
-                      Open
+                      {getNotificationOpenLabel(notification)}
                     </button>
                   </div>
                 </div>

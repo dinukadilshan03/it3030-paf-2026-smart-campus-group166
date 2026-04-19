@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Bell, CalendarRange, MessageSquareText, Ticket, type LucideIcon } from "lucide-react";
 
 import {
   listNotificationsClient,
@@ -13,11 +14,31 @@ import {
   formatNotificationDateTime,
   getNotificationHref,
 } from "@/lib/notifications/shared";
+import {
+  getNotificationDestinationLabel,
+  getNotificationTypePresentation,
+} from "@/lib/notifications/presentation";
 import type { NotificationSummary } from "@/lib/notifications/types";
 
 type NotificationBellProps = {
   initialUnreadCount: number;
 };
+
+function NotificationTypeIcon({
+  notification,
+}: {
+  notification: NotificationSummary;
+}) {
+  const iconByType: Record<NotificationSummary["type"], LucideIcon> = {
+    BOOKING: CalendarRange,
+    TICKET: Ticket,
+    COMMENT: MessageSquareText,
+    SYSTEM: Bell,
+  };
+  const Icon = iconByType[notification.type];
+
+  return <Icon className="h-4 w-4" aria-hidden="true" />;
+}
 
 export function NotificationBell({ initialUnreadCount }: NotificationBellProps) {
   const router = useRouter();
@@ -190,15 +211,26 @@ export function NotificationBell({ initialUnreadCount }: NotificationBellProps) 
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm font-semibold text-stone-900">
-                      {notification.title}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${getNotificationTypePresentation(notification.type).badgeClassName}`}
+                      >
+                        <NotificationTypeIcon notification={notification} />
+                        {getNotificationTypePresentation(notification.type).label}
+                      </span>
+                    </div>
                     {!notification.isRead ? (
                       <span className="mt-1 h-2.5 w-2.5 rounded-full bg-[color:var(--accent)]" />
                     ) : null}
                   </div>
+                  <p className="mt-3 text-sm font-semibold text-stone-900">
+                    {notification.title}
+                  </p>
                   <p className="mt-2 text-sm leading-6 text-stone-600">
                     {notification.message}
+                  </p>
+                  <p className="mt-2 text-xs font-medium uppercase tracking-[0.18em] text-stone-500">
+                    Opens {getNotificationDestinationLabel(notification)}
                   </p>
                   <p className="mt-2 text-xs font-medium uppercase tracking-[0.18em] text-stone-500">
                     {formatNotificationDateTime(notification.createdAt)}
