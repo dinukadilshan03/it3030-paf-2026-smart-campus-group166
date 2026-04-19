@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import AIChat from "./AIChat";
 import { getResources, deleteResource, resolveResourceImageUrl } from "@/lib/resources/api";
+import FormMessages from "../../components/ui/FormMessages";
 import { useRouter } from "next/navigation";
 import { clientApiFetch } from "@/lib/api/client";
 
@@ -11,6 +12,8 @@ export default function ResourcePage() {
 
   const [resources, setResources] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [success, setSuccess] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("");
 const [selectedLocation, setSelectedLocation] = useState("");
 
@@ -43,15 +46,22 @@ const [selectedLocation, setSelectedLocation] = useState("");
   };
 
   const handleDelete = async (id: number) => {
-    if (!isAdmin) return alert("Only admin can delete ❌");
+    setErrors([]);
+    setSuccess(null);
+    if (!isAdmin) {
+      setErrors(["Only admin can delete ❌"]);
+      return;
+    }
 
     if (!confirm("Delete this resource?")) return;
 
     try {
       await deleteResource(id);
+      setSuccess('Deleted');
+      setTimeout(() => setSuccess(null), 2000);
       loadResources();
     } catch (err: any) {
-      alert(err.message);
+      setErrors([err.message || 'Delete failed']);
     }
   };
 
@@ -104,6 +114,7 @@ const [selectedLocation, setSelectedLocation] = useState("");
       </div>
 
       {/* ✅ ADDED SEARCH BAR */}
+      <FormMessages errors={errors} success={success} onClose={() => { setErrors([]); setSuccess(null); }} />
       <input
         type="text"
         placeholder="🔍 Search..."

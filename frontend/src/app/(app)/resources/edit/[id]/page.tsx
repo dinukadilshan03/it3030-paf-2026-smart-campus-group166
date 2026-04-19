@@ -10,6 +10,7 @@ import {
   uploadResourceImage,
   resolveResourceImageUrl,
 } from "@/lib/resources/api";
+import FormMessages from "../../../../components/ui/FormMessages";
 
 export default function EditResourcePage() {
   const { id } = useParams();
@@ -30,6 +31,8 @@ export default function EditResourcePage() {
   const [locations, setLocations] = useState<any[]>([]);
   const [preview, setPreview] = useState("");
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -112,10 +115,22 @@ export default function EditResourcePage() {
         await uploadResourceImage(Number(id), selectedImageFile);
       }
 
-      alert("Updated successfully ✅");
-      router.push("/resources");
+      setSuccess('Updated successfully ✅');
+      setTimeout(() => router.push("/resources"), 400);
     } catch (err: any) {
-      alert(err.message);
+      try {
+        const parsed = JSON.parse(err.message || err || '{}');
+        if (parsed.validationErrors) {
+          const arr = Object.entries(parsed.validationErrors).map(([k, v]: any) => `${k}: ${v}`);
+          setErrors(arr as string[]);
+        } else if (parsed.message) {
+          setErrors([parsed.message]);
+        } else {
+          setErrors([err.message || 'Update failed']);
+        }
+      } catch (_) {
+        setErrors([err.message || 'Update failed']);
+      }
     }
   };
 
@@ -123,6 +138,8 @@ export default function EditResourcePage() {
     <div style={styles.container}>
       <div style={styles.card}>
         <h2 style={styles.title}>✏️ Edit Resource</h2>
+
+        <FormMessages errors={errors} success={success} onClose={() => { setErrors([]); setSuccess(null); }} />
 
         <div style={styles.grid}>
           <input
