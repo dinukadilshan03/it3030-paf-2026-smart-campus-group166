@@ -4,12 +4,20 @@ import { useState } from "react";
 
 import { TicketDialog } from "@/components/tickets/TicketDialog";
 import {
+  TicketConfirmDialog,
+  TicketPopupNotice,
+  type TicketPopupNoticeState,
+  buildTicketValidationNotice,
+} from "@/components/tickets/TicketPopupDialogs";
+import {
+  getTicketErrorMessage,
   getActiveTicketCategories,
   getLocationLabel,
   getResourceLabel,
   TicketApiError,
   toIdNumber,
 } from "@/lib/tickets/shared";
+import { refineTicketDescriptionClient } from "@/lib/tickets/client";
 import { validateUpdateTicketForm } from "@/lib/tickets/validation";
 import type {
   TicketCategorySummary,
@@ -74,20 +82,26 @@ export function EditTicketDialog({
   const [values, setValues] = useState<TicketEditFormValues>(getInitialValues(ticket));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<TicketPopupNoticeState>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingPayload, setPendingPayload] = useState<UpdateTicketRequest | null>(null);
+  const [isRefiningDescription, setIsRefiningDescription] = useState(false);
+  const [refineError, setRefineError] = useState<string | null>(null);
+  const [refineMessage, setRefineMessage] = useState<string | null>(null);
 
   const activeCategories = getActiveTicketCategories(categories);
   const filteredResources = values.locationId
     ? resources.filter((resource) => resource.locationId === Number(values.locationId))
     : resources;
   const inputClassName =
-    "rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:bg-white";
+    "w-full min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:bg-white";
 
   return (
     <TicketDialog
       open={open}
       onClose={onClose}
       title="Edit ticket details"
-      description="Open tickets can be corrected by the reporter, and admins can adjust ticket details at any point in the workflow."
+      description="Open tickets can be corrected by the original reporter before operational work starts."
     >
       <form
         className="space-y-6"
@@ -98,12 +112,18 @@ export function EditTicketDialog({
           const validationErrors = validateUpdateTicketForm(values, resources);
           if (Object.keys(validationErrors).length > 0) {
             setErrors(validationErrors);
+            setNotice(
+              buildTicketValidationNotice(
+                "Ticket changes need attention",
+                validationErrors,
+              ),
+            );
             return;
           }
 
           try {
             setErrors({});
-            await onSubmit({
+            setPendingPayload({
               resourceId: toIdNumber(values.resourceId),
               locationId: toIdNumber(values.locationId),
               ticketCategoryId: Number(values.ticketCategoryId),
@@ -114,12 +134,26 @@ export function EditTicketDialog({
               preferredContactEmail: values.preferredContactEmail.trim() || undefined,
               preferredContactPhone: values.preferredContactPhone.trim() || undefined,
             });
-            onClose();
+            setConfirmOpen(true);
           } catch (error) {
             if (error instanceof TicketApiError) {
               setErrors(error.validationErrors);
+              setNotice(
+                buildTicketValidationNotice(
+                  "Ticket changes need attention",
+                  error.validationErrors,
+                  error.message || "Review the highlighted ticket fields and try again.",
+                ),
+              );
             }
-            setFormError(error instanceof Error ? error.message : "Ticket update failed.");
+            const nextFormError =
+              error instanceof Error ? error.message : "Ticket update failed.";
+            setFormError(nextFormError);
+            setNotice({
+              tone: "error",
+              title: "Ticket update failed",
+              message: nextFormError,
+            });
           }
         }}
       >
@@ -194,7 +228,64 @@ export function EditTicketDialog({
           </label>
 
           <label className="grid gap-2 text-sm font-medium text-slate-700">
-            Description
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span>Description</span>
+              <button
+                type="button"
+                disabled={busy || isRefiningDescription}
+                onClick={async () => {
+                  const nextDescription = values.description.trim();
+                  if (!nextDescription) {
+                    const nextError =
+                      "Type your issue first, then use AI to polish the description.";
+                    setRefineError(nextError);
+                    setRefineMessage(null);
+                    setNotice({
+                      tone: "error",
+                      title: "Description needed",
+                      message: nextError,
+                    });
+                    return;
+                  }
+
+                  setRefineError(null);
+                  setRefineMessage(null);
+                  setIsRefiningDescription(true);
+                  try {
+                    const response = await refineTicketDescriptionClient({
+                      title: values.title.trim() || undefined,
+                      description: nextDescription,
+                    });
+
+                    setValues((current) => ({
+                      ...current,
+                      description: response.improvedDescription,
+                    }));
+                    setRefineMessage(
+                      response.assistantEnabled
+                        ? "AI polished the description. You can still edit it before saving."
+                        : "A clearer description was prepared. You can still edit it before saving.",
+                    );
+                  } catch (error) {
+                    const nextError = getTicketErrorMessage(
+                      error,
+                      "Could not polish the description right now.",
+                    );
+                    setRefineError(nextError);
+                    setNotice({
+                      tone: "error",
+                      title: "AI polish failed",
+                      message: nextError,
+                    });
+                  } finally {
+                    setIsRefiningDescription(false);
+                  }
+                }}
+                className="inline-flex items-center justify-center rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-800 transition hover:border-sky-300 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isRefiningDescription ? "AI refining..." : "AI polish"}
+              </button>
+            </div>
             <textarea
               rows={5}
               value={values.description}
@@ -207,6 +298,10 @@ export function EditTicketDialog({
               className={`${inputClassName} min-h-36 resize-y`}
               placeholder="Describe the fault, when it started, and any visible impact on classes or staff operations."
             />
+            {refineMessage ? (
+              <span className="text-xs text-emerald-700">{refineMessage}</span>
+            ) : null}
+            {refineError ? <span className="text-xs text-rose-600">{refineError}</span> : null}
             {errors.description ? (
               <span className="text-xs text-rose-600">{errors.description}</span>
             ) : null}
@@ -221,7 +316,7 @@ export function EditTicketDialog({
             </p>
           </div>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <div className="mt-5 grid gap-4 md:grid-cols-2 [&>*]:min-w-0">
             <label className="grid gap-2 text-sm font-medium text-slate-700">
               Location
               <select
@@ -368,6 +463,62 @@ export function EditTicketDialog({
           </button>
         </div>
       </form>
+
+      <TicketPopupNotice
+        notice={notice}
+        onClose={() => setNotice(null)}
+        actionLabel="Review"
+      />
+      <TicketConfirmDialog
+        open={confirmOpen}
+        title="Save ticket changes"
+        message="Are you sure you want to save these edits to the ticket?"
+        confirmLabel="Save changes"
+        cancelLabel="Keep editing"
+        busy={busy}
+        tone="neutral"
+        onClose={() => {
+          if (busy) {
+            return;
+          }
+
+          setConfirmOpen(false);
+          setPendingPayload(null);
+        }}
+        onConfirm={async () => {
+          if (!pendingPayload) {
+            setConfirmOpen(false);
+            return;
+          }
+
+          try {
+            await onSubmit(pendingPayload);
+            setConfirmOpen(false);
+            setPendingPayload(null);
+            onClose();
+          } catch (error) {
+            if (error instanceof TicketApiError) {
+              setErrors(error.validationErrors);
+              setNotice(
+                buildTicketValidationNotice(
+                  "Ticket changes need attention",
+                  error.validationErrors,
+                  error.message || "Review the highlighted ticket fields and try again.",
+                ),
+              );
+            }
+
+            const nextFormError =
+              error instanceof Error ? error.message : "Ticket update failed.";
+            setFormError(nextFormError);
+            setNotice({
+              tone: "error",
+              title: "Ticket update failed",
+              message: nextFormError,
+            });
+          }
+        }}
+      />
     </TicketDialog>
   );
 }

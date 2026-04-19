@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+
 type TicketDialogProps = {
   open: boolean;
   title: string;
@@ -17,17 +19,38 @@ export function TicketDialog({
   onClose,
   children,
 }: TicketDialogProps) {
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const { body } = document;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    const previousOverflow = body.style.overflow;
+    const previousPaddingRight = body.style.paddingRight;
+
+    body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    return () => {
+      body.style.overflow = previousOverflow;
+      body.style.paddingRight = previousPaddingRight;
+    };
+  }, [open]);
+
   if (!open) {
     return null;
   }
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/55 px-4 py-8 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/55 px-4 pt-3 pb-8 backdrop-blur-sm md:pt-4 md:pb-10"
       onClick={onClose}
     >
       <div
-        className={`w-full ${widthClassName} overflow-hidden rounded-[1.75rem] border border-white/70 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.24)]`}
+        className={`flex max-h-[calc(100vh-2.75rem)] w-full flex-col ${widthClassName} overflow-hidden rounded-[1.75rem] border border-white/70 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.24)] md:max-h-[calc(100vh-3.5rem)]`}
         onClick={(event) => event.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5 md:px-8">
@@ -53,7 +76,7 @@ export function TicketDialog({
           </button>
         </header>
 
-        <div className="max-h-[calc(100vh-8rem)] overflow-y-auto px-6 py-6 md:px-8">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 md:px-8">
           {children}
         </div>
       </div>
