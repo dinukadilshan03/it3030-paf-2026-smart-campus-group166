@@ -106,3 +106,29 @@ export const deleteResource = async (id: number) => {
 
   if (!res.ok) throw new Error(await res.text());
 };
+
+// ✅ CREATE CATEGORY
+export const createResourceCategory = async (data: any) => {
+  const res = await fetch(`${BASE_URL}/resource-categories`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+// ✅ CREATE LOCATION
+export const createLocation = async (data: any) => {
+  const res = await fetch(`${BASE_URL}/locations`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
