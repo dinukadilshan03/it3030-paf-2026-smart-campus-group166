@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { clientApiFetch } from "@/lib/api/client";
+
 interface Props {
   onResult?: (data: any[]) => void;
   isAdmin?: boolean;
@@ -32,9 +34,8 @@ export default function AIChat({ onResult, isAdmin, onUse }: Props) {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:8080/api/ai/recommendations", {
+      const res = await clientApiFetch("/api/ai/recommendations", {
         method: "POST",
-        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
