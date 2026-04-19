@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Trash2, XCircle } from "lucide-react";
+import { Trash2, XCircle, CheckCircle, X } from "lucide-react";
 import type { BookingSummaryResponse } from "@/lib/bookings/types";
 import type { CurrentUser } from "@/types/auth";
 import type { Resource } from "@/lib/resources/types";
@@ -489,20 +489,40 @@ export function BookingManagementPage({
 
                   {/* Action Buttons - Only for Pending */}
                   {activeTab === "pending" && (
-                    <div className="booking-actions">
+                    <div className="px-6 py-5 bg-gradient-to-r from-slate-50 to-slate-100 border-t-2 border-t-slate-200 flex gap-3">
                       <button
-                        className="primary-button"
                         onClick={() => handleApproveClick(booking.id)}
                         disabled={actionInProgress === booking.id}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-100 to-teal-100 border-2 border-emerald-300 text-emerald-800 rounded-lg font-semibold text-sm hover:from-emerald-200 hover:to-teal-200 hover:border-emerald-500 hover:shadow-md transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
-                        {actionInProgress === booking.id ? "Processing..." : "Approve"}
+                        {actionInProgress === booking.id ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-emerald-300 border-t-emerald-700 rounded-full animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle size={18} className="flex-shrink-0" />
+                            Approve
+                          </>
+                        )}
                       </button>
                       <button
-                        className="danger-button"
                         onClick={() => handleRejectClick(booking.id)}
                         disabled={actionInProgress === booking.id}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-red-100 to-rose-100 border-2 border-red-300 text-red-800 rounded-lg font-semibold text-sm hover:from-red-200 hover:to-rose-200 hover:border-red-500 hover:shadow-md transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
-                        {actionInProgress === booking.id ? "Processing..." : "Reject"}
+                        {actionInProgress === booking.id ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-red-300 border-t-red-700 rounded-full animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <X size={18} className="flex-shrink-0" />
+                            Reject
+                          </>
+                        )}
                       </button>
                     </div>
                   )}
