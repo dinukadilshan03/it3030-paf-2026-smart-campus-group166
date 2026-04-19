@@ -16,6 +16,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class ResourceMapper {
 
+    private static final String STORED_IMAGE_PREFIX = "resource-image:";
+
     public ResourceCategorySummaryResponse toCategorySummary(ResourceCategory category) {
         return new ResourceCategorySummaryResponse(
                 category.getId(), category.getCode(), category.getName(), category.getIsActive());
@@ -65,7 +67,7 @@ public class ResourceMapper {
                 resource.getCapacity(),
                 resource.getStatus(),
                 resource.getRequiresApproval(),
-                resource.getImageUrl());
+                resolveImageUrl(resource));
     }
 
     public ResourceDetailResponse toResourceDetail(Resource resource) {
@@ -77,7 +79,7 @@ public class ResourceMapper {
                 resource.getCapacity(),
                 resource.getStatus(),
                 resource.getRequiresApproval(),
-                resource.getImageUrl(),
+                resolveImageUrl(resource),
                 resource.getNotes(),
                 toCategorySummary(resource.getResourceCategory()),
                 toLocationSummary(resource.getLocation()));
@@ -92,5 +94,16 @@ public class ResourceMapper {
                 window.getIsAvailable(),
                 window.getEffectiveFrom(),
                 window.getEffectiveTo());
+    }
+
+    private String resolveImageUrl(Resource resource) {
+        String imageUrl = resource.getImageUrl();
+        if (imageUrl == null || imageUrl.isBlank()) {
+            return imageUrl;
+        }
+        if (imageUrl.startsWith(STORED_IMAGE_PREFIX)) {
+            return "/api/v1/resources/%d/image/content".formatted(resource.getId());
+        }
+        return imageUrl;
     }
 }
