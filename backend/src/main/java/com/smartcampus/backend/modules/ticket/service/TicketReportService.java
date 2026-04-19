@@ -104,40 +104,58 @@ public class TicketReportService {
         TicketReportDocumentService.RenderedTicketReport renderedReport;
 
         // Generate either a detailed report for one ticket or a summary report for many tickets
-        if (request.reportType() == TicketReportType.DETAIL) {
-            // Resolve the specific ticket and verify the user can view it
-            Ticket ticket = resolveDetailedTicket(request);
-            ticketAccessService.ensureCanViewTicket(membership, ticket);
+        try {
+            if (request.reportType() == TicketReportType.DETAIL) {
+                // Resolve the specific ticket and verify the user can view it
+                Ticket ticket = resolveDetailedTicket(request);
+                ticketAccessService.ensureCanViewTicket(membership, ticket);
 
-            // Fetch detailed ticket data, comments, and attachments
-            TicketDetailResponse detail = ticketService.getTicketById(ticket.getId());
-            List<TicketCommentResponse> comments = ticketCommentService.getComments(ticket);
-            List<TicketAttachmentResponse> attachments =
-                    ticketAttachmentService.getAttachments(ticket);
+                // Fetch detailed ticket data, comments, and attachments
+                TicketDetailResponse detail = ticketService.getTicketById(ticket.getId());
+                List<TicketCommentResponse> comments = ticketCommentService.getComments(ticket);
+                List<TicketAttachmentResponse> attachmentMetadata =
+                        ticketAttachmentService.getAttachments(ticket);
+                List<TicketReportDocumentService.AttachmentEvidence> attachments =
+                        loadRenderableAttachments(ticket, attachmentMetadata);
 
-            // Render the detailed report document
-            renderedReport =
-                    ticketReportDocumentService.renderDetailReport(
-                            request,
-                            generatedByDisplayName,
-                            filterSummary,
-                            detail,
-                            comments,
-                            attachments);
-        } else {
-            // Resolve all matching tickets for a summary report
-            List<TicketSummaryResponse> tickets = resolveSummaryTickets(request);
+                // Render the detailed report document
+                renderedReport =
+                        ticketReportDocumentService.renderDetailReport(
+                                request,
+                                generatedByDisplayName,
+                                filterSummary,
+                                detail,
+                                comments,
+                                attachments);
+            } else {
+                // Resolve all matching tickets for a summary report
+                List<TicketSummaryResponse> tickets = resolveSummaryTickets(request);
 
-            // Prevent generating empty reports
-            if (tickets.isEmpty()) {
-                throw new IllegalArgumentException(
-                        "No tickets matched the selected filters. Adjust the report criteria and try again.");
+                // Prevent generating empty reports
+                if (tickets.isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "No tickets matched the selected filters. Adjust the report criteria and try again.");
+                }
+
+                // Render the summary report document
+                renderedReport =
+                        ticketReportDocumentService.renderSummaryReport(
+                                request, generatedByDisplayName, filterSummary, tickets);
+            }
+        } catch (ResourceNotFoundException | IllegalArgumentException | AccessDeniedException ex) {
+            throw ex;
+        } catch (RuntimeException ex) {
+            if (request.reportType() == TicketReportType.DETAIL) {
+                log.error(
+                        "Could not generate detailed ticket report for ticketId={} ticketNumber={}",
+                        request.ticketId(),
+                        request.ticketNumber(),
+                        ex);
+                throw new IllegalStateException("Could not generate the detailed ticket report.");
             }
 
-            // Render the summary report document
-            renderedReport =
-                    ticketReportDocumentService.renderSummaryReport(
-                            request, generatedByDisplayName, filterSummary, tickets);
+            log.error("Could not generate summary ticket report", ex);
+            throw new IllegalStateException("Could not generate the ticket report.");
         }
 
         // Save the generated report metadata and file data
@@ -377,6 +395,44 @@ public class TicketReportService {
         }
 
         return trimToLength(String.join(" | ", fragments), 500);
+    }
+
+    private List<TicketReportDocumentService.AttachmentEvidence> loadRenderableAttachments(
+            Ticket ticket, List<TicketAttachmentResponse> attachments) {
+        return attachments.stream()
+                .map(attachment -> loadRenderableAttachment(ticket, attachment))
+                .filter(attachment -> attachment != null)
+                .toList();
+    }
+
+    private TicketReportDocumentService.AttachmentEvidence loadRenderableAttachment(
+            Ticket ticket, TicketAttachmentResponse attachment) {
+        if (attachment.id() == null) {
+            return null;
+        }
+
+        try {
+            var content =
+                    ticketAttachmentService.getAttachmentContent(
+                            ticket.getId(), attachment.id(), ticket);
+            if (content == null || content.content() == null || content.content().length == 0) {
+                return null;
+            }
+
+            String contentType = normalizeOptionalText(content.contentType());
+            if (contentType == null) {
+                contentType = normalizeOptionalText(attachment.mimeType());
+            }
+
+            return new TicketReportDocumentService.AttachmentEvidence(
+                    attachment, content.content(), contentType);
+        } catch (RuntimeException ex) {
+            log.info(
+                    "Skipping attachment={} for ticket={} because the stored image is unavailable.",
+                    attachment.id(),
+                    ticket.getTicketNumber());
+            return null;
+        }
     }
 
     private TicketReportResponse toResponse(TicketReport report) {

@@ -17,6 +17,7 @@ import {
   getSlaTargetLabel,
   getTicketErrorMessage,
   getTicketProgressLabel,
+  parseTicketDateValue,
   toTicketTitleCase,
 } from "@/lib/tickets/shared";
 import type {
@@ -222,10 +223,7 @@ type ServiceTimerVisualCardProps = {
 };
 
 function parseTicketDateMs(value: string | null | undefined) {
-  if (!value) return null;
-
-  const parsed = new Date(value).getTime();
-  return Number.isNaN(parsed) ? null : parsed;
+  return parseTicketDateValue(value);
 }
 
 function getWorkflowStepState(

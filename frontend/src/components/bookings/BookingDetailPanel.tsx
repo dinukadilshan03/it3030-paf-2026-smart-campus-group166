@@ -232,7 +232,7 @@ export function BookingDetailPanel({
                 )}
               </>
             )}
-            {(booking.status === "PENDING" || booking.status === "APPROVED") && onCancel && (
+            {booking.status === "APPROVED" && onCancel && (
               <button
                 className="secondary-button"
                 onClick={onCancel}

@@ -12,20 +12,24 @@ import com.smartcampus.backend.common.entity.Role;
 import com.smartcampus.backend.common.entity.User;
 import com.smartcampus.backend.common.entity.UserRole;
 import com.smartcampus.backend.common.enums.BookingStatus;
+import com.smartcampus.backend.common.enums.NotificationReferenceType;
 import com.smartcampus.backend.common.enums.ResourceStatus;
 import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.UserStatus;
 import com.smartcampus.backend.common.exception.ResourceConflictException;
+import com.smartcampus.backend.common.service.AuditLogService;
 import com.smartcampus.backend.modules.auth.service.CurrentUserService;
 import com.smartcampus.backend.modules.booking.dto.BookingDetailResponse;
 import com.smartcampus.backend.modules.booking.dto.BookingReviewDecision;
 import com.smartcampus.backend.modules.booking.dto.BookingSummaryResponse;
 import com.smartcampus.backend.modules.booking.dto.CancelBookingRequest;
 import com.smartcampus.backend.modules.booking.dto.CreateBookingRequest;
+import com.smartcampus.backend.modules.booking.dto.DeleteBookingRequest;
 import com.smartcampus.backend.modules.booking.dto.ReviewBookingRequest;
 import com.smartcampus.backend.modules.booking.entity.Booking;
 import com.smartcampus.backend.modules.booking.mapper.BookingMapper;
 import com.smartcampus.backend.modules.booking.repository.BookingRepository;
+import com.smartcampus.backend.modules.notification.repository.NotificationRepository;
 import com.smartcampus.backend.modules.notification.service.NotificationService;
 import com.smartcampus.backend.modules.resource.entity.Location;
 import com.smartcampus.backend.modules.resource.entity.Resource;
@@ -54,6 +58,8 @@ class BookingServiceTest {
     @Mock private CurrentUserService currentUserService;
     @Mock private BookingMapper bookingMapper;
     @Mock private NotificationService notificationService;
+    @Mock private NotificationRepository notificationRepository;
+    @Mock private AuditLogService auditLogService;
 
     private BookingService bookingService;
 
@@ -66,7 +72,9 @@ class BookingServiceTest {
                         resourceAvailabilityWindowRepository,
                         currentUserService,
                         bookingMapper,
-                        notificationService);
+                        notificationService,
+                        notificationRepository,
+                        auditLogService);
     }
 
     @Test
