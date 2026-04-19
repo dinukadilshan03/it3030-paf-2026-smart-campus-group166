@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { CheckCircle, XCircle } from "lucide-react";
-import type { BookingSummaryResponse } from "@/lib/bookings/types";
+import type { BookingSummaryResponse, BookingFilters } from "@/lib/bookings/types";
 import type { CurrentUser } from "@/types/auth";
 import type { Resource } from "@/lib/resources/types";
 import { cancelBookingClient, listBookingsClient, reviewBookingClient } from "@/lib/bookings/client";
@@ -11,6 +11,7 @@ import NLBookingInput from "@/components/booking/NLBookingInput";
 import { BookingAnalytics } from "./BookingAnalytics";
 import { CreateBookingForm } from "./CreateBookingForm";
 import { BookingCalendar } from "./BookingCalendar";
+import { BookingFiltersPanel } from "./BookingFiltersPanel";
 
 interface ReviewAction {
   bookingId: number;
@@ -72,6 +73,9 @@ export function BookingManagementPage({
   // State for analytics
   const [showAnalytics, setShowAnalytics] = useState(false);
 
+  // State for advanced filters (admin only)
+  const [advancedFilters, setAdvancedFilters] = useState<BookingFilters>({});
+
   // Check if user is admin
   const isAdmin = user.role === "ADMIN";
 
@@ -105,19 +109,22 @@ export function BookingManagementPage({
     [bookings]
   );
 
-  const loadBookings = async () => {
-    setIsLoading(true);
-    setError("");
+  const loadBookings = useCallback(
+    async (filters?: BookingFilters) => {
+      setIsLoading(true);
+      setError("");
 
-    try {
-      const data = await listBookingsClient();
-      setBookings(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load bookings");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      try {
+        const data = await listBookingsClient(filters);
+        setBookings(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load bookings");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
 
   const loadResources = async () => {
     try {
@@ -130,9 +137,15 @@ export function BookingManagementPage({
   };
 
   useEffect(() => {
-    loadBookings();
+    if (isAdmin) {
+      // For admin, load with filters
+      loadBookings(advancedFilters);
+    } else {
+      // For students, load without filters
+      loadBookings();
+    }
     loadResources();
-  }, []);
+  }, [isAdmin, advancedFilters, loadBookings]);
 
   useEffect(() => {
     if (initialHighlightedBookingId == null || bookings.length === 0) {
@@ -302,58 +315,65 @@ export function BookingManagementPage({
             </div>
           </section>
 
-          <div className="tabs-container">
-            <button
-              className={`tab-button ${activeTab === "pending" ? "active" : ""}`}
-              onClick={() => {
-                setActiveTab("pending");
-                setShowAnalytics(false);
-              }}
-            >
-              Pending ({stats.pending})
-            </button>
-            <button
-              className={`tab-button ${activeTab === "approved" ? "active" : ""}`}
-              onClick={() => {
-                setActiveTab("approved");
-                setShowAnalytics(false);
-              }}
-            >
-              Approved ({stats.approved})
-            </button>
-            <button
-              className={`tab-button ${activeTab === "rejected" ? "active" : ""}`}
-              onClick={() => {
-                setActiveTab("rejected");
-                setShowAnalytics(false);
-              }}
-            >
-              Rejected ({stats.rejected})
-            </button>
-            <button
-              className={`tab-button ${activeTab === "cancelled" ? "active" : ""}`}
-              onClick={() => {
-                setActiveTab("cancelled");
-                setShowAnalytics(false);
-              }}
-            >
-              Cancelled ({stats.cancelled})
-            </button>
-            <button
-              className={`tab-button ${activeTab === "all" ? "active" : ""}`}
-              onClick={() => {
-                setActiveTab("all");
-                setShowAnalytics(false);
-              }}
-            >
-              All ({stats.total})
-            </button>
-            <button
-              className={`tab-button analytics-tab ${showAnalytics ? "active" : ""}`}
-              onClick={() => setShowAnalytics(!showAnalytics)}
-            >
-              📊 Analytics
-            </button>
+          <div className="tabs-container-wrapper">
+            <div className="tabs-container">
+              <button
+                className={`tab-button ${activeTab === "pending" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveTab("pending");
+                  setShowAnalytics(false);
+                }}
+              >
+                Pending ({stats.pending})
+              </button>
+              <button
+                className={`tab-button ${activeTab === "approved" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveTab("approved");
+                  setShowAnalytics(false);
+                }}
+              >
+                Approved ({stats.approved})
+              </button>
+              <button
+                className={`tab-button ${activeTab === "rejected" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveTab("rejected");
+                  setShowAnalytics(false);
+                }}
+              >
+                Rejected ({stats.rejected})
+              </button>
+              <button
+                className={`tab-button ${activeTab === "cancelled" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveTab("cancelled");
+                  setShowAnalytics(false);
+                }}
+              >
+                Cancelled ({stats.cancelled})
+              </button>
+              <button
+                className={`tab-button ${activeTab === "all" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveTab("all");
+                  setShowAnalytics(false);
+                }}
+              >
+                All ({stats.total})
+              </button>
+              <button
+                className={`tab-button analytics-tab ${showAnalytics ? "active" : ""}`}
+                onClick={() => setShowAnalytics(!showAnalytics)}
+              >
+                📊 Analytics
+              </button>
+            </div>
+            <BookingFiltersPanel
+              resources={resources}
+              onFiltersChange={setAdvancedFilters}
+              isLoading={isLoading}
+            />
           </div>
         </>
       )}
@@ -387,18 +407,6 @@ export function BookingManagementPage({
                       <span className={`status-badge status-${booking.status.toLowerCase()}`}>
                         {booking.status}
                       </span>
-                      {(booking.status === "APPROVED" || booking.status === "PENDING") && (
-                        <>
-                          <button
-                            className="icon-button cancel-icon"
-                            onClick={() => handleStudentCancelClick(booking.id)}
-                            title="Cancel booking"
-                            disabled={actionInProgress === booking.id}
-                          >
-                            <XCircle size={18} />
-                          </button>
-                        </>
-                      )}
                     </div>
                   </div>
 
@@ -590,7 +598,7 @@ export function BookingManagementPage({
                       <span className={`status-badge status-${booking.status.toLowerCase()}`}>
                         {booking.status}
                       </span>
-                      {(booking.status === "APPROVED" || booking.status === "PENDING") && (
+                      {booking.status === "APPROVED" && (
                         <>
                           <button
                             className="icon-button cancel-icon"
@@ -856,10 +864,20 @@ export function BookingManagementPage({
           display: flex;
           gap: 0.75rem;
           padding: 1.5rem 1.5rem;
-          background: linear-gradient(135deg, rgba(248, 246, 244, 0.6) 0%, rgba(245, 243, 241, 0.4) 100%);
+          background: transparent;
           flex-wrap: wrap;
           border-radius: 8px;
-          margin: 0 1.5rem;
+          margin: 0;
+          align-items: center;
+        }
+
+        .tabs-container-wrapper {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          gap: 1.5rem;
+          margin: 0 1.5rem 1.5rem;
+          flex-wrap: wrap;
         }
 
         .tab-button {
@@ -888,7 +906,7 @@ export function BookingManagementPage({
         }
 
         .bookings-section {
-          padding: 2rem 1.5rem;
+          padding: 1rem 1.5rem 2rem;
           flex: 1;
           background: transparent;
         }
