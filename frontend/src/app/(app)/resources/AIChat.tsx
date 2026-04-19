@@ -44,12 +44,15 @@ export default function AIChat({ onResult, isAdmin, onUse }: Props) {
 
       if (!res.ok) {
         const txt = await res.text();
+        // include status for easier debugging
+        let msg = `AI request failed (${res.status} ${res.statusText})`;
         try {
           const j = JSON.parse(txt);
-          throw new Error(j.message || txt || "AI request failed");
-        } catch (e) {
-          throw new Error(txt || "AI request failed");
+          msg = j.message || txt || msg;
+        } catch (_) {
+          msg = txt || msg;
         }
+        throw new Error(msg);
       }
 
       const data = await res.json();
