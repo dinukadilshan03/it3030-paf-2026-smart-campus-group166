@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { getResources } from "@/lib/resources/api";
+import ResourceDemands from "@/components/resources/ResourceDemands";
 
 export default function ResourceAnalysisPage() {
   const router = useRouter();
@@ -12,12 +13,15 @@ export default function ResourceAnalysisPage() {
   const [utilData, setUtilData] = useState<number[] | null>(null);
   const [statusBreakdown, setStatusBreakdown] = useState<{ label: string; value: number; color: string }[]>([]);
   const [topUsed, setTopUsed] = useState<{ resourceId: string; name: string; location: string; count: number }[]>([]);
+  const [resourcesList, setResourcesList] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]);
 
   useEffect(() => {
     async function loadMetrics() {
       try {
         const resources = await getResources();
         const resArr = Array.isArray(resources) ? resources : [];
+        setResourcesList(resArr);
         setTotalResources(resArr.length);
 
         // status counts
@@ -34,6 +38,7 @@ export default function ResourceAnalysisPage() {
         const resp = await fetch('/api/v1/bookings');
         let bookings: any[] = [];
         if (resp.ok) bookings = (await resp.json()) || [];
+        setBookings(bookings);
 
         // compute bookings per day for last 14 days
         const days = 14;
@@ -177,6 +182,14 @@ export default function ResourceAnalysisPage() {
             );
           })()}
         </div>
+      </div>
+
+      <div style={{ marginTop: 22 }}>
+        {bookings.length > 0 || resourcesList.length > 0 ? (
+          <ResourceDemands bookings={bookings} resources={resourcesList} />
+        ) : (
+          <div style={styles.chartPlaceholder}>No booking or resource data available</div>
+        )}
       </div>
 
     </div>
