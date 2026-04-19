@@ -3,6 +3,12 @@
 import { useState } from "react";
 
 import {
+  TicketConfirmDialog,
+  TicketPopupNotice,
+  type TicketPopupNoticeState,
+  buildTicketValidationNotice,
+} from "@/components/tickets/TicketPopupDialogs";
+import {
   canCurrentUserAddInternalNote,
   canCurrentUserManageComment,
   formatDateTime,
@@ -64,6 +70,12 @@ export function TicketComments({
     commentId: number;
     message: string;
   } | null>(null);
+  const [notice, setNotice] = useState<TicketPopupNoticeState>(null);
+  const [confirmState, setConfirmState] = useState<
+    | { type: "delete"; commentId: number }
+    | { type: "save"; commentId: number; body: string }
+    | null
+  >(null);
 
   const canUseInternalNotes =
     currentUser.role != null &&
@@ -109,6 +121,12 @@ export function TicketComments({
           const validationErrors = validateCommentForm(values, currentUser.role ?? "STUDENT");
           if (Object.keys(validationErrors).length > 0) {
             setErrors(validationErrors);
+            setNotice(
+              buildTicketValidationNotice(
+                "Comment details need attention",
+                validationErrors,
+              ),
+            );
             return;
           }
 
@@ -122,8 +140,22 @@ export function TicketComments({
           } catch (error) {
             if (error instanceof TicketApiError) {
               setErrors(error.validationErrors);
+              setNotice(
+                buildTicketValidationNotice(
+                  "Comment details need attention",
+                  error.validationErrors,
+                  error.message || "Review the highlighted comment fields and try again.",
+                ),
+              );
             }
-            setFormError(error instanceof Error ? error.message : "Comment could not be posted.");
+            const nextFormError =
+              error instanceof Error ? error.message : "Comment could not be posted.";
+            setFormError(nextFormError);
+            setNotice({
+              tone: "error",
+              title: "Comment could not be posted",
+              message: nextFormError,
+            });
           }
         }}
       >
@@ -244,31 +276,9 @@ export function TicketComments({
                       </button>
                       <button
                         type="button"
-                        onClick={async () => {
-                          if (!window.confirm("Delete this comment?")) {
-                            return;
-                          }
-
-                          setActiveCommentActionId(comment.id);
+                        onClick={() => {
                           setCommentActionError(null);
-                          try {
-                            await onDelete(comment.id);
-                            if (editingCommentId === comment.id) {
-                              setEditingCommentId(null);
-                              setEditingBody("");
-                              setEditingError(null);
-                            }
-                          } catch (error) {
-                            setCommentActionError({
-                              commentId: comment.id,
-                              message:
-                                error instanceof Error
-                                  ? error.message
-                                  : "Comment could not be deleted.",
-                            });
-                          } finally {
-                            setActiveCommentActionId(null);
-                          }
+                          setConfirmState({ type: "delete", commentId: comment.id });
                         }}
                         disabled={busy || isProcessingAction}
                         className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
@@ -298,32 +308,25 @@ export function TicketComments({
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={async () => {
+                      onClick={() => {
                         if (!editingBody.trim()) {
-                          setEditingError("Comment text is required.");
+                          const nextError = "Comment text is required.";
+                          setEditingError(nextError);
+                          setNotice({
+                            tone: "error",
+                            title: "Comment text needed",
+                            message: nextError,
+                          });
                           return;
                         }
 
-                        setActiveCommentActionId(comment.id);
                         setEditingError(null);
                         setCommentActionError(null);
-                        try {
-                          await onUpdate(comment.id, { body: editingBody.trim() });
-                          setEditingCommentId(null);
-                          setEditingBody("");
-                        } catch (error) {
-                          if (error instanceof TicketApiError) {
-                            setEditingError(
-                              error.validationErrors.body ?? error.message ?? "Comment update failed.",
-                            );
-                          } else {
-                            setEditingError(
-                              error instanceof Error ? error.message : "Comment update failed.",
-                            );
-                          }
-                        } finally {
-                          setActiveCommentActionId(null);
-                        }
+                        setConfirmState({
+                          type: "save",
+                          commentId: comment.id,
+                          body: editingBody.trim(),
+                        });
                       }}
                       disabled={busy || isProcessingAction}
                       className="inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
@@ -365,6 +368,90 @@ export function TicketComments({
           );
         })}
       </div>
+
+      <TicketPopupNotice
+        notice={notice}
+        onClose={() => setNotice(null)}
+        actionLabel="Review"
+      />
+      <TicketConfirmDialog
+        open={confirmState != null}
+        title={
+          confirmState?.type === "delete"
+            ? "Delete this comment"
+            : "Save comment changes"
+        }
+        message={
+          confirmState?.type === "delete"
+            ? "Are you sure you want to permanently delete this comment?"
+            : "Are you sure you want to save these comment edits?"
+        }
+        confirmLabel={confirmState?.type === "delete" ? "Delete comment" : "Save changes"}
+        cancelLabel="Cancel"
+        busy={busy || activeCommentActionId === confirmState?.commentId}
+        tone={confirmState?.type === "delete" ? "danger" : "neutral"}
+        onClose={() => {
+          if (busy || activeCommentActionId === confirmState?.commentId) {
+            return;
+          }
+
+          setConfirmState(null);
+        }}
+        onConfirm={async () => {
+          if (!confirmState) {
+            return;
+          }
+
+          setActiveCommentActionId(confirmState.commentId);
+          setCommentActionError(null);
+          try {
+            if (confirmState.type === "delete") {
+              await onDelete(confirmState.commentId);
+              if (editingCommentId === confirmState.commentId) {
+                setEditingCommentId(null);
+                setEditingBody("");
+                setEditingError(null);
+              }
+            } else {
+              await onUpdate(confirmState.commentId, { body: confirmState.body });
+              setEditingCommentId(null);
+              setEditingBody("");
+              setEditingError(null);
+            }
+
+            setConfirmState(null);
+          } catch (error) {
+            if (confirmState.type === "save") {
+              const nextError =
+                error instanceof TicketApiError
+                  ? error.validationErrors.body ?? error.message ?? "Comment update failed."
+                  : error instanceof Error
+                    ? error.message
+                    : "Comment update failed.";
+              setEditingError(nextError);
+              setNotice({
+                tone: "error",
+                title: "Comment update failed",
+                message: nextError,
+              });
+            } else {
+              const nextError =
+                error instanceof Error ? error.message : "Comment could not be deleted.";
+              setCommentActionError({
+                commentId: confirmState.commentId,
+                message: nextError,
+              });
+              setNotice({
+                tone: "error",
+                title: "Comment delete failed",
+                message: nextError,
+              });
+            }
+          } finally {
+            setActiveCommentActionId(null);
+          }
+        }}
+      />
     </section>
   );
 }

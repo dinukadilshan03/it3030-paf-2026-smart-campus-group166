@@ -1,14 +1,17 @@
-import { clientApiFetch } from "@/lib/api/client";
+const BASE_URL = "http://localhost:8080/api/v1";
 
+// ✅ GET RESOURCES
 export const getResources = async (search?: string) => {
   try {
-    const params = new URLSearchParams();
+    let url = `${BASE_URL}/resources`;
+
     if (search && search.trim() !== "") {
-      params.set("search", search);
+      url += `?search=${search}`;
     }
 
-    const query = params.toString();
-    const res = await clientApiFetch(`/api/v1/resources${query ? `?${query}` : ""}`);
+    const res = await fetch(url, {
+      credentials: "include",
+    });
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
@@ -28,9 +31,12 @@ export const getResources = async (search?: string) => {
   }
 };
 
+// ✅ GET CATEGORIES
 export const getCategories = async () => {
   try {
-    const res = await clientApiFetch("/api/v1/resource-categories");
+    const res = await fetch(`${BASE_URL}/resource-categories`, {
+      credentials: "include",
+    });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       console.warn('GET categories error:', res.status, text);
@@ -43,9 +49,12 @@ export const getCategories = async () => {
   }
 };
 
+// ✅ GET LOCATIONS
 export const getLocations = async () => {
   try {
-    const res = await clientApiFetch("/api/v1/locations");
+    const res = await fetch(`${BASE_URL}/locations`, {
+      credentials: "include",
+    });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       console.warn('GET locations error:', res.status, text);
@@ -58,9 +67,11 @@ export const getLocations = async () => {
   }
 };
 
-export const createResource = async (data: unknown) => {
-  const res = await clientApiFetch("/api/v1/resources", {
+// ✅ CREATE
+export const createResource = async (data: any) => {
+  const res = await fetch(`${BASE_URL}/resources`, {
     method: "POST",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
@@ -71,9 +82,11 @@ export const createResource = async (data: unknown) => {
   return res.json();
 };
 
-export const updateResource = async (id: number, data: unknown) => {
-  const res = await clientApiFetch(`/api/v1/resources/${id}`, {
+// ✅ UPDATE
+export const updateResource = async (id: number, data: any) => {
+  const res = await fetch(`${BASE_URL}/resources/${id}`, {
     method: "PATCH",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
@@ -84,10 +97,38 @@ export const updateResource = async (id: number, data: unknown) => {
   return res.json();
 };
 
+// ✅ DELETE
 export const deleteResource = async (id: number) => {
-  const res = await clientApiFetch(`/api/v1/resources/${id}`, {
+  const res = await fetch(`${BASE_URL}/resources/${id}`, {
     method: "DELETE",
+    credentials: "include",
   });
 
   if (!res.ok) throw new Error(await res.text());
+};
+
+// ✅ CREATE CATEGORY
+export const createResourceCategory = async (data: any) => {
+  const res = await fetch(`${BASE_URL}/resource-categories`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+// ✅ CREATE LOCATION
+export const createLocation = async (data: any) => {
+  const res = await fetch(`${BASE_URL}/locations`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 };

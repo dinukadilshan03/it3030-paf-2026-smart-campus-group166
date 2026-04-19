@@ -3,6 +3,12 @@
 import { useState } from "react";
 
 import { TicketDialog } from "@/components/tickets/TicketDialog";
+import {
+  TicketConfirmDialog,
+  TicketPopupNotice,
+  type TicketPopupNoticeState,
+  buildTicketValidationNotice,
+} from "@/components/tickets/TicketPopupDialogs";
 import { TicketApiError } from "@/lib/tickets/shared";
 import { validateTicketCategoryForm } from "@/lib/tickets/validation";
 import type {
@@ -59,7 +65,6 @@ export function TicketCategoryManager({
   onClose,
   onCreate,
   onUpdate,
-  onDelete,
 }: TicketCategoryManagerProps) {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
     categories[0]?.id ?? null,
@@ -68,6 +73,14 @@ export function TicketCategoryManager({
   const [values, setValues] = useState<TicketCategoryFormValues>(toFormValues(categories[0]));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<TicketPopupNoticeState>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingPayload, setPendingPayload] = useState<{
+    code: string;
+    name: string;
+    description?: string;
+    isActive?: boolean;
+  } | null>(null);
 
   const selectedCategory =
     selectedCategoryId == null
@@ -82,7 +95,7 @@ export function TicketCategoryManager({
       open={open}
       onClose={onClose}
       title="Manage ticket categories"
-      description="Admins can create, activate, retire, or rename incident categories. The backend blocks deletion if existing tickets still reference a category."
+      description="Admins can create, activate, retire, or rename incident categories. Use the active toggle to retire old categories without removing reporting history."
       widthClassName="max-w-6xl"
     >
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.25fr)]">
@@ -170,27 +183,6 @@ export function TicketCategoryManager({
                 Keep codes short and stable so they are easy to reference across reports and audits.
               </p>
             </div>
-
-            {!createMode && selectedCategory ? (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={async () => {
-                  if (
-                    !window.confirm(
-                      `Delete "${selectedCategory.name}"? The backend will reject this if tickets still use the category.`,
-                    )
-                  ) {
-                    return;
-                  }
-
-                  await onDelete(selectedCategory.id);
-                }}
-                className="text-sm font-semibold text-rose-700 transition hover:text-rose-800 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Delete category
-              </button>
-            ) : null}
           </div>
 
           <form
@@ -202,6 +194,12 @@ export function TicketCategoryManager({
               const validationErrors = validateTicketCategoryForm(values);
               if (Object.keys(validationErrors).length > 0) {
                 setErrors(validationErrors);
+                setNotice(
+                  buildTicketValidationNotice(
+                    createMode ? "Category details need attention" : "Category changes need attention",
+                    validationErrors,
+                  ),
+                );
                 return;
               }
 
@@ -220,15 +218,28 @@ export function TicketCategoryManager({
                   setSelectedCategoryId(createdCategory.id);
                   setValues(toFormValues(createdCategory));
                 } else if (selectedCategory) {
-                  const updatedCategory = await onUpdate(selectedCategory.id, payload);
-                  setSelectedCategoryId(updatedCategory.id);
-                  setValues(toFormValues(updatedCategory));
+                  setPendingPayload(payload);
+                  setConfirmOpen(true);
                 }
               } catch (error) {
                 if (error instanceof TicketApiError) {
                   setErrors(error.validationErrors);
+                  setNotice(
+                    buildTicketValidationNotice(
+                      createMode ? "Category details need attention" : "Category changes need attention",
+                      error.validationErrors,
+                      error.message || "Review the highlighted category fields and try again.",
+                    ),
+                  );
                 }
-                setFormError(error instanceof Error ? error.message : "Category save failed.");
+                const nextFormError =
+                  error instanceof Error ? error.message : "Category save failed.";
+                setFormError(nextFormError);
+                setNotice({
+                  tone: "error",
+                  title: "Category save failed",
+                  message: nextFormError,
+                });
               }
             }}
           >
@@ -339,6 +350,63 @@ export function TicketCategoryManager({
           </form>
         </section>
       </div>
+
+      <TicketPopupNotice
+        notice={notice}
+        onClose={() => setNotice(null)}
+        actionLabel="Review"
+      />
+      <TicketConfirmDialog
+        open={confirmOpen}
+        title="Save category changes"
+        message="Are you sure you want to save these ticket category updates?"
+        confirmLabel="Save changes"
+        cancelLabel="Keep editing"
+        busy={busy}
+        tone="neutral"
+        onClose={() => {
+          if (busy) {
+            return;
+          }
+
+          setConfirmOpen(false);
+          setPendingPayload(null);
+        }}
+        onConfirm={async () => {
+          if (!pendingPayload || !selectedCategory) {
+            setConfirmOpen(false);
+            return;
+          }
+
+          try {
+            const updatedCategory = await onUpdate(selectedCategory.id, pendingPayload);
+            setSelectedCategoryId(updatedCategory.id);
+            setValues(toFormValues(updatedCategory));
+            setConfirmOpen(false);
+            setPendingPayload(null);
+          } catch (error) {
+            if (error instanceof TicketApiError) {
+              setErrors(error.validationErrors);
+              setNotice(
+                buildTicketValidationNotice(
+                  "Category changes need attention",
+                  error.validationErrors,
+                  error.message || "Review the highlighted category fields and try again.",
+                ),
+              );
+            }
+
+            const nextFormError =
+              error instanceof Error ? error.message : "Category save failed.";
+            setFormError(nextFormError);
+            setNotice({
+              tone: "error",
+              title: "Category save failed",
+              message: nextFormError,
+            });
+          }
+        }}
+      />
     </TicketDialog>
   );
 }

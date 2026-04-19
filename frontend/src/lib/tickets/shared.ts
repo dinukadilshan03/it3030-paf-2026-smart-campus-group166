@@ -4,6 +4,7 @@ import type { RoleCode } from "@/types/auth";
 
 import type {
   ApiErrorResponse,
+  TicketAgeFilter,
   TicketCategorySummary,
   TicketComment,
   TicketDetail,
@@ -28,8 +29,11 @@ export const DEFAULT_TICKET_FILTERS: Required<TicketFilters> = {
   status: "",
   priority: "",
   ticketCategoryId: "",
+  age: "",
   search: "",
 };
+
+export const OLD_TICKET_AGE_DAYS = 30;
 
 type TicketSlaRecord = {
   createdAt: string;
@@ -158,13 +162,34 @@ export function getTicketAttachmentFormatLabel(mimeType: string | null | undefin
   return extension ? extension.toUpperCase() : "Image";
 }
 
-export function getAllowedStatusTargets(role: RoleCode, currentStatus: TicketStatus) {
+export function getAllowedStatusTargets(
+  role: RoleCode,
+  ticket:
+    | TicketStatus
+    | Pick<
+        TicketDetail,
+        | "status"
+        | "reconsiderationRequestedAt"
+        | "reconsiderationReviewedAt"
+        | "reconsiderationRequestCount"
+      >,
+) {
+  const currentStatus = typeof ticket === "string" ? ticket : ticket.status;
+  const hasPendingReconsiderationReview =
+    typeof ticket !== "string" &&
+    ticket.status === "REJECTED" &&
+    Boolean(ticket.reconsiderationRequestedAt) &&
+    !ticket.reconsiderationReviewedAt &&
+    ticket.reconsiderationRequestCount > 0;
+
   if (role === "ADMIN") {
     switch (currentStatus) {
       case "OPEN":
         return ["REJECTED"] as TicketStatus[];
       case "RESOLVED":
         return ["CLOSED"] as TicketStatus[];
+      case "REJECTED":
+        return hasPendingReconsiderationReview ? (["REJECTED"] as TicketStatus[]) : [];
       default:
         return [] as TicketStatus[];
     }
@@ -189,7 +214,7 @@ export function canCurrentUserManageAttachments(
   currentUserId: number,
   ticket: TicketDetail,
 ) {
-  return role === "ADMIN" || ticket.reporterUserId === currentUserId;
+  return role === "STUDENT" && ticket.reporterUserId === currentUserId;
 }
 
 export function canCurrentUserEditTicket(
@@ -197,10 +222,6 @@ export function canCurrentUserEditTicket(
   currentUserId: number,
   ticket: TicketDetail,
 ) {
-  if (role === "ADMIN") {
-    return true;
-  }
-
   return ticket.reporterUserId === currentUserId && ticket.status === "OPEN";
 }
 
@@ -213,7 +234,7 @@ export function canCurrentUserDeleteTicket(
     return false;
   }
 
-  return role === "ADMIN" || ticket.reporterUserId === currentUserId;
+  return role !== "ADMIN" && ticket.reporterUserId === currentUserId;
 }
 
 export function canCurrentUserAddInternalNote(
@@ -242,7 +263,7 @@ export function canCurrentUserUpdateStatus(
   ticket: TicketDetail,
 ) {
   if (role === "ADMIN") {
-    return getAllowedStatusTargets(role, ticket.status).length > 0;
+    return getAllowedStatusTargets(role, ticket).length > 0;
   }
 
   if (role !== "STAFF") {
@@ -251,7 +272,7 @@ export function canCurrentUserUpdateStatus(
 
   return (
     ticket.assignedStaffUserId === currentUserId &&
-    getAllowedStatusTargets(role, ticket.status).length > 0
+    getAllowedStatusTargets(role, ticket).length > 0
   );
 }
 
@@ -301,6 +322,42 @@ export function resolveSelectedTicketId(
   }
 
   return tickets[0]?.id ?? null;
+}
+
+export function isOldTicket(
+  ticket: { createdAt: string },
+  nowMs = Date.now(),
+  thresholdDays = OLD_TICKET_AGE_DAYS,
+) {
+  const createdAtMs = parseDateValue(ticket.createdAt);
+  if (createdAtMs == null) {
+    return false;
+  }
+
+  return nowMs - createdAtMs >= thresholdDays * 24 * 60 * 60 * 1000;
+}
+
+export function isArchivedTicket(ticket: { createdAt: string; status: TicketStatus }) {
+  return ticket.status === "CLOSED";
+}
+
+export function filterTicketsByAge<T extends { createdAt: string; status: TicketStatus }>(
+  tickets: T[],
+  age: TicketAgeFilter,
+  nowMs = Date.now(),
+) {
+  switch (age) {
+    case "NEW":
+      return tickets.filter((ticket) => !isOldTicket(ticket, nowMs));
+    case "OLD":
+      return tickets.filter(
+        (ticket) => isOldTicket(ticket, nowMs) && !isArchivedTicket(ticket),
+      );
+    case "ARCHIVED":
+      return tickets.filter((ticket) => isArchivedTicket(ticket));
+    default:
+      return tickets;
+  }
 }
 
 export function getOpenTicketCount(tickets: { status: TicketStatus }[]) {

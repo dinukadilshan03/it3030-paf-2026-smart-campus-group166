@@ -435,20 +435,40 @@ export function BookingManagementPage({
 
                   {/* Action Buttons - Only for Pending */}
                   {activeTab === "pending" && (
-                    <div className="booking-actions">
+                    <div className="px-6 py-5 bg-gradient-to-r from-slate-50 to-slate-100 border-t-2 border-t-slate-200 flex gap-3">
                       <button
-                        className="primary-button"
                         onClick={() => handleApproveClick(booking.id)}
                         disabled={actionInProgress === booking.id}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-100 to-teal-100 border-2 border-emerald-300 text-emerald-800 rounded-lg font-semibold text-sm hover:from-emerald-200 hover:to-teal-200 hover:border-emerald-500 hover:shadow-md transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
-                        {actionInProgress === booking.id ? "Processing..." : "Approve"}
+                        {actionInProgress === booking.id ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-emerald-300 border-t-emerald-700 rounded-full animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle size={18} className="flex-shrink-0" />
+                            Approve
+                          </>
+                        )}
                       </button>
                       <button
-                        className="danger-button"
                         onClick={() => handleRejectClick(booking.id)}
                         disabled={actionInProgress === booking.id}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-red-100 to-rose-100 border-2 border-red-300 text-red-800 rounded-lg font-semibold text-sm hover:from-red-200 hover:to-rose-200 hover:border-red-500 hover:shadow-md transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
-                        {actionInProgress === booking.id ? "Processing..." : "Reject"}
+                        {actionInProgress === booking.id ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-red-300 border-t-red-700 rounded-full animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <X size={18} className="flex-shrink-0" />
+                            Reject
+                          </>
+                        )}
                       </button>
                     </div>
                   )}
@@ -692,7 +712,7 @@ export function BookingManagementPage({
           display: flex;
           flex-direction: column;
           min-height: 100vh;
-          background-color: #f5f5f5;
+          background: linear-gradient(180deg, rgba(248, 246, 244, 0.6) 0%, rgba(245, 243, 241, 0.4) 50%, rgba(255, 255, 255, 0.8) 100%);
         }
 
         .admin-topbar {
@@ -746,12 +766,15 @@ export function BookingManagementPage({
         }
 
         .primary-button {
-          background-color: #0066cc;
+          background: linear-gradient(135deg, #8B9DB5 0%, #7A92A8 100%);
           color: white;
+          box-shadow: 0 4px 12px rgba(139, 157, 181, 0.35);
         }
 
         .primary-button:hover:not(:disabled) {
-          background-color: #0052a3;
+          background: linear-gradient(135deg, #7A92A8 0%, #6B7F95 100%);
+          box-shadow: 0 6px 16px rgba(139, 157, 181, 0.4);
+          transform: translateY(-1px);
         }
 
         .danger-button {
@@ -785,11 +808,18 @@ export function BookingManagementPage({
         }
 
         .stat-card {
-          background: white;
+          background: linear-gradient(135deg, rgba(248, 246, 244, 0.6) 0%, rgba(245, 243, 241, 0.4) 100%);
           padding: 1.5rem;
-          border-radius: 8px;
-          border: 1px solid #e0e0e0;
+          border-radius: 12px;
+          border: 2px solid rgba(139, 157, 181, 0.3);
           text-align: center;
+          transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+          border-color: rgba(139, 157, 181, 0.6);
+          box-shadow: 0 6px 20px rgba(139, 157, 181, 0.1);
+          transform: translateY(-2px);
         }
 
         .stat-label {
@@ -824,37 +854,43 @@ export function BookingManagementPage({
 
         .tabs-container {
           display: flex;
-          gap: 1rem;
-          padding: 0 1.5rem 1rem;
-          border-bottom: 1px solid #e0e0e0;
-          background-color: white;
+          gap: 0.75rem;
+          padding: 1.5rem 1.5rem;
+          background: linear-gradient(135deg, rgba(248, 246, 244, 0.6) 0%, rgba(245, 243, 241, 0.4) 100%);
           flex-wrap: wrap;
+          border-radius: 8px;
+          margin: 0 1.5rem;
         }
 
         .tab-button {
-          padding: 0.75rem 1rem;
-          border: none;
-          background: none;
-          color: #666;
+          padding: 0.7rem 1.2rem;
+          border: 1px solid rgba(139, 157, 181, 0.4);
+          background: linear-gradient(135deg, rgba(248, 246, 244, 0.8) 0%, rgba(245, 243, 241, 0.8) 100%);
+          color: #6B7280;
           font-size: 0.95rem;
-          font-weight: 500;
+          font-weight: 600;
           cursor: pointer;
-          border-bottom: 3px solid transparent;
-          transition: all 0.2s ease;
+          border-radius: 8px;
+          transition: all 0.3s ease;
         }
 
         .tab-button:hover {
-          color: #333;
+          background: linear-gradient(135deg, rgba(245, 243, 241, 0.95) 0%, rgba(243, 241, 239, 0.95) 100%);
+          border-color: rgba(139, 157, 181, 0.7);
+          transform: translateY(-2px);
         }
 
         .tab-button.active {
-          color: #0066cc;
-          border-bottom-color: #0066cc;
+          background: linear-gradient(135deg, #8B9DB5 0%, #7A92A8 100%);
+          color: white;
+          border-color: #6B7F95;
+          box-shadow: 0 4px 12px rgba(139, 157, 181, 0.35);
         }
 
         .bookings-section {
           padding: 2rem 1.5rem;
           flex: 1;
+          background: transparent;
         }
 
         .bookings-grid {
@@ -864,18 +900,27 @@ export function BookingManagementPage({
         }
 
         .booking-card {
-          border: 1px solid #e0e0e0;
-          border-radius: 8px;
+          border: 2px solid rgba(139, 157, 181, 0.3);
+          border-radius: 12px;
           padding: 1.5rem;
-          background: white;
+          background: linear-gradient(135deg, rgba(248, 246, 244, 0.8) 0%, rgba(245, 243, 241, 0.8) 100%);
           display: flex;
           flex-direction: column;
           gap: 1rem;
+          transition: all 0.3s ease;
+          box-shadow: 0 4px 16px rgba(139, 157, 181, 0.08);
+        }
+
+        .booking-card:hover {
+          border-color: rgba(139, 157, 181, 0.6);
+          box-shadow: 0 8px 24px rgba(139, 157, 181, 0.12);
+          transform: translateY(-2px);
         }
 
         .booking-highlighted {
-          border-color: #14b8a6;
-          box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.15);
+          border-color: #8B9DB5;
+          box-shadow: 0 0 0 4px rgba(139, 157, 181, 0.15);
+          background: linear-gradient(135deg, rgba(245, 243, 241, 0.9) 0%, rgba(242, 240, 238, 0.9) 100%);
         }
 
         .booking-header {
@@ -883,7 +928,7 @@ export function BookingManagementPage({
           justify-content: space-between;
           align-items: flex-start;
           gap: 1rem;
-          border-bottom: 1px solid #f0f0f0;
+          border-bottom: 2px solid rgba(139, 157, 181, 0.2);
           padding-bottom: 1rem;
         }
 
@@ -948,23 +993,27 @@ export function BookingManagementPage({
         }
 
         .status-pending {
-          background-color: #fff3cd;
-          color: #856404;
+          background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.2) 100%);
+          color: #92400e;
+          border: 1px solid rgba(245, 158, 11, 0.5);
         }
 
         .status-approved {
-          background-color: #d4edda;
-          color: #155724;
+          background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(16, 185, 129, 0.2) 100%);
+          color: #065f46;
+          border: 1px solid rgba(34, 197, 94, 0.5);
         }
 
         .status-rejected {
-          background-color: #f8d7da;
-          color: #721c24;
+          background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.2) 100%);
+          color: #7f1d1d;
+          border: 1px solid rgba(239, 68, 68, 0.5);
         }
 
         .status-cancelled {
-          background-color: #e2e3e5;
-          color: #383d41;
+          background: linear-gradient(135deg, rgba(107, 114, 128, 0.2) 0%, rgba(75, 85, 99, 0.2) 100%);
+          color: #1f2937;
+          border: 1px solid rgba(107, 114, 128, 0.5);
         }
 
         .booking-details {
@@ -1099,10 +1148,10 @@ export function BookingManagementPage({
           align-items: center;
           gap: 2rem;
           padding: 1.5rem;
-          background: white;
-          border-bottom: 1px solid #e0e0e0;
+          background: linear-gradient(135deg, rgba(248, 246, 244, 0.6) 0%, rgba(245, 243, 241, 0.4) 100%);
+          border: 2px solid rgba(139, 157, 181, 0.3);
           margin-bottom: 1.5rem;
-          border-radius: 8px;
+          border-radius: 12px;
         }
 
         .student-header h2 {
@@ -1118,12 +1167,13 @@ export function BookingManagementPage({
         }
 
         .create-form-container {
-          background: white;
-          border: 1px solid #e0e0e0;
-          border-radius: 8px;
+          background: linear-gradient(135deg, rgba(248, 246, 244, 0.6) 0%, rgba(245, 243, 241, 0.4) 100%);
+          border: 2px solid rgba(139, 157, 181, 0.3);
+          border-radius: 12px;
           padding: 2rem;
           margin-bottom: 2rem;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+          box-shadow: 0 4px 16px rgba(139, 157, 181, 0.08);
+        }
         }
 
         .ai-booking-section {

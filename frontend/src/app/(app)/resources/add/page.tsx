@@ -6,6 +6,8 @@ import {
   getCategories,
   getLocations,
   getResources,
+  createResourceCategory,
+  createLocation,
 } from "@/lib/resources/api";
 import { useRouter } from "next/navigation";
 
@@ -28,10 +30,39 @@ export default function AddResourcePage() {
 
   const [preview, setPreview] = useState("");
   const [tempImage, setTempImage] = useState("");
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryCode, setNewCategoryCode] = useState("");
+  const [newLocationName, setNewLocationName] = useState("");
+  const [newLocationCode, setNewLocationCode] = useState("");
 
   useEffect(() => {
     loadData();
   }, []);
+
+  // auto-generate codes when name typed and code empty
+  useEffect(() => {
+    if (newCategoryName && !newCategoryCode) {
+      setNewCategoryCode(
+        newCategoryName
+          .toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, "")
+          .trim()
+          .replace(/\s+/g, "-")
+      );
+    }
+  }, [newCategoryName]);
+
+  useEffect(() => {
+    if (newLocationName && !newLocationCode) {
+      setNewLocationCode(
+        newLocationName
+          .toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, "")
+          .trim()
+          .replace(/\s+/g, "-")
+      );
+    }
+  }, [newLocationName]);
 
   const loadData = async () => {
     const [cat, loc] = await Promise.all([
@@ -46,6 +77,34 @@ export default function AddResourcePage() {
     );
 
     setLocations(uniqueLocations);
+  };
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) return alert('Enter category name');
+    if (!newCategoryCode.trim()) return alert('Enter category code');
+    try {
+      await createResourceCategory({ name: newCategoryName.trim(), code: newCategoryCode.trim() });
+      setNewCategoryName('');
+      setNewCategoryCode('');
+      await loadData();
+      alert('Category added');
+    } catch (e: any) {
+      alert(e.message || 'Failed to add category');
+    }
+  };
+
+  const handleCreateLocation = async () => {
+    if (!newLocationName.trim()) return alert('Enter location name');
+    if (!newLocationCode.trim()) return alert('Enter location code');
+    try {
+      await createLocation({ name: newLocationName.trim(), code: newLocationCode.trim() });
+      setNewLocationName('');
+      setNewLocationCode('');
+      await loadData();
+      alert('Location added');
+    } catch (e: any) {
+      alert(e.message || 'Failed to add location');
+    }
   };
 
   const handleChange = (e: any) => {
@@ -109,6 +168,8 @@ export default function AddResourcePage() {
       <div style={styles.card}>
         <h2 style={styles.title}>➕ Add Resource</h2>
 
+        
+
         <div style={styles.grid}>
           <input
             name="name"
@@ -171,6 +232,8 @@ export default function AddResourcePage() {
           <img src={preview} style={styles.image} />
         )}
 
+        
+
         {/* BUTTONS */}
         <div style={styles.buttons}>
           <button onClick={handleSave} style={styles.saveBtn}>
@@ -183,6 +246,27 @@ export default function AddResourcePage() {
           >
             Cancel
           </button>
+        </div>
+
+        {/* --- Quick add category / location (moved under Save/Cancel) --- */}
+        <div style={{ display: 'flex', gap: 12, marginTop: 18 }}>
+          <div style={{ flex: 1, minWidth: 0, background: '#fbfafb', padding: 12, borderRadius: 10 }}>
+            <div style={{ fontSize: 13, color: '#374151', fontWeight: 700, marginBottom: 8 }}>Add Category</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="Category name" style={{ ...styles.input, padding: '10px', flex: 1, minWidth: 0 }} />
+              <input value={newCategoryCode} onChange={(e) => setNewCategoryCode(e.target.value)} placeholder="Code" style={{ ...styles.input, padding: '10px', width: 140, minWidth: 0 }} />
+              <button onClick={handleCreateCategory} style={{ width: 64, padding: '10px 8px', borderRadius: 8, background: '#10b981', color: '#fff', border: 'none', cursor: 'pointer' }}>Add</button>
+            </div>
+          </div>
+
+          <div style={{ flex: 1, minWidth: 0, background: '#fbfafb', padding: 12, borderRadius: 10 }}>
+            <div style={{ fontSize: 13, color: '#374151', fontWeight: 700, marginBottom: 8 }}>Add Location</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input value={newLocationName} onChange={(e) => setNewLocationName(e.target.value)} placeholder="Location name" style={{ ...styles.input, padding: '10px', flex: 1, minWidth: 0 }} />
+              <input value={newLocationCode} onChange={(e) => setNewLocationCode(e.target.value)} placeholder="Code" style={{ ...styles.input, padding: '10px', width: 140, minWidth: 0 }} />
+              <button onClick={handleCreateLocation} style={{ width: 64, padding: '10px 8px', borderRadius: 8, background: '#2563eb', color: '#fff', border: 'none', cursor: 'pointer' }}>Add</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

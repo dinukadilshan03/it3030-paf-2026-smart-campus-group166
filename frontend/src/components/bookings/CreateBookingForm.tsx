@@ -182,161 +182,174 @@ export function CreateBookingForm({
 
   return (
     <form onSubmit={handleSubmit} className="create-booking-form">
-      <div className="form-section">
-        <h2>Create New Booking Request</h2>
+      <div className="form-container">
+        <div className="form-section">
+          <h2>Create New Booking Request</h2>
 
-        <div className="form-group">
-          <label htmlFor="resourceName">
-            Select Resource <span className="required">*</span>
-          </label>
-          {isLoadingResources ? (
-            <p className="loading-text">Loading available resources...</p>
-          ) : (
-            <>
+          <div className="form-group">
+            <label htmlFor="resourceName">
+              Select Resource <span className="required">*</span>
+            </label>
+            {isLoadingResources ? (
+              <p className="loading-text">Loading available resources...</p>
+            ) : (
+              <>
+                <input
+                  id="resourceSearch"
+                  type="text"
+                  placeholder="Search by resource name or code..."
+                  value={resourceSearch}
+                  onChange={(e) => setResourceSearch(e.target.value)}
+                  className="search-input"
+                />
+                <select
+                  id="resourceName"
+                  name="resourceId"
+                  value={formData.resourceId || ""}
+                  onChange={handleChange}
+                  required
+                >
+                  <option value="">-- Select a resource --</option>
+                  {filteredResources.map((resource) => (
+                    <option key={resource.id} value={resource.id}>
+                      {resource.name} ({resource.resourceCode})
+                      {resource.capacity ? ` - Capacity: ${resource.capacity}` : ""}
+                    </option>
+                  ))}
+                </select>
+                {filteredResources.length === 0 && resourceSearch && (
+                  <p className="no-results">No resources found matching &quot;{resourceSearch}&quot;</p>
+                )}
+              </>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="bookingDate">
+              Booking Date <span className="required">*</span>
+            </label>
+            <input
+              id="bookingDate"
+              type="date"
+              name="bookingDate"
+              value={formData.bookingDate}
+              onChange={handleChange}
+              min={getTodayString()}
+              required
+            />
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="startTime">
+                Start Time <span className="required">*</span>
+              </label>
               <input
-                id="resourceSearch"
-                type="text"
-                placeholder="Search by resource name or code..."
-                value={resourceSearch}
-                onChange={(e) => setResourceSearch(e.target.value)}
-                className="search-input"
-              />
-              <select
-                id="resourceName"
-                name="resourceId"
-                value={formData.resourceId || ""}
+                id="startTime"
+                type="time"
+                name="startTime"
+                value={formData.startTime}
                 onChange={handleChange}
                 required
-              >
-                <option value="">-- Select a resource --</option>
-                {filteredResources.map((resource) => (
-                  <option key={resource.id} value={resource.id}>
-                    {resource.name} ({resource.resourceCode})
-                    {resource.capacity ? ` - Capacity: ${resource.capacity}` : ""}
-                  </option>
-                ))}
-              </select>
-              {filteredResources.length === 0 && resourceSearch && (
-                <p className="no-results">No resources found matching &quot;{resourceSearch}&quot;</p>
-              )}
-            </>
-          )}
-        </div>
+              />
+            </div>
 
-        <div className="form-group">
-          <label htmlFor="bookingDate">
-            Booking Date <span className="required">*</span>
-          </label>
-          <input
-            id="bookingDate"
-            type="date"
-            name="bookingDate"
-            value={formData.bookingDate}
-            onChange={handleChange}
-            min={getTodayString()}
-            required
-          />
-        </div>
+            <div className="form-group">
+              <label htmlFor="endTime">
+                End Time <span className="required">*</span>
+              </label>
+              <input
+                id="endTime"
+                type="time"
+                name="endTime"
+                value={formData.endTime}
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </div>
 
-        <div className="form-row">
           <div className="form-group">
-            <label htmlFor="startTime">
-              Start Time <span className="required">*</span>
-            </label>
+            <label htmlFor="expectedAttendees">Expected Attendees</label>
             <input
-              id="startTime"
-              type="time"
-              name="startTime"
-              value={formData.startTime}
+              id="expectedAttendees"
+              type="number"
+              name="expectedAttendees"
+              value={formData.expectedAttendees || ""}
               onChange={handleChange}
-              required
+              placeholder="Number of expected attendees"
+              min="1"
+              max={selectedResource?.capacity ?? undefined}
+            />
+            {selectedResource?.capacity != null && (
+              <p className="capacity-hint">
+                Maximum allowed for this resource: {selectedResource.capacity} attendees
+              </p>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="purpose">Purpose</label>
+            <input
+              id="purpose"
+              type="text"
+              name="purpose"
+              value={formData.purpose || ""}
+              onChange={handleChange}
+              placeholder="What is this booking for?"
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="endTime">
-              End Time <span className="required">*</span>
-            </label>
-            <input
-              id="endTime"
-              type="time"
-              name="endTime"
-              value={formData.endTime}
+            <label htmlFor="requestNotes">Notes</label>
+            <textarea
+              id="requestNotes"
+              name="requestNotes"
+              value={formData.requestNotes || ""}
               onChange={handleChange}
-              required
+              placeholder="Any additional notes or requirements?"
+              rows={4}
             />
+          </div>
+
+          <div className="form-actions">
+            <button type="submit" className="primary-button" disabled={isSubmitting}>
+              {isSubmitting ? "Creating..." : "Create Booking"}
+            </button>
           </div>
         </div>
 
-        <div className="form-group">
-          <label htmlFor="expectedAttendees">Expected Attendees</label>
-          <input
-            id="expectedAttendees"
-            type="number"
-            name="expectedAttendees"
-            value={formData.expectedAttendees || ""}
-            onChange={handleChange}
-            placeholder="Number of expected attendees"
-            min="1"
-            max={selectedResource?.capacity ?? undefined}
-          />
-          {selectedResource?.capacity != null && (
-            <p className="capacity-hint">
-              Maximum allowed for this resource: {selectedResource.capacity} attendees
-            </p>
-          )}
-        </div>
 
-        <div className="form-group">
-          <label htmlFor="purpose">Purpose</label>
-          <input
-            id="purpose"
-            type="text"
-            name="purpose"
-            value={formData.purpose || ""}
-            onChange={handleChange}
-            placeholder="What is this booking for?"
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="requestNotes">Notes</label>
-          <textarea
-            id="requestNotes"
-            name="requestNotes"
-            value={formData.requestNotes || ""}
-            onChange={handleChange}
-            placeholder="Any additional notes or requirements?"
-            rows={4}
-          />
-        </div>
-
-        <div className="form-actions">
-          <button type="submit" className="primary-button" disabled={isSubmitting}>
-            {isSubmitting ? "Creating..." : "Create Booking"}
-          </button>
-        </div>
       </div>
 
       <style jsx>{`
         .create-booking-form {
-          padding: 2.5rem;
-          background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(91, 76, 243, 0.02) 100%);
-          border-radius: 1rem;
-          border: 1px solid rgba(91, 76, 243, 0.15);
-          max-width: 700px;
-          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-          backdrop-filter: blur(10px);
+          width: 100%;
+        }
+
+        .form-container {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 2rem;
+          padding: 2rem;
+          background: linear-gradient(135deg, rgba(248, 246, 244, 0.8) 0%, rgba(245, 243, 241, 0.8) 100%);
+          border: 2px solid rgba(139, 157, 181, 0.3);
+          border-radius: 12px;
+          max-width: 100%;
+        }
+
+        @media (max-width: 1024px) {
+          .form-container {
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+          }
         }
 
         .form-section h2 {
           margin: 0 0 2rem;
-          font-size: 1.75rem;
+          font-size: 1.5rem;
           font-weight: 700;
-          background: linear-gradient(135deg, #5b4cf3 0%, #06b6d4 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
+          color: #4B5563;
           letter-spacing: -0.5px;
         }
 
@@ -344,14 +357,14 @@ export function CreateBookingForm({
           display: flex;
           flex-direction: column;
           gap: 0.625rem;
-          margin-bottom: 1.75rem;
+          margin-bottom: 1.5rem;
         }
 
         .form-row {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 1.25rem;
-          margin-bottom: 1.75rem;
+          margin-bottom: 1.5rem;
         }
 
         .form-row .form-group {
@@ -360,14 +373,14 @@ export function CreateBookingForm({
 
         .form-group label {
           font-weight: 700;
-          color: #334155;
-          font-size: 0.9375rem;
+          color: #4B5563;
+          font-size: 0.9rem;
           text-transform: uppercase;
           letter-spacing: 0.25px;
         }
 
         .required {
-          color: #ff6b35;
+          color: #E74C3C;
           font-weight: 700;
         }
 
@@ -375,8 +388,8 @@ export function CreateBookingForm({
         .form-group textarea,
         .form-group select {
           padding: 0.875rem 1rem;
-          border: 2px solid #e2e8f0;
-          border-radius: 0.625rem;
+          border: 2px solid rgba(139, 157, 181, 0.3);
+          border-radius: 8px;
           font-size: 0.9375rem;
           font-family: inherit;
           background: rgba(255, 255, 255, 0.9);
@@ -387,7 +400,7 @@ export function CreateBookingForm({
         .form-group input:hover,
         .form-group textarea:hover,
         .form-group select:hover {
-          border-color: rgba(91, 76, 243, 0.3);
+          border-color: rgba(139, 157, 181, 0.6);
           background: rgba(255, 255, 255, 0.95);
         }
 
@@ -395,9 +408,9 @@ export function CreateBookingForm({
         .form-group textarea:focus,
         .form-group select:focus {
           outline: none;
-          border-color: #5b4cf3;
+          border-color: #8B9DB5;
           background: white;
-          box-shadow: 0 0 0 4px rgba(91, 76, 243, 0.12);
+          box-shadow: 0 0 0 4px rgba(139, 157, 181, 0.15);
         }
 
         .form-group textarea {
@@ -407,27 +420,28 @@ export function CreateBookingForm({
         .form-actions {
           display: flex;
           gap: 1rem;
-          margin-top: 2.5rem;
+          margin-top: 2rem;
         }
 
         .primary-button {
           padding: 0.875rem 2rem;
-          background: linear-gradient(135deg, #5b4cf3 0%, #7c63f8 100%);
+          background: linear-gradient(135deg, #8B9DB5 0%, #7A92A8 100%);
           color: white;
           border: none;
-          border-radius: 0.625rem;
+          border-radius: 8px;
           font-weight: 700;
           font-size: 0.95rem;
           cursor: pointer;
           transition: all 0.2s ease;
-          box-shadow: 0 4px 12px rgba(91, 76, 243, 0.3);
+          box-shadow: 0 4px 12px rgba(139, 157, 181, 0.35);
           letter-spacing: 0.25px;
           flex: 1;
         }
 
         .primary-button:hover:not(:disabled) {
           transform: translateY(-2px);
-          box-shadow: 0 6px 20px rgba(91, 76, 243, 0.4);
+          box-shadow: 0 6px 16px rgba(139, 157, 181, 0.4);
+          background: linear-gradient(135deg, #7A92A8 0%, #6B7F95 100%);
         }
 
         .primary-button:active:not(:disabled) {
@@ -452,21 +466,21 @@ export function CreateBookingForm({
           color: #64748b;
           font-style: italic;
           padding: 1.25rem;
-          background: rgba(91, 76, 243, 0.08);
-          border-radius: 0.625rem;
+          background: linear-gradient(135deg, rgba(248, 246, 244, 0.6) 0%, rgba(245, 243, 241, 0.4) 100%);
+          border-radius: 8px;
           margin: 0;
-          border: 1px solid rgba(91, 76, 243, 0.15);
+          border: 2px solid rgba(139, 157, 181, 0.3);
           font-weight: 500;
         }
 
         .form-group .no-results {
-          color: #ff6b35;
+          color: #E74C3C;
           font-size: 0.875rem;
           margin: 0.5rem 0 0;
           padding: 0.75rem;
-          background: rgba(255, 107, 53, 0.08);
+          background: rgba(231, 76, 60, 0.08);
           border-radius: 0.5rem;
-          border-left: 3px solid #ff6b35;
+          border-left: 3px solid #E74C3C;
           font-weight: 600;
         }
 
@@ -476,6 +490,7 @@ export function CreateBookingForm({
           font-size: 0.85rem;
           font-weight: 500;
         }
+
       `}</style>
     </form>
   );
