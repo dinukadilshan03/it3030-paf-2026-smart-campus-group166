@@ -7,6 +7,7 @@ import com.smartcampus.backend.common.enums.BookingStatus;
 import com.smartcampus.backend.modules.booking.dto.BookingDetailResponse;
 import com.smartcampus.backend.modules.booking.dto.BookingSummaryResponse;
 import com.smartcampus.backend.modules.booking.dto.CreateBookingRequest;
+import com.smartcampus.backend.modules.booking.dto.DeleteBookingRequest;
 import com.smartcampus.backend.modules.booking.service.BookingService;
 import java.lang.reflect.Method;
 import java.time.LocalDate;
@@ -48,6 +49,17 @@ class BookingControllerTest {
 
         assertThat(annotation).isNotNull();
         assertThat(annotation.value()).isEqualTo("hasRole('ADMIN')");
+    }
+
+    @Test
+    void deleteBookingIsRestrictedToStudentsAndAdmins() throws NoSuchMethodException {
+        Method method =
+                BookingController.class.getDeclaredMethod(
+                        "deleteBooking", Long.class, DeleteBookingRequest.class);
+        PreAuthorize annotation = method.getAnnotation(PreAuthorize.class);
+
+        assertThat(annotation).isNotNull();
+        assertThat(annotation.value()).isEqualTo("hasAnyRole('STUDENT', 'ADMIN')");
     }
 
     @Test

@@ -10,14 +10,19 @@ import com.smartcampus.backend.modules.ticket.dto.TicketCommentResponse;
 import com.smartcampus.backend.modules.ticket.dto.TicketDetailResponse;
 import com.smartcampus.backend.modules.ticket.dto.TicketSummaryResponse;
 import java.awt.Color;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
+import javax.imageio.ImageIO;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -27,6 +32,9 @@ import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.pdmodel.graphics.image.JPEGFactory;
+import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -59,7 +67,7 @@ public class TicketReportDocumentService {
             String filterSummary,
             TicketDetailResponse detail,
             List<TicketCommentResponse> comments,
-            List<TicketAttachmentResponse> attachments) {
+            List<AttachmentEvidence> attachments) {
         // Render the detailed report in the requested output format
         return switch (request.format()) {
             case PDF ->
@@ -243,11 +251,18 @@ public class TicketReportDocumentService {
             String filterSummary,
             TicketDetailResponse detail,
             List<TicketCommentResponse> comments,
-            List<TicketAttachmentResponse> attachments) {
+            List<AttachmentEvidence> attachments) {
+
+        List<TicketCommentResponse> safeComments = normalizeComments(comments);
+        List<AttachmentEvidence> safeAttachments = normalizeAttachments(attachments);
+        List<TicketAssignmentResponse> assignmentHistory = normalizeAssignments(detail.assignmentHistory());
+        String ticketNumber = safeValue(detail.ticketNumber());
+        String ticketTitle = safeValue(detail.title());
+        String statusLabel = safeEnumTitle(detail.status());
+        String priorityLabel = safeEnumTitle(detail.priority());
 
         // Sanitize ticket number so it is safe to use in a file name
-        String safeTicketNumber =
-                detail.ticketNumber().replaceAll("[^A-Za-z0-9_-]+", "_").toLowerCase(Locale.ROOT);
+        String safeTicketNumber = safeTicketNumberForFile(detail.ticketNumber());
 
         // Build the PDF file name
         String fileName = "ticket_%s_detail.pdf".formatted(safeTicketNumber);
@@ -255,7 +270,7 @@ public class TicketReportDocumentService {
         // Human-readable report summary
         String summaryText =
                 "Detailed %s report prepared for ticket %s."
-                        .formatted(request.format().name(), detail.ticketNumber());
+                        .formatted(safeEnumName(request.format()), ticketNumber);
 
         try (PDDocument document = new PDDocument()) {
             try (PdfWriter writer =
@@ -263,24 +278,32 @@ public class TicketReportDocumentService {
                             document,
                             "Ticket Detail Report",
                             "Full maintenance and incident ticket record")) {
+                List<PreparedAttachmentImage> preparedAttachmentImages =
+                        safeAttachments.stream()
+                                .map(attachment -> prepareAttachmentImage(document, attachment))
+                                .filter(attachment -> attachment != null)
+                                .toList();
 
                 // Add the hero section for the detailed report
                 writer.writeHeroCard(
                         "Smart Campus Ticketing",
                         "Detailed Ticket Record",
-                        detail.ticketNumber() + "  |  " + detail.title(),
+                        ticketNumber + "  |  " + ticketTitle,
                         List.of(
                                 "Prepared for | " + generatedByDisplayName,
                                 "Prepared at | " + LocalDateTime.now().format(TIMESTAMP_FORMATTER),
-                                "Current status | " + toTitleCase(detail.status().name())));
+                                "Current status | " + statusLabel));
 
                 // Add quick stats for the selected ticket
                 writer.writeStatGrid(
                         List.of(
-                                new StatItem("Status", toTitleCase(detail.status().name()), toneForStatus(detail.status())),
-                                new StatItem("Priority", toTitleCase(detail.priority().name()), toneForPriority(detail.priority())),
-                                new StatItem("Comments", String.valueOf(comments.size()), PdfTone.SKY),
-                                new StatItem("Attachments", String.valueOf(attachments.size()), PdfTone.EMERALD)));
+                                new StatItem("Status", statusLabel, toneForStatus(detail.status())),
+                                new StatItem("Priority", priorityLabel, toneForPriority(detail.priority())),
+                                new StatItem("Comments", String.valueOf(safeComments.size()), PdfTone.SKY),
+                                new StatItem(
+                                        "Attachments",
+                                        String.valueOf(preparedAttachmentImages.size()),
+                                        PdfTone.EMERALD)));
 
                 // Add filter/scope summary
                 writer.writeParagraphCard("Reporting scope", safeValue(filterSummary), PdfTone.SKY);
@@ -289,15 +312,19 @@ public class TicketReportDocumentService {
                 writer.writeCard(
                         "Ticket profile",
                         List.of(
-                                "Ticket number | " + detail.ticketNumber(),
-                                "Category | " + detail.ticketCategoryName(),
-                                "Status | " + toTitleCase(detail.status().name()),
-                                "Priority | " + toTitleCase(detail.priority().name()),
-                                "Reporter | " + detail.reporterDisplayName() + " (" + detail.reporterEmail() + ")",
+                                "Ticket number | " + ticketNumber,
+                                "Category | " + safeValue(detail.ticketCategoryName()),
+                                "Status | " + statusLabel,
+                                "Priority | " + priorityLabel,
+                                "Reporter | "
+                                        + safeValue(detail.reporterDisplayName())
+                                        + " ("
+                                        + safeValue(detail.reporterEmail())
+                                        + ")",
                                 "Assigned Staff | "
                                         + (detail.assignedStaffDisplayName() == null
                                                 ? "Not assigned"
-                                                : detail.assignedStaffDisplayName()),
+                                                : safeValue(detail.assignedStaffDisplayName())),
                                 "Resource | " + safeValue(detail.resourceName()),
                                 "Location | " + resolveDetailScope(detail)),
                         PdfTone.SLATE);
@@ -340,38 +367,41 @@ public class TicketReportDocumentService {
                         toneForStatus(detail.status()));
 
                 // Add assignment history or a placeholder if there is none
-                if (detail.assignmentHistory().isEmpty()) {
+                if (assignmentHistory.isEmpty()) {
                     writer.writeParagraphCard(
                             "Assignment history",
                             "No assignment history was recorded for this ticket.",
                             PdfTone.SKY);
                 } else {
-                    for (TicketAssignmentResponse assignment : detail.assignmentHistory()) {
+                    for (TicketAssignmentResponse assignment : assignmentHistory) {
                         writer.writeCard(
-                                "Assignment record  |  " + assignment.assignedToDisplayName(),
+                                "Assignment record  |  " + safeValue(assignment.assignedToDisplayName()),
                                 List.of(
-                                        "Assigned By | " + assignment.assignedByDisplayName(),
+                                        "Assigned By | " + safeValue(assignment.assignedByDisplayName()),
                                         "Assigned At | " + formatDateTime(assignment.assignedAt()),
                                         "Assignment Note | " + safeValue(assignment.assignmentNote()),
                                         "Assignment Closed | " + formatDateTime(assignment.unassignedAt()),
-                                        "Current record | " + (assignment.isActive() ? "Active" : "Historical")),
+                                        "Current record | "
+                                                + (Boolean.TRUE.equals(assignment.isActive())
+                                                        ? "Active"
+                                                        : "Historical")),
                                 PdfTone.SKY);
                     }
                 }
 
                 // Add ticket comments or a placeholder if none exist
-                if (comments.isEmpty()) {
+                if (safeComments.isEmpty()) {
                     writer.writeParagraphCard(
                             "Comments and notes",
                             "No comments or staff notes are attached to this ticket record.",
                             PdfTone.EMERALD);
                 } else {
-                    for (TicketCommentResponse comment : comments) {
+                    for (TicketCommentResponse comment : safeComments) {
                         writer.writeCard(
                                 "Comment entry  |  "
-                                        + comment.authorDisplayName()
+                                        + safeValue(comment.authorDisplayName())
                                         + "  |  "
-                                        + toTitleCase(comment.commentType().name()),
+                                        + safeEnumTitle(comment.commentType()),
                                 List.of(
                                         "Created | " + formatDateTime(comment.createdAt()),
                                         "Edited | " + formatDateTime(comment.editedAt()),
@@ -380,27 +410,14 @@ public class TicketReportDocumentService {
                     }
                 }
 
-                // Add attachment list or a placeholder if there are none
-                if (attachments.isEmpty()) {
+                // Embed available attachment images directly into the PDF.
+                if (preparedAttachmentImages.isEmpty()) {
                     writer.writeParagraphCard(
                             "Attachments and evidence",
-                            "No image evidence or supporting attachments were uploaded for this ticket.",
+                            "No image evidence is currently available for this ticket. Removed or unreadable files were skipped.",
                             PdfTone.SLATE);
                 } else {
-                    writer.writeCard(
-                            "Attachments and evidence",
-                            attachments.stream()
-                                    .map(
-                                            attachment ->
-                                                    attachment.fileName()
-                                                            + " | "
-                                                            + safeValue(attachment.mimeType())
-                                                            + " | "
-                                                            + formatFileSize(attachment.fileSize())
-                                                            + " | Uploaded "
-                                                            + formatDateTime(attachment.createdAt()))
-                                    .toList(),
-                            PdfTone.SLATE);
+                    writer.writeAttachmentGallery(preparedAttachmentImages, PdfTone.SLATE);
                 }
             }
 
@@ -411,7 +428,7 @@ public class TicketReportDocumentService {
                     saveDocument(document),
                     1,
                     summaryText);
-        } catch (IOException ex) {
+        } catch (IOException | RuntimeException ex) {
             log.warn("Could not render detail PDF report for ticket={}", detail.ticketNumber(), ex);
             throw new IllegalStateException("Could not generate the PDF report.");
         }
@@ -422,11 +439,14 @@ public class TicketReportDocumentService {
             String filterSummary,
             TicketDetailResponse detail,
             List<TicketCommentResponse> comments,
-            List<TicketAttachmentResponse> attachments) {
+            List<AttachmentEvidence> attachments) {
+
+        List<TicketCommentResponse> safeComments = normalizeComments(comments);
+        List<AttachmentEvidence> safeAttachments = normalizeAttachments(attachments);
+        String ticketNumber = safeValue(detail.ticketNumber());
 
         // Sanitize ticket number for file naming
-        String safeTicketNumber =
-                detail.ticketNumber().replaceAll("[^A-Za-z0-9_-]+", "_").toLowerCase(Locale.ROOT);
+        String safeTicketNumber = safeTicketNumberForFile(detail.ticketNumber());
 
         // Build CSV file name
         String fileName = "ticket_%s_detail.csv".formatted(safeTicketNumber);
@@ -434,7 +454,7 @@ public class TicketReportDocumentService {
         // Human-readable summary of the export
         String summaryText =
                 "Detailed CSV export prepared for ticket %s."
-                        .formatted(detail.ticketNumber());
+                        .formatted(ticketNumber);
 
         StringBuilder csv = new StringBuilder();
 
@@ -470,16 +490,16 @@ public class TicketReportDocumentService {
         // Write one detailed CSV row
         csv.append(
                 csvLine(
-                        request.reportType().name(),
+                        safeEnumName(request.reportType()),
                         filterSummary,
-                        detail.ticketNumber(),
-                        detail.title(),
-                        detail.description(),
-                        detail.ticketCategoryName(),
-                        detail.priority().name(),
-                        detail.status().name(),
-                        detail.reporterDisplayName(),
-                        detail.reporterEmail(),
+                        ticketNumber,
+                        safeValue(detail.title()),
+                        safeValue(detail.description()),
+                        safeValue(detail.ticketCategoryName()),
+                        safeEnumName(detail.priority()),
+                        safeEnumName(detail.status()),
+                        safeValue(detail.reporterDisplayName()),
+                        safeValue(detail.reporterEmail()),
                         safeValue(detail.assignedStaffDisplayName()),
                         safeValue(detail.preferredContactName()),
                         safeValue(detail.preferredContactEmail()),
@@ -493,8 +513,8 @@ public class TicketReportDocumentService {
                         formatDateTime(detail.resolvedAt()),
                         formatDateTime(detail.rejectedAt()),
                         formatDateTime(detail.closedAt()),
-                        joinComments(comments),
-                        joinAttachments(attachments)));
+                        joinComments(safeComments),
+                        joinAttachments(safeAttachments)));
 
         return new RenderedTicketReport(
                 fileName,
@@ -548,30 +568,67 @@ public class TicketReportDocumentService {
 
     private String joinComments(List<TicketCommentResponse> comments) {
         // Join all comments into a single CSV-safe string
-        if (comments.isEmpty()) {
+        if (comments == null || comments.isEmpty()) {
             return "";
         }
         return comments.stream()
+                .filter(Objects::nonNull)
                 .map(
                         comment ->
                                 "[%s] %s: %s"
                                         .formatted(
-                                                toTitleCase(comment.commentType().name()),
-                                                comment.authorDisplayName(),
-                                                comment.body().replaceAll("\\s+", " ").trim()))
+                                                safeEnumTitle(comment.commentType()),
+                                                safeValue(comment.authorDisplayName()),
+                                                safeValue(comment.body()).replaceAll("\\s+", " ").trim()))
                 .reduce((left, right) -> left + " | " + right)
                 .orElse("");
     }
 
-    private String joinAttachments(List<TicketAttachmentResponse> attachments) {
+    private String joinAttachments(List<AttachmentEvidence> attachments) {
         // Join attachment file names into a single CSV-safe string
-        if (attachments.isEmpty()) {
+        if (attachments == null || attachments.isEmpty()) {
             return "";
         }
         return attachments.stream()
-                .map(TicketAttachmentResponse::fileName)
+                .filter(Objects::nonNull)
+                .map(attachment -> safeValue(attachment.attachment().fileName()))
                 .reduce((left, right) -> left + " | " + right)
                 .orElse("");
+    }
+
+    private List<TicketCommentResponse> normalizeComments(List<TicketCommentResponse> comments) {
+        if (comments == null || comments.isEmpty()) {
+            return List.of();
+        }
+        return comments.stream().filter(Objects::nonNull).toList();
+    }
+
+    private List<AttachmentEvidence> normalizeAttachments(List<AttachmentEvidence> attachments) {
+        if (attachments == null || attachments.isEmpty()) {
+            return List.of();
+        }
+        return attachments.stream().filter(Objects::nonNull).toList();
+    }
+
+    private List<TicketAssignmentResponse> normalizeAssignments(
+            List<TicketAssignmentResponse> assignments) {
+        if (assignments == null || assignments.isEmpty()) {
+            return List.of();
+        }
+        return assignments.stream().filter(Objects::nonNull).toList();
+    }
+
+    private String safeTicketNumberForFile(String ticketNumber) {
+        String normalized = safeValue(ticketNumber);
+        return normalized.replaceAll("[^A-Za-z0-9_-]+", "_").toLowerCase(Locale.ROOT);
+    }
+
+    private static String safeEnumName(Enum<?> value) {
+        return value == null ? "UNKNOWN" : value.name();
+    }
+
+    private static String safeEnumTitle(Enum<?> value) {
+        return value == null ? "Unknown" : toTitleCase(value.name());
     }
 
     private String csvLine(String... values) {
@@ -591,12 +648,12 @@ public class TicketReportDocumentService {
         return "\"" + escaped + "\"";
     }
 
-    private String formatDateTime(LocalDateTime value) {
+    private static String formatDateTime(LocalDateTime value) {
         // Format LocalDateTime or return empty string when null
         return value == null ? "" : value.format(TIMESTAMP_FORMATTER);
     }
 
-    private String formatFileSize(Long bytes) {
+    private static String formatFileSize(Long bytes) {
         // Format raw byte size into B, KB, or MB
         if (bytes == null || bytes < 0) {
             return "Unknown size";
@@ -610,12 +667,12 @@ public class TicketReportDocumentService {
         return String.format(Locale.ROOT, "%.1f MB", bytes / (1024d * 1024d));
     }
 
-    private String safeValue(String value) {
+    private static String safeValue(String value) {
         // Replace null or blank text with a placeholder
         return value == null || value.isBlank() ? "Not provided" : value;
     }
 
-    private String toTitleCase(String value) {
+    private static String toTitleCase(String value) {
         // Convert enum-like uppercase text into readable title case
         String normalized = value.toLowerCase(Locale.ROOT).replace('_', ' ');
         String[] segments = normalized.split("\\s+");
@@ -638,6 +695,10 @@ public class TicketReportDocumentService {
     // Holds the generated report file and related metadata
     public record RenderedTicketReport(
             String fileName, String mimeType, byte[] fileData, int recordCount, String summaryText) {}
+
+    // Holds attachment metadata plus the stored file bytes needed for report rendering.
+    public record AttachmentEvidence(
+            TicketAttachmentResponse attachment, byte[] content, String contentType) {}
 
     // Predefined color themes used in PDF sections
     private enum PdfTone {
@@ -695,6 +756,58 @@ public class TicketReportDocumentService {
         // Count how many tickets match the given status
         return tickets.stream().filter(ticket -> ticket.status() == status).count();
     }
+
+    private PreparedAttachmentImage prepareAttachmentImage(
+            PDDocument document, AttachmentEvidence attachmentEvidence) {
+        if (attachmentEvidence == null
+                || attachmentEvidence.attachment() == null
+                || attachmentEvidence.content() == null
+                || attachmentEvidence.content().length == 0) {
+            return null;
+        }
+
+        try {
+            return new PreparedAttachmentImage(
+                    attachmentEvidence,
+                    createPdfImage(document, attachmentEvidence));
+        } catch (IOException | RuntimeException ex) {
+            String fileName =
+                    attachmentEvidence.attachment().fileName() == null
+                            ? "unknown"
+                            : attachmentEvidence.attachment().fileName();
+            log.warn("Skipping attachment image {} while rendering PDF", fileName, ex);
+            return null;
+        }
+    }
+
+    private PDImageXObject createPdfImage(PDDocument document, AttachmentEvidence attachmentEvidence)
+            throws IOException {
+        String contentType =
+                attachmentEvidence.contentType() == null
+                        ? ""
+                        : attachmentEvidence.contentType().toLowerCase(Locale.ROOT);
+
+        if (contentType.contains("jpeg") || contentType.contains("jpg")) {
+            return JPEGFactory.createFromStream(
+                    document, new ByteArrayInputStream(attachmentEvidence.content()));
+        }
+
+        try {
+            return PDImageXObject.createFromByteArray(
+                    document,
+                    attachmentEvidence.content(),
+                    safeValue(attachmentEvidence.attachment().fileName()));
+        } catch (IOException ex) {
+            BufferedImage bufferedImage =
+                    ImageIO.read(new ByteArrayInputStream(attachmentEvidence.content()));
+            if (bufferedImage == null) {
+                throw ex;
+            }
+            return LosslessFactory.createFromImage(document, bufferedImage);
+        }
+    }
+
+    private record PreparedAttachmentImage(AttachmentEvidence attachment, PDImageXObject image) {}
 
     private static final class PdfWriter implements AutoCloseable {
 
@@ -1085,6 +1198,109 @@ public class TicketReportDocumentService {
             cursorY = cardY - 14f;
         }
 
+        private void writeAttachmentGallery(
+                List<PreparedAttachmentImage> attachments, PdfTone tone) throws IOException {
+            writeParagraphCard(
+                    "Attachments and evidence",
+                    "Evidence images that were still available at report generation time are embedded below.",
+                    tone);
+
+            for (PreparedAttachmentImage attachment : attachments) {
+                writeAttachmentImageCard(attachment, tone);
+            }
+        }
+
+        private void writeAttachmentImageCard(PreparedAttachmentImage attachmentImage, PdfTone tone)
+                throws IOException {
+            TicketAttachmentResponse attachment = attachmentImage.attachment().attachment();
+            PDImageXObject image = attachmentImage.image();
+            float cardWidth = page.getMediaBox().getWidth() - 2 * MARGIN;
+            float cardX = MARGIN;
+            float maxImageWidth = cardWidth - 42f;
+            float maxImageHeight = 220f;
+            float imageScale =
+                    Math.min(
+                            1f,
+                            Math.min(
+                                    maxImageWidth / Math.max(image.getWidth(), 1f),
+                                    maxImageHeight / Math.max(image.getHeight(), 1f)));
+            float drawWidth = image.getWidth() * imageScale;
+            float drawHeight = image.getHeight() * imageScale;
+
+            String heading =
+                    attachment.title() == null || attachment.title().isBlank()
+                            ? safeValue(attachment.fileName())
+                            : attachment.title();
+            String metadata =
+                    safeValue(attachment.fileName())
+                            + " | "
+                            + safeValue(attachmentImage.attachment().contentType())
+                            + " | "
+                            + formatFileSize(attachment.fileSize())
+                            + " | Uploaded "
+                            + formatDateTime(attachment.createdAt());
+
+            List<String> titleLines =
+                    wrapText(heading, headingFont, SECTION_FONT_SIZE, cardWidth - 30f);
+            List<String> metadataLines =
+                    wrapText(metadata, bodyFont, BODY_FONT_SIZE, cardWidth - 30f);
+            float cardHeight =
+                    28f
+                            + titleLines.size() * 17f
+                            + 8f
+                            + metadataLines.size() * LINE_GAP
+                            + 14f
+                            + drawHeight
+                            + 22f;
+
+            ensureSpace(cardHeight + 10f);
+
+            float cardY = cursorY - cardHeight;
+
+            stream.setNonStrokingColor(tone.surfaceColor());
+            stream.addRect(cardX, cardY, cardWidth, cardHeight);
+            stream.fill();
+            stream.setStrokingColor(BORDER_COLOR);
+            stream.setLineWidth(0.75f);
+            stream.addRect(cardX, cardY, cardWidth, cardHeight);
+            stream.stroke();
+
+            stream.setNonStrokingColor(tone.accentColor());
+            stream.addRect(cardX, cardY + cardHeight - 7f, cardWidth, 7f);
+            stream.fill();
+
+            float textX = cardX + 15f;
+            float textY = cardY + cardHeight - 22f;
+            drawTextBlock(titleLines, headingFont, SECTION_FONT_SIZE, textX, textY, 17f, TEXT_COLOR);
+            drawTextBlock(
+                    metadataLines,
+                    bodyFont,
+                    BODY_FONT_SIZE,
+                    textX,
+                    textY - titleLines.size() * 17f - 8f,
+                    LINE_GAP,
+                    MUTED_TEXT_COLOR);
+
+            float imageFrameX = cardX + 15f;
+            float imageFrameY = cardY + 15f;
+            float imageFrameWidth = cardWidth - 30f;
+            float imageFrameHeight = drawHeight + 12f;
+
+            stream.setNonStrokingColor(Color.WHITE);
+            stream.addRect(imageFrameX, imageFrameY, imageFrameWidth, imageFrameHeight);
+            stream.fill();
+            stream.setStrokingColor(new Color(226, 232, 240));
+            stream.setLineWidth(0.6f);
+            stream.addRect(imageFrameX, imageFrameY, imageFrameWidth, imageFrameHeight);
+            stream.stroke();
+
+            float imageX = cardX + (cardWidth - drawWidth) / 2f;
+            float imageY = imageFrameY + 6f;
+            stream.drawImage(image, imageX, imageY, drawWidth, drawHeight);
+
+            cursorY = cardY - 14f;
+        }
+
         private void drawTextBlock(
                 List<String> lines,
                 PDFont font,
@@ -1099,10 +1315,11 @@ public class TicketReportDocumentService {
             stream.setNonStrokingColor(color);
             float textY = startY;
             for (String line : lines) {
+                String renderedLine = sanitizeForFont(line, font);
                 stream.beginText();
                 stream.setFont(font, fontSize);
                 stream.newLineAtOffset(x, textY);
-                stream.showText(line);
+                stream.showText(renderedLine);
                 stream.endText();
                 textY -= lineHeight;
             }
@@ -1112,7 +1329,11 @@ public class TicketReportDocumentService {
                 throws IOException {
 
             // Normalize text and split it into lines that fit inside maxWidth
-            String normalized = text == null || text.isBlank() ? " " : text.replace('\n', ' ');
+            String normalized =
+                    sanitizeForFont(text, font)
+                            .replace('\r', ' ')
+                            .replace('\n', ' ')
+                            .replace('\t', ' ');
             List<String> lines = new ArrayList<>();
             StringBuilder currentLine = new StringBuilder();
 
@@ -1133,6 +1354,70 @@ public class TicketReportDocumentService {
             }
 
             return lines.isEmpty() ? List.of(" ") : lines;
+        }
+
+        private String sanitizeForFont(String text, PDFont font) throws IOException {
+            String normalized = text == null || text.isBlank() ? " " : text;
+            normalized =
+                    normalized
+                            .replace("\r\n", "\n")
+                            .replace('\r', '\n')
+                            .replace('\u00A0', ' ')
+                            .replace('\u2007', ' ')
+                            .replace('\u202F', ' ')
+                            .replace("\u200B", "")
+                            .replace("\u200C", "")
+                            .replace("\u200D", "")
+                            .replace("\uFEFF", "")
+                            .replace('\u2018', '\'')
+                            .replace('\u2019', '\'')
+                            .replace('\u201A', '\'')
+                            .replace('\u201B', '\'')
+                            .replace('\u201C', '"')
+                            .replace('\u201D', '"')
+                            .replace('\u201E', '"')
+                            .replace('\u2022', '*')
+                            .replace('\u2026', '.')
+                            .replace('\u2013', '-')
+                            .replace('\u2014', '-')
+                            .replace('\u2212', '-');
+
+            String decomposed = Normalizer.normalize(normalized, Normalizer.Form.NFKD);
+            StringBuilder safe = new StringBuilder(decomposed.length());
+
+            for (int index = 0; index < decomposed.length(); ) {
+                int codePoint = decomposed.codePointAt(index);
+                index += Character.charCount(codePoint);
+
+                int type = Character.getType(codePoint);
+                if (type == Character.NON_SPACING_MARK
+                        || type == Character.COMBINING_SPACING_MARK
+                        || type == Character.ENCLOSING_MARK) {
+                    continue;
+                }
+
+                String candidate;
+                if (codePoint == '\n' || codePoint == '\r' || codePoint == '\t') {
+                    candidate = " ";
+                } else if (Character.isISOControl(codePoint)) {
+                    candidate = " ";
+                } else {
+                    candidate = new String(Character.toChars(codePoint));
+                }
+
+                try {
+                    font.getStringWidth(candidate);
+                    safe.append(candidate);
+                } catch (IllegalArgumentException ex) {
+                    safe.append('?');
+                }
+            }
+
+            if (safe.length() == 0) {
+                return " ";
+            }
+
+            return safe.toString();
         }
 
         @Override

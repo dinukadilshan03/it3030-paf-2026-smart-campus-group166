@@ -103,7 +103,6 @@ export default function EditResourcePage() {
         locationId: Number(form.locationId),
         status: form.status,
         requiresApproval: form.requiresApproval,
-        imageUrl: "",
       };
 
       await updateResource(Number(id), payload);

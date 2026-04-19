@@ -165,6 +165,7 @@ public class TicketService {
 
         // Save and return the created ticket
         Ticket savedTicket = ticketRepository.save(ticket);
+        notificationService.notifyTicketCreated(savedTicket);
         return ticketMapper.toDetail(savedTicket, List.of());
     }
 
@@ -283,6 +284,10 @@ public class TicketService {
                                         + " to "
                                         + resolveDisplayName(assignedUser);
         ticketCommentService.createSystemStatusNote(ticket, noteBody, membership.getUser());
+        notificationService.notifyTicketAssigned(
+                ticket,
+                membership.getUser(),
+                activeAssignment == null ? null : activeAssignment.getAssignedToUser());
 
         return getTicketById(id);
     }
@@ -555,6 +560,7 @@ public class TicketService {
         // Add a system comment for audit trail
         ticketCommentService.createSystemStatusNote(
                 ticket, "Student requested reconsideration review", membership.getUser());
+        notificationService.notifyTicketReconsiderationRequested(ticket);
 
         return getTicketById(id);
     }

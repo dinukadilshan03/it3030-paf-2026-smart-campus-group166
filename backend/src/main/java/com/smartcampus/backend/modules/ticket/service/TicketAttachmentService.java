@@ -58,6 +58,9 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor // Generates constructor injection for final fields
 public class TicketAttachmentService {
 
+    private static final String ATTACHMENT_UPLOAD_FAILURE_MESSAGE =
+            "Could not upload the attachment image. Confirm the ticket attachments bucket exists and Supabase storage is configured.";
+
     // Maximum number of attachments allowed per ticket
     private static final int MAX_ATTACHMENTS = 3;
 
@@ -145,7 +148,7 @@ public class TicketAttachmentService {
         byte[] content = readFileContent(upload.file());
 
         // Upload actual file to object storage
-        supabaseStorageService.uploadObject(storageBucket, storagePath, content, upload.mimeType());
+        uploadToStorage(storageBucket, storagePath, content, upload.mimeType());
 
         // Build attachment entity metadata for persistence
         TicketAttachment attachment =
@@ -402,6 +405,15 @@ public class TicketAttachmentService {
             supabaseStorageService.deleteObject(bucket, path);
         } catch (RuntimeException ignored) {
             // Best effort cleanup if persistence fails after upload.
+        }
+    }
+
+    private void uploadToStorage(
+            String storageBucket, String storagePath, byte[] content, String mimeType) {
+        try {
+            supabaseStorageService.uploadObject(storageBucket, storagePath, content, mimeType);
+        } catch (IllegalStateException ex) {
+            throw new IllegalStateException(ATTACHMENT_UPLOAD_FAILURE_MESSAGE, ex);
         }
     }
 

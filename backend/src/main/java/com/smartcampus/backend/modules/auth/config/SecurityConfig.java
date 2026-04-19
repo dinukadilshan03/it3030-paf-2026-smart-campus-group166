@@ -73,6 +73,8 @@ public class SecurityConfig {
                                         .hasAnyRole("STUDENT", "ADMIN")
                                         .requestMatchers(HttpMethod.GET, "/api/v1/bookings/**")
                                         .hasAnyRole("STUDENT", "ADMIN")
+                                        .requestMatchers(HttpMethod.DELETE, "/api/v1/bookings/**")
+                                        .hasAnyRole("STUDENT", "ADMIN")
                                         .requestMatchers(
                                                 HttpMethod.POST,
                                                 "/api/v1/resource-categories/**",

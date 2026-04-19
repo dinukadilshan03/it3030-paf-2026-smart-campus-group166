@@ -3,6 +3,8 @@ package com.smartcampus.backend.modules.ticket.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
@@ -53,24 +55,9 @@ class TicketAttachmentServiceTest {
 
     @Test
     void rejectsMoreThanThreeAttachments() {
-        User reporter = User.builder().id(1L).email("reporter@example.com").status(UserStatus.ACTIVE).build();
-        UserRole membership =
-                UserRole.builder()
-                        .user(reporter)
-                        .role(Role.builder().id(1L).code(RoleCode.STUDENT).name("STUDENT").build())
-                        .isActive(true)
-                        .build();
-        Ticket ticket =
-                Ticket.builder()
-                        .id(100L)
-                        .ticketNumber("TCK-100")
-                        .reporterUser(reporter)
-                        .ticketCategory(TicketCategory.builder().id(1L).code("IT").name("IT").build())
-                        .title("Issue")
-                        .description("Desc")
-                        .build();
-        ticket.setCreatedAt(LocalDateTime.now());
-        ticket.setUpdatedAt(LocalDateTime.now());
+        User reporter = buildReporter();
+        UserRole membership = buildMembership(reporter);
+        Ticket ticket = buildTicket(reporter);
 
         when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
         when(ticketAttachmentRepository.countByTicket_Id(100L)).thenReturn(3L);
@@ -87,24 +74,9 @@ class TicketAttachmentServiceTest {
 
     @Test
     void rejectsNonImageUpload() {
-        User reporter = User.builder().id(1L).email("reporter@example.com").status(UserStatus.ACTIVE).build();
-        UserRole membership =
-                UserRole.builder()
-                        .user(reporter)
-                        .role(Role.builder().id(1L).code(RoleCode.STUDENT).name("STUDENT").build())
-                        .isActive(true)
-                        .build();
-        Ticket ticket =
-                Ticket.builder()
-                        .id(100L)
-                        .ticketNumber("TCK-100")
-                        .reporterUser(reporter)
-                        .ticketCategory(TicketCategory.builder().id(1L).code("IT").name("IT").build())
-                        .title("Issue")
-                        .description("Desc")
-                        .build();
-        ticket.setCreatedAt(LocalDateTime.now());
-        ticket.setUpdatedAt(LocalDateTime.now());
+        User reporter = buildReporter();
+        UserRole membership = buildMembership(reporter);
+        Ticket ticket = buildTicket(reporter);
 
         when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
         when(ticketAttachmentRepository.countByTicket_Id(100L)).thenReturn(0L);
@@ -119,24 +91,9 @@ class TicketAttachmentServiceTest {
 
     @Test
     void derivesTitleFromFilenameWhenTitleIsMissing() {
-        User reporter = User.builder().id(1L).email("reporter@example.com").status(UserStatus.ACTIVE).build();
-        UserRole membership =
-                UserRole.builder()
-                        .user(reporter)
-                        .role(Role.builder().id(1L).code(RoleCode.STUDENT).name("STUDENT").build())
-                        .isActive(true)
-                        .build();
-        Ticket ticket =
-                Ticket.builder()
-                        .id(100L)
-                        .ticketNumber("TCK-100")
-                        .reporterUser(reporter)
-                        .ticketCategory(TicketCategory.builder().id(1L).code("IT").name("IT").build())
-                        .title("Issue")
-                        .description("Desc")
-                        .build();
-        ticket.setCreatedAt(LocalDateTime.now());
-        ticket.setUpdatedAt(LocalDateTime.now());
+        User reporter = buildReporter();
+        UserRole membership = buildMembership(reporter);
+        Ticket ticket = buildTicket(reporter);
 
         when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
         when(ticketAttachmentRepository.countByTicket_Id(100L)).thenReturn(0L);
@@ -151,6 +108,83 @@ class TicketAttachmentServiceTest {
         assertThat(response.title()).isEqualTo("projector damage");
         verify(supabaseStorageService)
                 .uploadObject(any(String.class), any(String.class), any(byte[].class), any(String.class));
+    }
+
+    @Test
+    void deletesUploadedObjectWhenMetadataSaveFails() {
+        User reporter = buildReporter();
+        UserRole membership = buildMembership(reporter);
+        Ticket ticket = buildTicket(reporter);
+
+        when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
+        when(ticketAttachmentRepository.countByTicket_Id(100L)).thenReturn(0L);
+        when(ticketAttachmentRepository.save(any(TicketAttachment.class)))
+                .thenThrow(new RuntimeException("db write failed"));
+
+        MultipartFile file =
+                new MockMultipartFile("file", "projector-damage.jpg", "image/jpeg", new byte[] {1, 2, 3});
+
+        assertThatThrownBy(() -> ticketAttachmentService.addAttachment(ticket, null, file))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Could not save the attachment image.");
+
+        verify(supabaseStorageService)
+                .uploadObject(
+                        eq("ticket-attachments"),
+                        any(String.class),
+                        any(byte[].class),
+                        eq("image/jpeg"));
+        verify(supabaseStorageService).deleteObject(eq("ticket-attachments"), any(String.class));
+    }
+
+    @Test
+    void returnsClearMessageWhenStorageUploadFails() {
+        User reporter = buildReporter();
+        UserRole membership = buildMembership(reporter);
+        Ticket ticket = buildTicket(reporter);
+
+        when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
+        when(ticketAttachmentRepository.countByTicket_Id(100L)).thenReturn(0L);
+        doThrow(new IllegalStateException("bucket not found"))
+                .when(supabaseStorageService)
+                .uploadObject(
+                        eq("ticket-attachments"),
+                        any(String.class),
+                        any(byte[].class),
+                        eq("image/jpeg"));
+
+        MultipartFile file =
+                new MockMultipartFile("file", "projector-damage.jpg", "image/jpeg", new byte[] {1, 2, 3});
+
+        assertThatThrownBy(() -> ticketAttachmentService.addAttachment(ticket, null, file))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage(
+                        "Could not upload the attachment image. Confirm the ticket attachments bucket exists and Supabase storage is configured.");
+
+        verify(ticketAttachmentRepository, never()).save(any(TicketAttachment.class));
+    }
+
+    @Test
+    void deletesSingleAttachmentFromStorageAndDatabase() {
+        User reporter = buildReporter();
+        UserRole membership = buildMembership(reporter);
+        Ticket ticket = buildTicket(reporter);
+        TicketAttachment attachment =
+                TicketAttachment.builder()
+                        .id(50L)
+                        .ticket(ticket)
+                        .storageBucket("ticket-attachments")
+                        .storagePath("tickets/TCK-100/example.jpg")
+                        .build();
+
+        when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
+        when(ticketAttachmentRepository.findByIdAndTicketId(50L, 100L)).thenReturn(java.util.Optional.of(attachment));
+
+        ticketAttachmentService.deleteAttachment(100L, 50L, ticket);
+
+        verify(supabaseStorageService)
+                .deleteObject("ticket-attachments", "tickets/TCK-100/example.jpg");
+        verify(ticketAttachmentRepository).delete(attachment);
     }
 
     @Test
@@ -184,5 +218,32 @@ class TicketAttachmentServiceTest {
 
         verify(ticketAttachmentRepository, never()).deleteAll(any());
         verify(ticketAttachmentRepository, never()).flush();
+    }
+
+    private User buildReporter() {
+        return User.builder().id(1L).email("reporter@example.com").status(UserStatus.ACTIVE).build();
+    }
+
+    private UserRole buildMembership(User reporter) {
+        return UserRole.builder()
+                .user(reporter)
+                .role(Role.builder().id(1L).code(RoleCode.STUDENT).name("STUDENT").build())
+                .isActive(true)
+                .build();
+    }
+
+    private Ticket buildTicket(User reporter) {
+        Ticket ticket =
+                Ticket.builder()
+                        .id(100L)
+                        .ticketNumber("TCK-100")
+                        .reporterUser(reporter)
+                        .ticketCategory(TicketCategory.builder().id(1L).code("IT").name("IT").build())
+                        .title("Issue")
+                        .description("Desc")
+                        .build();
+        ticket.setCreatedAt(LocalDateTime.now());
+        ticket.setUpdatedAt(LocalDateTime.now());
+        return ticket;
     }
 }

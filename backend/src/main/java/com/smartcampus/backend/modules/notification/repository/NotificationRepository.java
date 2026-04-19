@@ -1,5 +1,6 @@
 package com.smartcampus.backend.modules.notification.repository;
 
+import com.smartcampus.backend.common.enums.NotificationReferenceType;
 import com.smartcampus.backend.modules.notification.entity.Notification;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -51,4 +52,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     long countAllUnread();
 
     long countByReadAtGreaterThanEqualAndReadAtLessThan(LocalDateTime start, LocalDateTime end);
+
+    void deleteByReferenceTypeAndReferenceId(
+            NotificationReferenceType referenceType, Long referenceId);
 }

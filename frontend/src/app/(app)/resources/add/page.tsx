@@ -11,11 +11,23 @@ import {
 } from "@/lib/resources/api";
 import { useRouter } from "next/navigation";
 
+type NoticeTone = "success" | "error" | "info";
+
+type NoticeState = {
+  tone: NoticeTone;
+  title: string;
+  message: string;
+} | null;
+
 export default function AddResourcePage() {
   const router = useRouter();
 
   const [categories, setCategories] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
+  const [notice, setNotice] = useState<NoticeState>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [isCreatingLocation, setIsCreatingLocation] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -38,6 +50,16 @@ export default function AddResourcePage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (!notice || notice.tone === "error") return;
+
+    const timeout = window.setTimeout(() => {
+      setNotice((current) => (current?.tone === "error" ? current : null));
+    }, 3000);
+
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
 
   // auto-generate codes when name typed and code empty
   useEffect(() => {
@@ -79,31 +101,86 @@ export default function AddResourcePage() {
     setLocations(uniqueLocations);
   };
 
+  const showNotice = (tone: NoticeTone, title: string, message: string) => {
+    setNotice({ tone, title, message });
+  };
+
+  const validateResourceForm = () => {
+    if (!form.name.trim()) {
+      showNotice("error", "Resource name is required", "Enter a clear name so people can identify this resource.");
+      return false;
+    }
+
+    if (!form.resourceCode.trim()) {
+      showNotice("error", "Resource code is required", "Add a unique code such as LAB-101 or HALL-A.");
+      return false;
+    }
+
+    if (!form.categoryId) {
+      showNotice("error", "Choose a category", "Select the resource category before saving.");
+      return false;
+    }
+
+    if (!form.locationId) {
+      showNotice("error", "Choose a location", "Select where this resource is located before saving.");
+      return false;
+    }
+
+    if (form.capacity && Number(form.capacity) < 0) {
+      showNotice("error", "Capacity is invalid", "Capacity cannot be a negative number.");
+      return false;
+    }
+
+    return true;
+  };
+
   const handleCreateCategory = async () => {
-    if (!newCategoryName.trim()) return alert('Enter category name');
-    if (!newCategoryCode.trim()) return alert('Enter category code');
+    if (!newCategoryName.trim()) {
+      showNotice("error", "Category name is required", "Enter a category name before adding it.");
+      return;
+    }
+
+    if (!newCategoryCode.trim()) {
+      showNotice("error", "Category code is required", "Enter a short code for the new category.");
+      return;
+    }
+
     try {
+      setIsCreatingCategory(true);
       await createResourceCategory({ name: newCategoryName.trim(), code: newCategoryCode.trim() });
       setNewCategoryName('');
       setNewCategoryCode('');
       await loadData();
-      alert('Category added');
+      showNotice("success", "Category added", `"${newCategoryName.trim()}" is now available in the category list.`);
     } catch (e: any) {
-      alert(e.message || 'Failed to add category');
+      showNotice("error", "Could not add category", e.message || "Please try again.");
+    } finally {
+      setIsCreatingCategory(false);
     }
   };
 
   const handleCreateLocation = async () => {
-    if (!newLocationName.trim()) return alert('Enter location name');
-    if (!newLocationCode.trim()) return alert('Enter location code');
+    if (!newLocationName.trim()) {
+      showNotice("error", "Location name is required", "Enter a location name before adding it.");
+      return;
+    }
+
+    if (!newLocationCode.trim()) {
+      showNotice("error", "Location code is required", "Enter a short code for the new location.");
+      return;
+    }
+
     try {
+      setIsCreatingLocation(true);
       await createLocation({ name: newLocationName.trim(), code: newLocationCode.trim() });
       setNewLocationName('');
       setNewLocationCode('');
       await loadData();
-      alert('Location added');
+      showNotice("success", "Location added", `"${newLocationName.trim()}" is now available in the location list.`);
     } catch (e: any) {
-      alert(e.message || 'Failed to add location');
+      showNotice("error", "Could not add location", e.message || "Please try again.");
+    } finally {
+      setIsCreatingLocation(false);
     }
   };
 
@@ -133,14 +210,16 @@ export default function AddResourcePage() {
   };
 
   const handleSave = async () => {
+    if (!validateResourceForm()) return;
+
     try {
+      setIsSaving(true);
       const payload = {
-        name: form.name,
-        resourceCode: form.resourceCode,
+        name: form.name.trim(),
+        resourceCode: form.resourceCode.trim(),
         capacity: form.capacity ? Number(form.capacity) : null,
         resourceCategoryId: Number(form.categoryId),
         locationId: Number(form.locationId),
-        imageUrl: "",
         status: form.status,
         requiresApproval: form.requiresApproval,
       };
@@ -151,10 +230,12 @@ export default function AddResourcePage() {
         await uploadResourceImage(createdResource.id, selectedImageFile);
       }
 
-      alert("Added ✅");
+      showNotice("success", "Resource created", `"${form.name.trim()}" was added successfully. Redirecting to resources...`);
       router.push("/resources");
     } catch (err: any) {
-      alert(err.message);
+      showNotice("error", "Could not save resource", err.message || "Please review the form and try again.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -163,7 +244,32 @@ export default function AddResourcePage() {
       <div style={styles.card}>
         <h2 style={styles.title}>➕ Add Resource</h2>
 
-        
+        {notice ? (
+          <div
+            style={{
+              ...styles.notice,
+              ...(notice.tone === "success"
+                ? styles.noticeSuccess
+                : notice.tone === "error"
+                ? styles.noticeError
+                : styles.noticeInfo),
+            }}
+          >
+            <div>
+              <div style={styles.noticeTitle}>{notice.title}</div>
+              <div style={styles.noticeMessage}>{notice.message}</div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setNotice(null)}
+              style={styles.noticeDismiss}
+              aria-label="Dismiss alert"
+            >
+              ×
+            </button>
+          </div>
+        ) : null}
 
         <div style={styles.grid}>
           <input
@@ -231,8 +337,8 @@ export default function AddResourcePage() {
 
         {/* BUTTONS */}
         <div style={styles.buttons}>
-          <button onClick={handleSave} style={styles.saveBtn}>
-            💾 Save
+          <button onClick={handleSave} style={styles.saveBtn} disabled={isSaving}>
+            {isSaving ? "Saving..." : "💾 Save"}
           </button>
 
           <button
@@ -250,7 +356,9 @@ export default function AddResourcePage() {
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="Category name" style={{ ...styles.input, padding: '10px', flex: 1, minWidth: 0 }} />
               <input value={newCategoryCode} onChange={(e) => setNewCategoryCode(e.target.value)} placeholder="Code" style={{ ...styles.input, padding: '10px', width: 140, minWidth: 0 }} />
-              <button onClick={handleCreateCategory} style={{ width: 64, padding: '10px 8px', borderRadius: 8, background: '#10b981', color: '#fff', border: 'none', cursor: 'pointer' }}>Add</button>
+              <button onClick={handleCreateCategory} style={{ ...styles.quickAddBtn, background: '#10b981' }} disabled={isCreatingCategory}>
+                {isCreatingCategory ? "..." : "Add"}
+              </button>
             </div>
           </div>
 
@@ -259,7 +367,9 @@ export default function AddResourcePage() {
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <input value={newLocationName} onChange={(e) => setNewLocationName(e.target.value)} placeholder="Location name" style={{ ...styles.input, padding: '10px', flex: 1, minWidth: 0 }} />
               <input value={newLocationCode} onChange={(e) => setNewLocationCode(e.target.value)} placeholder="Code" style={{ ...styles.input, padding: '10px', width: 140, minWidth: 0 }} />
-              <button onClick={handleCreateLocation} style={{ width: 64, padding: '10px 8px', borderRadius: 8, background: '#2563eb', color: '#fff', border: 'none', cursor: 'pointer' }}>Add</button>
+              <button onClick={handleCreateLocation} style={{ ...styles.quickAddBtn, background: '#2563eb' }} disabled={isCreatingLocation}>
+                {isCreatingLocation ? "..." : "Add"}
+              </button>
             </div>
           </div>
         </div>
@@ -290,6 +400,56 @@ const styles: any = {
     marginBottom: "20px",
     fontWeight: "600",
     fontSize: "22px",
+  },
+
+  notice: {
+    marginBottom: "18px",
+    borderRadius: "14px",
+    padding: "14px 16px",
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "12px",
+    border: "1px solid transparent",
+  },
+
+  noticeSuccess: {
+    background: "#ecfdf5",
+    borderColor: "#a7f3d0",
+    color: "#065f46",
+  },
+
+  noticeError: {
+    background: "#fef2f2",
+    borderColor: "#fecaca",
+    color: "#991b1b",
+  },
+
+  noticeInfo: {
+    background: "#eff6ff",
+    borderColor: "#bfdbfe",
+    color: "#1d4ed8",
+  },
+
+  noticeTitle: {
+    fontSize: "14px",
+    fontWeight: "700",
+    marginBottom: "4px",
+  },
+
+  noticeMessage: {
+    fontSize: "13px",
+    lineHeight: 1.45,
+  },
+
+  noticeDismiss: {
+    border: "none",
+    background: "transparent",
+    color: "inherit",
+    cursor: "pointer",
+    fontSize: "20px",
+    lineHeight: 1,
+    padding: "0",
   },
 
   grid: {
@@ -343,6 +503,16 @@ const styles: any = {
     border: "none",
     cursor: "pointer",
     fontWeight: "500",
+  },
+
+  quickAddBtn: {
+    width: 64,
+    padding: "10px 8px",
+    borderRadius: 8,
+    color: "#fff",
+    border: "none",
+    cursor: "pointer",
+    fontWeight: 600,
   },
 
   cancelBtn: {

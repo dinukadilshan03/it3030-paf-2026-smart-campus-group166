@@ -3,9 +3,11 @@ package com.smartcampus.backend.modules.notification.service;
 import com.smartcampus.backend.common.entity.User;
 import com.smartcampus.backend.common.entity.UserRole;
 import com.smartcampus.backend.common.enums.CommentType;
+import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.NotificationReferenceType;
 import com.smartcampus.backend.common.enums.NotificationType;
 import com.smartcampus.backend.common.enums.TicketStatus;
+import com.smartcampus.backend.common.enums.UserStatus;
 import com.smartcampus.backend.common.exception.ResourceNotFoundException;
 import com.smartcampus.backend.modules.auth.service.CurrentUserService;
 import com.smartcampus.backend.modules.booking.entity.Booking;
@@ -16,6 +18,7 @@ import com.smartcampus.backend.modules.notification.mapper.NotificationMapper;
 import com.smartcampus.backend.modules.notification.repository.NotificationRepository;
 import com.smartcampus.backend.modules.ticket.entity.Ticket;
 import com.smartcampus.backend.modules.ticket.entity.TicketComment;
+import com.smartcampus.backend.modules.user.repository.UserRoleRepository;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -44,6 +47,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final CurrentUserService currentUserService;
     private final NotificationMapper notificationMapper;
+    private final UserRoleRepository userRoleRepository;
 
     @Transactional(readOnly = true)
     public List<NotificationSummaryResponse> getNotifications(Integer limit, Boolean unreadOnly) {
@@ -110,13 +114,7 @@ public class NotificationService {
                 booking.getStatus() == com.smartcampus.backend.common.enums.BookingStatus.APPROVED
                         ? "Booking approved"
                         : "Booking rejected";
-        String message =
-                "%s on %s from %s to %s"
-                        .formatted(
-                                booking.getResource().getName(),
-                                booking.getBookingDate().format(BOOKING_DATE_FORMAT),
-                                booking.getStartTime().format(BOOKING_TIME_FORMAT),
-                                booking.getEndTime().format(BOOKING_TIME_FORMAT));
+        String message = formatBookingSchedule(booking);
 
         createNotifications(
                 List.of(booking.getRequesterUser()),
@@ -129,15 +127,105 @@ public class NotificationService {
     }
 
     @Transactional
+    public void notifyBookingCreated(Booking booking) {
+        if (booking.getStatus() == com.smartcampus.backend.common.enums.BookingStatus.APPROVED) {
+            createNotifications(
+                    List.of(booking.getRequesterUser()),
+                    null,
+                    NotificationType.BOOKING,
+                    "Booking confirmed",
+                    formatBookingSchedule(booking),
+                    NotificationReferenceType.BOOKING,
+                    booking.getId());
+            return;
+        }
+
+        createNotifications(
+                getActiveAdmins(),
+                booking.getRequesterUser(),
+                NotificationType.BOOKING,
+                "Booking request submitted",
+                "%s requested %s"
+                        .formatted(resolveDisplayName(booking.getRequesterUser()), formatBookingSchedule(booking)),
+                NotificationReferenceType.BOOKING,
+                booking.getId());
+    }
+
+    @Transactional
+    public void notifyBookingCancelled(Booking booking, User actor) {
+        boolean cancelledByAdmin =
+                actor != null && !actor.getId().equals(booking.getRequesterUser().getId());
+
+        if (cancelledByAdmin) {
+            createNotifications(
+                    List.of(booking.getRequesterUser()),
+                    actor,
+                    NotificationType.BOOKING,
+                    "Booking cancelled",
+                    "%s cancelled %s"
+                            .formatted(resolveDisplayName(actor), formatBookingSchedule(booking)),
+                    NotificationReferenceType.BOOKING,
+                    booking.getId());
+            return;
+        }
+
+        createNotifications(
+                getActiveAdmins(),
+                actor,
+                NotificationType.BOOKING,
+                "Booking cancelled",
+                "%s cancelled %s"
+                        .formatted(resolveDisplayName(booking.getRequesterUser()), formatBookingSchedule(booking)),
+                NotificationReferenceType.BOOKING,
+                booking.getId());
+    }
+
+    @Transactional
     public void notifyTicketStatusChanged(
             Ticket ticket, TicketStatus status, User actor, User assignedStaffSnapshot) {
         String title = "Ticket status updated";
         String message =
                 "%s is now %s"
                         .formatted(ticket.getTicketNumber(), toHumanReadableStatus(status.name()));
+        List<User> recipients = new ArrayList<>();
+        recipients.add(ticket.getReporterUser());
+        recipients.add(assignedStaffSnapshot);
 
         createNotifications(
-                List.of(ticket.getReporterUser(), assignedStaffSnapshot),
+                recipients,
+                actor,
+                NotificationType.TICKET,
+                title,
+                message,
+                NotificationReferenceType.TICKET,
+                ticket.getId());
+    }
+
+    @Transactional
+    public void notifyTicketCreated(Ticket ticket) {
+        createNotifications(
+                getActiveAdmins(),
+                ticket.getReporterUser(),
+                NotificationType.TICKET,
+                "New ticket submitted",
+                "%s reported %s"
+                        .formatted(resolveDisplayName(ticket.getReporterUser()), ticket.getTicketNumber()),
+                NotificationReferenceType.TICKET,
+                ticket.getId());
+    }
+
+    @Transactional
+    public void notifyTicketAssigned(Ticket ticket, User actor, User previousAssignedStaff) {
+        String title = previousAssignedStaff == null ? "Ticket assigned" : "Ticket reassigned";
+        String message =
+                previousAssignedStaff == null
+                        ? "%s assigned %s to you"
+                                .formatted(resolveDisplayName(actor), ticket.getTicketNumber())
+                        : "%s reassigned %s to you"
+                                .formatted(resolveDisplayName(actor), ticket.getTicketNumber());
+
+        createNotifications(
+                List.of(ticket.getAssignedStaffUser()),
                 actor,
                 NotificationType.TICKET,
                 title,
@@ -172,6 +260,19 @@ public class NotificationService {
                 NotificationType.COMMENT,
                 title,
                 message,
+                NotificationReferenceType.TICKET,
+                ticket.getId());
+    }
+
+    @Transactional
+    public void notifyTicketReconsiderationRequested(Ticket ticket) {
+        createNotifications(
+                getActiveAdmins(),
+                ticket.getReporterUser(),
+                NotificationType.TICKET,
+                "Ticket reconsideration requested",
+                "%s asked for another review of %s"
+                        .formatted(resolveDisplayName(ticket.getReporterUser()), ticket.getTicketNumber()),
                 NotificationReferenceType.TICKET,
                 ticket.getId());
     }
@@ -241,6 +342,19 @@ public class NotificationService {
             return user.getDisplayName();
         }
         return user.getEmail();
+    }
+
+    private List<User> getActiveAdmins() {
+        return userRoleRepository.findActiveUsersByRoleAndStatus(RoleCode.ADMIN, UserStatus.ACTIVE);
+    }
+
+    private String formatBookingSchedule(Booking booking) {
+        return "%s on %s from %s to %s"
+                .formatted(
+                        booking.getResource().getName(),
+                        booking.getBookingDate().format(BOOKING_DATE_FORMAT),
+                        booking.getStartTime().format(BOOKING_TIME_FORMAT),
+                        booking.getEndTime().format(BOOKING_TIME_FORMAT));
     }
 
     private String toHumanReadableStatus(String status) {
