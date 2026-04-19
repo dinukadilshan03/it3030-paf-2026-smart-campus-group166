@@ -5,7 +5,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     const backendBase =
-      process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+      process.env.BACKEND_API_URL ||
+      process.env.NEXT_PUBLIC_API_BASE_URL;
+
+    // 🔥 SAFETY CHECK
+    if (!backendBase) {
+      throw new Error("Backend API URL not configured");
+    }
+
+    
     const target = `${backendBase.replace(/\/$/, '')}/api/ai/recommendations`;
 
     const forwardHeaders: Record<string, string> = {
@@ -25,15 +33,20 @@ export async function POST(req: NextRequest) {
     });
 
     const text = await resp.text();
-    const contentType = resp.headers.get('content-type') || 'application/json';
+    const contentType =
+      resp.headers.get('content-type') || 'application/json';
 
     return new Response(text, {
       status: resp.status,
       headers: { 'content-type': contentType },
     });
+
   } catch (err: any) {
     console.error('AI proxy error', err);
-    const message = (err && err.message) || 'Unknown error';
-    return new Response(JSON.stringify({ message }), { status: 502, headers: { 'content-type': 'application/json' } });
+
+    return new Response(
+      JSON.stringify({ message: err.message || 'Unknown error' }),
+      { status: 502, headers: { 'content-type': 'application/json' } }
+    );
   }
 }
