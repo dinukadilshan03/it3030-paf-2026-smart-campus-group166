@@ -21,6 +21,7 @@ import com.smartcampus.backend.modules.resource.entity.Resource;
 import com.smartcampus.backend.modules.resource.service.LocationService;
 import com.smartcampus.backend.modules.resource.service.ResourceService;
 import com.smartcampus.backend.modules.ticket.dto.CreateTicketRequest;
+import com.smartcampus.backend.modules.ticket.dto.RequestTicketReconsiderationRequest;
 import com.smartcampus.backend.modules.ticket.dto.TicketDetailResponse;
 import com.smartcampus.backend.modules.ticket.dto.UpdateTicketAssignmentRequest;
 import com.smartcampus.backend.modules.ticket.dto.UpdateTicketStatusRequest;
@@ -238,38 +239,56 @@ class TicketServiceTest {
     }
 
     @Test
-    void adminCanCreateTicketOnBehalfOfStudent() {
+    void adminCannotCreateTicket() {
         User admin = buildUser(20L, "admin4@example.com", "Admin 4");
-        User student = buildUser(21L, "student4@example.com", "Student 4");
         UserRole membership = buildMembership(admin, RoleCode.ADMIN);
-        TicketCategory category =
-                TicketCategory.builder().id(13L).code("IT_NETWORK").name("IT / Network").isActive(true).build();
-        Location location = Location.builder().id(40L).name("Lab 2").build();
 
         when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
-        when(ticketCategoryService.getManagedCategory(13L)).thenReturn(category);
-        when(locationService.getManagedLocation(40L)).thenReturn(location);
-        when(userRepository.findById(21L)).thenReturn(Optional.of(student));
-        when(userRoleRepository.findActiveByUserId(21L)).thenReturn(Optional.of(buildMembership(student, RoleCode.STUDENT)));
-        when(ticketRepository.existsByTicketNumber(any())).thenReturn(false);
-        when(ticketRepository.save(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        TicketDetailResponse response =
-                ticketService.create(
-                        new CreateTicketRequest(
-                                21L,
-                                null,
-                                40L,
-                                13L,
-                                "Network outage",
-                                "No internet connectivity in the lab",
-                                TicketPriority.HIGH,
-                                "Student 4",
-                                "student4@example.com",
-                                "0771234567"));
+        assertThatThrownBy(
+                        () ->
+                                ticketService.create(
+                                        new CreateTicketRequest(
+                                                21L,
+                                                null,
+                                                40L,
+                                                13L,
+                                                "Network outage",
+                                                "No internet connectivity in the lab",
+                                                TicketPriority.HIGH,
+                                                "Student 4",
+                                                "student4@example.com",
+                                                "0771234567")))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("Admins cannot create tickets");
+    }
 
-        assertThat(response.reporterUserId()).isEqualTo(21L);
-        assertThat(response.priority()).isEqualTo(TicketPriority.HIGH);
+    @Test
+    void adminCannotEditStudentTicket() {
+        User admin = buildUser(20L, "admin4@example.com", "Admin 4");
+        User reporter = buildUser(21L, "student4@example.com", "Student 4");
+        UserRole membership = buildMembership(admin, RoleCode.ADMIN);
+        Ticket ticket = buildTicket(149L, reporter);
+
+        when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
+        when(ticketRepository.findById(149L)).thenReturn(Optional.of(ticket));
+
+        assertThatThrownBy(
+                        () ->
+                                ticketService.updateTicket(
+                                        149L,
+                                        new com.smartcampus.backend.modules.ticket.dto.UpdateTicketRequest(
+                                                null,
+                                                30L,
+                                                12L,
+                                                "Updated title",
+                                                "Updated description",
+                                                TicketPriority.MEDIUM,
+                                                null,
+                                                null,
+                                                null)))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("view tickets");
     }
 
     @Test
@@ -351,6 +370,21 @@ class TicketServiceTest {
     }
 
     @Test
+    void adminCannotDeleteOpenTicket() {
+        User admin = buildUser(34L, "admin-delete@example.com", "Admin Delete");
+        UserRole membership = buildMembership(admin, RoleCode.ADMIN);
+        Ticket ticket = buildTicket(154L, buildUser(35L, "student-delete@example.com", "Student Delete"));
+
+        when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
+        when(ticketRepository.findById(154L)).thenReturn(Optional.of(ticket));
+
+        assertThatThrownBy(() -> ticketService.deleteTicket(154L))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("Admins cannot delete tickets");
+        verify(ticketRepository, never()).delete(any(Ticket.class));
+    }
+
+    @Test
     void reporterCannotWithdrawProcessedTicket() {
         User reporter = buildUser(33L, "student7@example.com", "Student 7");
         UserRole membership = buildMembership(reporter, RoleCode.STUDENT);
@@ -398,7 +432,7 @@ class TicketServiceTest {
     }
 
     @Test
-    void reporterCanRequestReconsiderationForRejectedTicket() {
+    void studentCanRequestReconsiderationForRejectedTicket() {
         User reporter = buildUser(50L, "student-reconsider@example.com", "Student Reconsider");
         UserRole membership = buildMembership(reporter, RoleCode.STUDENT);
         Ticket ticket = buildTicket(170L, reporter);
@@ -421,7 +455,87 @@ class TicketServiceTest {
         assertThat(response.reconsiderationNote()).contains("different room issue");
         assertThat(response.reconsiderationRequestCount()).isEqualTo(1);
         verify(ticketCommentService)
-                .createSystemStatusNote(ticket, "Reporter requested reconsideration review", reporter);
+                .createSystemStatusNote(ticket, "Student requested reconsideration review", reporter);
+    }
+
+    @Test
+    void studentCannotRequestReconsiderationMoreThanOnce() {
+        User reporter = buildUser(51L, "student-reconsider-twice@example.com", "Student Reconsider Twice");
+        UserRole membership = buildMembership(reporter, RoleCode.STUDENT);
+        Ticket ticket = buildTicket(1701L, reporter);
+        ticket.setStatus(TicketStatus.REJECTED);
+        ticket.setRejectionReason("Duplicate request");
+        ticket.setRejectedAt(LocalDateTime.now().minusHours(2));
+        ticket.setReconsiderationRequestCount(1);
+        ticket.setReconsiderationRequestedAt(LocalDateTime.now().minusMinutes(20));
+
+        when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
+        when(ticketRepository.findById(1701L)).thenReturn(Optional.of(ticket));
+
+        assertThatThrownBy(
+                        () ->
+                                ticketService.requestReconsideration(
+                                        1701L,
+                                        new RequestTicketReconsiderationRequest(
+                                                "Please review this again.")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Only one reconsideration request");
+    }
+
+    @Test
+    void staffReporterCannotRequestReconsideration() {
+        User reporter = buildUser(52L, "staff-reconsider@example.com", "Staff Reconsider");
+        UserRole membership = buildMembership(reporter, RoleCode.STAFF);
+        Ticket ticket = buildTicket(1703L, reporter);
+        ticket.setStatus(TicketStatus.REJECTED);
+        ticket.setRejectionReason("Invalid request");
+        ticket.setRejectedAt(LocalDateTime.now().minusHours(1));
+
+        when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
+        when(ticketRepository.findById(1703L)).thenReturn(Optional.of(ticket));
+
+        assertThatThrownBy(
+                        () ->
+                                ticketService.requestReconsideration(
+                                        1703L,
+                                        new RequestTicketReconsiderationRequest(
+                                                "Please review this again.")))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("Only students can ask admin");
+    }
+
+    @Test
+    void adminCanRejectPendingReconsiderationWithoutReopeningTicket() {
+        User admin = buildUser(55L, "admin-second-reject@example.com", "Admin Second Reject");
+        User reporter = buildUser(56L, "student-second-reject@example.com", "Student Second Reject");
+        UserRole membership = buildMembership(admin, RoleCode.ADMIN);
+        Ticket ticket = buildTicket(1702L, reporter);
+        ticket.setStatus(TicketStatus.REJECTED);
+        ticket.setRejectionReason("Duplicate request");
+        ticket.setRejectedAt(LocalDateTime.now().minusHours(2));
+        ticket.setReconsiderationNote("This is a different issue.");
+        ticket.setReconsiderationRequestedAt(LocalDateTime.now().minusMinutes(30));
+
+        when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
+        when(ticketRepository.findById(1702L)).thenReturn(Optional.of(ticket));
+        when(ticketAssignmentRepository.findActiveByTicketId(1702L)).thenReturn(Optional.empty());
+        when(ticketRepository.save(ticket)).thenReturn(ticket);
+        when(ticketRepository.findDetailedById(1702L)).thenReturn(Optional.of(ticket));
+        when(ticketAssignmentRepository.findByTicketIdOrderByAssignedAtDesc(1702L)).thenReturn(List.of());
+
+        TicketDetailResponse response =
+                ticketService.updateStatus(
+                        1702L,
+                        new UpdateTicketStatusRequest(
+                                TicketStatus.REJECTED, null, "Still rejected after review"));
+
+        assertThat(response.status()).isEqualTo(TicketStatus.REJECTED);
+        assertThat(response.rejectionReason()).isEqualTo("Still rejected after review");
+        assertThat(response.adminReviewCount()).isEqualTo(1);
+        assertThat(response.reconsiderationReviewedAt()).isNotNull();
+        verify(ticketCommentService)
+                .createSystemStatusNote(ticket, "Reconsideration request reviewed and rejected", admin);
+        verify(notificationService).notifyTicketStatusChanged(ticket, TicketStatus.REJECTED, admin, null);
     }
 
     @Test
