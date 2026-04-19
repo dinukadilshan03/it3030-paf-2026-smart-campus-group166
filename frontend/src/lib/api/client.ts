@@ -24,3 +24,13 @@ export async function clientApiFetch(path: string, init: RequestInit = {}) {
     }),
   });
 }
+
+export async function frontendRouteFetch(path: string, init: RequestInit = {}) {
+  return fetch(path, {
+    ...init,
+    credentials: "include",
+    headers: withDefaultHeaders(init.headers, {
+      Accept: "application/json",
+    }),
+  });
+}

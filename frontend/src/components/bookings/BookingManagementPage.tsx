@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Trash2, XCircle, CheckCircle, X } from "lucide-react";
+import { XCircle } from "lucide-react";
 import type { BookingSummaryResponse } from "@/lib/bookings/types";
 import type { CurrentUser } from "@/types/auth";
 import type { Resource } from "@/lib/resources/types";
+import { cancelBookingClient, listBookingsClient, reviewBookingClient } from "@/lib/bookings/client";
 import { getResources } from "@/lib/resources/api";
 import NLBookingInput from "@/components/booking/NLBookingInput";
 import { BookingAnalytics } from "./BookingAnalytics";
@@ -14,8 +15,7 @@ import { BookingCalendar } from "./BookingCalendar";
 interface ReviewAction {
   bookingId: number;
   reason: string;
-  decision: "APPROVE" | "REJECT" | "CANCEL" | "DELETE";
-  bookingStatus?: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
+  decision: "APPROVE" | "REJECT" | "CANCEL";
 }
 
 type TabType = "pending" | "approved" | "rejected" | "cancelled" | "all";
@@ -110,15 +110,7 @@ export function BookingManagementPage({
     setError("");
 
     try {
-      const response = await fetch("/api/v1/bookings", {
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to load bookings");
-      }
-
-      const data = (await response.json()) as BookingSummaryResponse[];
+      const data = await listBookingsClient();
       setBookings(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load bookings");
@@ -198,16 +190,6 @@ export function BookingManagementPage({
     setShowReviewDialog(true);
   };
 
-  const handleDeleteClick = (bookingId: number, status: string) => {
-    setPendingAction({
-      bookingId,
-      reason: "",
-      decision: "DELETE",
-      bookingStatus: status as any,
-    });
-    setShowReviewDialog(true);
-  };
-
   const handleConfirmReview = async () => {
     if (!pendingAction) return;
 
@@ -215,45 +197,19 @@ export function BookingManagementPage({
     setActionInProgress(pendingAction.bookingId);
 
     try {
-      let endpoint = "review";
-      
       if (pendingAction.decision === "CANCEL") {
-        endpoint = "cancel";
-      } else if (pendingAction.decision === "DELETE") {
-        endpoint = "delete";
-      }
-      
-      const requestBody: Record<string, unknown> = {};
-
-      // For review (approve/reject), include decision
-      if (pendingAction.decision !== "CANCEL" && pendingAction.decision !== "DELETE") {
-        requestBody.decision = pendingAction.decision;
-      }
-
-      // Only add reason if it exists and is not empty
-      if (pendingAction.reason && pendingAction.reason.trim()) {
-        requestBody.reason = pendingAction.reason;
-      }
-
-      const url = `/api/v1/bookings/${pendingAction.bookingId}/${endpoint}`;
-      const response = await fetch(url, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(requestBody),
-      });
-      if (!response.ok) {
-        const errorData = (await response.json().catch(() => ({}))) as { message?: string };
-        const actionName = pendingAction.decision === "DELETE" ? "delete" : pendingAction.decision === "CANCEL" ? "cancel" : "review";
-        throw new Error(errorData.message || `Failed to ${actionName} booking`);
+        await cancelBookingClient(pendingAction.bookingId, {
+          reason: pendingAction.reason.trim() || undefined,
+        });
+      } else {
+        await reviewBookingClient(pendingAction.bookingId, {
+          decision: pendingAction.decision,
+          reason: pendingAction.reason.trim() || undefined,
+        });
       }
 
       let message = "";
-      if (pendingAction.decision === "DELETE") {
-        message = "Booking deleted successfully!";
-      } else if (pendingAction.decision === "CANCEL") {
+      if (pendingAction.decision === "CANCEL") {
         message = "Booking cancelled successfully!";
       } else if (pendingAction.decision === "APPROVE") {
         message = "Booking approved successfully!";
@@ -431,26 +387,16 @@ export function BookingManagementPage({
                       <span className={`status-badge status-${booking.status.toLowerCase()}`}>
                         {booking.status}
                       </span>
-                      {(booking.status === "PENDING" || booking.status === "APPROVED" || booking.status === "REJECTED" || booking.status === "CANCELLED") && (
+                      {(booking.status === "APPROVED" || booking.status === "PENDING") && (
                         <>
                           <button
-                            className="icon-button delete-icon"
-                            onClick={() => handleDeleteClick(booking.id, booking.status)}
-                            title="Delete booking"
+                            className="icon-button cancel-icon"
+                            onClick={() => handleStudentCancelClick(booking.id)}
+                            title="Cancel booking"
                             disabled={actionInProgress === booking.id}
                           >
-                            <Trash2 size={18} />
+                            <XCircle size={18} />
                           </button>
-                          {(booking.status === "APPROVED" || booking.status === "PENDING") && (
-                            <button
-                              className="icon-button cancel-icon"
-                              onClick={() => handleStudentCancelClick(booking.id)}
-                              title="Cancel booking"
-                              disabled={actionInProgress === booking.id}
-                            >
-                              <XCircle size={18} />
-                            </button>
-                          )}
                         </>
                       )}
                     </div>
@@ -644,26 +590,16 @@ export function BookingManagementPage({
                       <span className={`status-badge status-${booking.status.toLowerCase()}`}>
                         {booking.status}
                       </span>
-                      {(booking.status === "PENDING" || booking.status === "APPROVED" || booking.status === "REJECTED" || booking.status === "CANCELLED") && (
+                      {(booking.status === "APPROVED" || booking.status === "PENDING") && (
                         <>
                           <button
-                            className="icon-button delete-icon"
-                            onClick={() => handleDeleteClick(booking.id, booking.status)}
-                            title="Delete booking"
+                            className="icon-button cancel-icon"
+                            onClick={() => handleStudentCancelClick(booking.id)}
+                            title="Cancel booking"
                             disabled={actionInProgress === booking.id}
                           >
-                            <Trash2 size={18} />
+                            <XCircle size={18} />
                           </button>
-                          {(booking.status === "APPROVED" || booking.status === "PENDING") && (
-                            <button
-                              className="icon-button cancel-icon"
-                              onClick={() => handleStudentCancelClick(booking.id)}
-                              title="Cancel booking"
-                              disabled={actionInProgress === booking.id}
-                            >
-                              <XCircle size={18} />
-                            </button>
-                          )}
                         </>
                       )}
                     </div>
@@ -710,18 +646,14 @@ export function BookingManagementPage({
                 ? "Approve Booking"
                 : pendingAction.decision === "REJECT"
                   ? "Reject Booking"
-                  : pendingAction.decision === "DELETE"
-                    ? "Delete Booking"
-                    : "Cancel Booking"}
+                  : "Cancel Booking"}
             </h2>
             <p>
               {pendingAction.decision === "APPROVE"
                 ? "Are you sure you want to approve this booking?"
                 : pendingAction.decision === "REJECT"
                   ? "Are you sure you want to reject this booking?"
-                  : pendingAction.decision === "DELETE"
-                    ? "Are you sure you want to delete this booking? This action cannot be undone."
-                    : "Are you sure you want to cancel this booking?"}
+                  : "Are you sure you want to cancel this booking?"}
             </p>
 
             <div className="field">
@@ -730,9 +662,7 @@ export function BookingManagementPage({
                   ? "Approval"
                   : pendingAction.decision === "REJECT"
                     ? "Rejection"
-                    : pendingAction.decision === "DELETE"
-                      ? "Reason for deletion"
-                      : "Cancellation"}{" "}
+                    : "Cancellation"}{" "}
                 Reason (optional)
                 <textarea
                   rows={4}
@@ -745,9 +675,7 @@ export function BookingManagementPage({
                       ? "Enter approval notes..."
                       : pendingAction.decision === "REJECT"
                         ? "Enter rejection reason..."
-                        : pendingAction.decision === "DELETE"
-                          ? "Why are you deleting this booking?"
-                          : "Enter cancellation reason..."
+                        : "Enter cancellation reason..."
                   }
                 />
               </label>
@@ -766,9 +694,7 @@ export function BookingManagementPage({
                   ? "Approve"
                   : pendingAction.decision === "REJECT"
                     ? "Reject"
-                    : pendingAction.decision === "DELETE"
-                      ? "Delete"
-                      : "Cancel booking"}
+                    : "Cancel booking"}
               </button>
               <button
                 className="secondary-button"
