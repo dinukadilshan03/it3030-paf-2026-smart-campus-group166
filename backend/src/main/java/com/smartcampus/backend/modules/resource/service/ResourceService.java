@@ -5,6 +5,8 @@ import com.smartcampus.backend.common.exception.DuplicateResourceException;
 import com.smartcampus.backend.common.exception.ResourceConflictException;
 import com.smartcampus.backend.common.exception.ResourceNotFoundException;
 import com.smartcampus.backend.common.enums.ResourceStatus;
+import com.smartcampus.backend.common.service.StoredObjectContent;
+import com.smartcampus.backend.common.service.SupabaseStorageService;
 import com.smartcampus.backend.modules.auth.service.CurrentUserService;
 import com.smartcampus.backend.modules.resource.dto.CreateResourceRequest;
 import com.smartcampus.backend.modules.resource.dto.ResourceDetailResponse;
@@ -17,14 +19,25 @@ import com.smartcampus.backend.modules.resource.mapper.ResourceMapper;
 import com.smartcampus.backend.modules.resource.repository.ResourceAvailabilityWindowRepository;
 import com.smartcampus.backend.modules.resource.repository.ResourceRepository;
 import jakarta.persistence.EntityManager;
+import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
 public class ResourceService {
+
+    private static final String STORED_IMAGE_PREFIX = "resource-image:";
+    private static final long MAX_IMAGE_SIZE_BYTES = 5L * 1024L * 1024L;
+    private static final Set<String> ALLOWED_IMAGE_TYPES =
+            Set.of("image/jpeg", "image/png", "image/webp", "image/gif");
 
     private final ResourceRepository resourceRepository;
     private final ResourceAvailabilityWindowRepository resourceAvailabilityWindowRepository;
@@ -33,6 +46,10 @@ public class ResourceService {
     private final CurrentUserService currentUserService;
     private final ResourceMapper resourceMapper;
     private final EntityManager entityManager;
+    private final SupabaseStorageService storageService;
+
+    @Value("${app.supabase.storage.resource-images-bucket:resource-images}")
+    private String resourceImagesBucket;
 
     @Transactional(readOnly = true)
     public List<ResourceSummaryResponse> getResources(
@@ -154,8 +171,50 @@ public class ResourceService {
                     "Cannot delete resource while tickets still reference it");
         }
 
+        deleteStoredImageIfPresent(resource);
         resourceAvailabilityWindowRepository.deleteByResource_Id(id);
         resourceRepository.delete(resource);
+    }
+
+    @Transactional
+    public ResourceDetailResponse uploadImage(Long id, MultipartFile file) {
+        Resource resource = getManagedResource(id);
+        ValidatedImageUpload upload = validateImageUpload(file);
+        String storageBucket = normalizeRequiredBucket();
+        String storagePath = buildStoragePath(id, upload.originalFileName());
+        byte[] content = readFileContent(upload.file());
+
+        storageService.uploadObject(storageBucket, storagePath, content, upload.contentType());
+
+        String previousStoragePath = extractStoredImagePath(resource.getImageUrl());
+        resource.setImageUrl(STORED_IMAGE_PREFIX + storagePath);
+        resource.setUpdatedByUser(getAuthenticatedUser());
+
+        Resource savedResource;
+        try {
+            savedResource = resourceRepository.save(resource);
+        } catch (RuntimeException ex) {
+            tryDeleteUploadedObject(storageBucket, storagePath);
+            throw new IllegalStateException("Could not save the resource image.");
+        }
+
+        if (previousStoragePath != null) {
+            tryDeleteUploadedObject(storageBucket, previousStoragePath);
+        }
+
+        return resourceMapper.toResourceDetail(savedResource);
+    }
+
+    @Transactional(readOnly = true)
+    public StoredObjectContent getImageContent(Long id) {
+        Resource resource = getManagedResource(id);
+        String storagePath =
+                extractStoredImagePath(resource.getImageUrl());
+        if (storagePath == null) {
+            throw new ResourceNotFoundException("Resource image not found for id: " + id);
+        }
+
+        return storageService.downloadObject(normalizeRequiredBucket(), storagePath);
     }
 
     @Transactional(readOnly = true)
@@ -213,4 +272,82 @@ public class ResourceService {
         }
         return search.trim().toLowerCase();
     }
+
+    private void deleteStoredImageIfPresent(Resource resource) {
+        String storagePath = extractStoredImagePath(resource.getImageUrl());
+        if (storagePath == null) {
+            return;
+        }
+        tryDeleteUploadedObject(normalizeRequiredBucket(), storagePath);
+    }
+
+    private void tryDeleteUploadedObject(String bucket, String storagePath) {
+        try {
+            storageService.deleteObject(bucket, storagePath);
+        } catch (RuntimeException ignored) {
+            // Best effort cleanup so resource CRUD failures are still surfaced consistently.
+        }
+    }
+
+    private String normalizeRequiredBucket() {
+        String trimmed = normalizeOptionalText(resourceImagesBucket);
+        if (trimmed == null) {
+            throw new IllegalStateException("Resource image uploads are not configured.");
+        }
+        return trimmed;
+    }
+
+    private ValidatedImageUpload validateImageUpload(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Resource image is required");
+        }
+
+        String contentType = normalizeOptionalText(file.getContentType());
+        if (contentType == null
+                || !ALLOWED_IMAGE_TYPES.contains(contentType.toLowerCase(Locale.ROOT))) {
+            throw new IllegalArgumentException("Only JPG, PNG, WEBP, and GIF images are allowed");
+        }
+
+        if (file.getSize() > MAX_IMAGE_SIZE_BYTES) {
+            throw new IllegalArgumentException("Resource image must be 5 MB or smaller");
+        }
+
+        String originalFileName = normalizeOptionalText(file.getOriginalFilename());
+        if (originalFileName == null) {
+            throw new IllegalArgumentException("Resource image file name is required");
+        }
+
+        return new ValidatedImageUpload(file, contentType, originalFileName);
+    }
+
+    private byte[] readFileContent(MultipartFile file) {
+        try {
+            return file.getBytes();
+        } catch (IOException ex) {
+            throw new IllegalStateException("Could not read the resource image.");
+        }
+    }
+
+    private String buildStoragePath(Long resourceId, String originalFileName) {
+        String sanitizedFileName =
+                originalFileName
+                        .replace('\\', '/')
+                        .replaceAll("^.*?/", "")
+                        .replaceAll("[^A-Za-z0-9._-]", "-");
+        String extension = sanitizedFileName.contains(".")
+                ? sanitizedFileName.substring(sanitizedFileName.lastIndexOf('.'))
+                : "";
+        return "resources/%d/%s%s".formatted(resourceId, UUID.randomUUID(), extension);
+    }
+
+    private String extractStoredImagePath(String imageUrl) {
+        if (imageUrl == null || !imageUrl.startsWith(STORED_IMAGE_PREFIX)) {
+            return null;
+        }
+        String storagePath = imageUrl.substring(STORED_IMAGE_PREFIX.length()).trim();
+        return storagePath.isEmpty() ? null : storagePath;
+    }
+
+    private record ValidatedImageUpload(
+            MultipartFile file, String contentType, String originalFileName) {}
 }

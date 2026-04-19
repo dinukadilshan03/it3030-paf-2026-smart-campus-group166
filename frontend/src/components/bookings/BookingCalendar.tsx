@@ -31,6 +31,12 @@ interface BookingCalendarProps {
   onSlotClick?: (date: string, startTime: string, endTime: string, resourceId?: number) => void;
 }
 
+interface HoveredBooking {
+  booking: BookingSummaryResponse;
+  x: number;
+  y: number;
+}
+
 function dateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
@@ -77,33 +83,31 @@ function bookingOverlapsSlot(
   return bookingStart < slotEnd && bookingEnd > slotStart;
 }
 
-function getStatusStyles(status: BookingStatus): { chip: string; dot: string } {
+const BOOKING_COLORS = [
+  { bg: "bg-cyan-50", border: "border-cyan-300", text: "text-cyan-900", dot: "bg-cyan-500" },
+  { bg: "bg-blue-50", border: "border-blue-300", text: "text-blue-900", dot: "bg-blue-500" },
+  { bg: "bg-purple-50", border: "border-purple-300", text: "text-purple-900", dot: "bg-purple-500" },
+  { bg: "bg-pink-50", border: "border-pink-300", text: "text-pink-900", dot: "bg-pink-500" },
+  { bg: "bg-orange-50", border: "border-orange-300", text: "text-orange-900", dot: "bg-orange-500" },
+  { bg: "bg-green-50", border: "border-green-300", text: "text-green-900", dot: "bg-green-500" },
+];
+
+function getBookingColor(bookingId: number) {
+  return BOOKING_COLORS[bookingId % BOOKING_COLORS.length];
+}
+
+function getStatusStyles(status: BookingStatus): { dot: string; label: string } {
   switch (status) {
     case "APPROVED":
-      return {
-        chip: "bg-emerald-50 border border-emerald-200 text-emerald-800",
-        dot: "bg-emerald-500",
-      };
+      return { dot: "bg-green-500", label: "Approved" };
     case "PENDING":
-      return {
-        chip: "bg-amber-50 border border-amber-200 border-dashed text-amber-800",
-        dot: "bg-amber-400",
-      };
+      return { dot: "bg-amber-500", label: "Pending" };
     case "REJECTED":
-      return {
-        chip: "bg-red-50 border border-red-200 text-red-800",
-        dot: "bg-red-500",
-      };
+      return { dot: "bg-red-500", label: "Rejected" };
     case "CANCELLED":
-      return {
-        chip: "bg-slate-50 border border-slate-200 text-slate-600",
-        dot: "bg-slate-400",
-      };
+      return { dot: "bg-gray-500", label: "Cancelled" };
     default:
-      return {
-        chip: "bg-slate-50 border border-slate-200 text-slate-600",
-        dot: "bg-slate-400",
-      };
+      return { dot: "bg-gray-400", label: "Unknown" };
   }
 }
 
@@ -120,6 +124,7 @@ export function BookingCalendar({
 
   const [view, setView] = useState<"weekly" | "daily">("weekly");
   const [anchor, setAnchor] = useState<Date>(new Date(today));
+  const [hoveredBooking, setHoveredBooking] = useState<HoveredBooking | null>(null);
 
   const bookingsByResourceAndDate = useMemo(() => {
     const map = new Map<string, BookingSummaryResponse[]>();
@@ -181,7 +186,7 @@ export function BookingCalendar({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 relative">
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-slate-100 shadow-sm">
           <span className="w-2 h-2 rounded-full bg-slate-400" />
@@ -269,16 +274,16 @@ export function BookingCalendar({
                     <div
                       key={index}
                       className={`flex flex-col items-center justify-center h-12 border-b border-r border-slate-100 last:border-r-0 ${
-                        isToday ? "bg-indigo-50" : "bg-slate-50"
+                        isToday ? "bg-blue-50" : "bg-slate-50"
                       }`}
                     >
-                      <span className={`text-xs font-medium uppercase tracking-widest ${isToday ? "text-indigo-400" : "text-slate-400"}`}>
+                      <span className={`text-xs font-medium uppercase tracking-widest ${isToday ? "text-blue-500" : "text-slate-400"}`}>
                         {DAYS_SHORT[day.getDay()]}
                       </span>
                       <span
                         className={`text-sm font-bold mt-0.5 ${
                           isToday
-                            ? "w-6 h-6 flex items-center justify-center rounded-full bg-indigo-600 text-white"
+                            ? "w-6 h-6 flex items-center justify-center rounded-full bg-blue-500 text-white"
                             : "text-slate-700"
                         }`}
                       >
@@ -324,21 +329,36 @@ export function BookingCalendar({
                           className={`border-b border-r border-slate-100 last:border-r-0 p-1 group transition-colors ${
                             isPast
                               ? "bg-slate-50/40 opacity-50 cursor-not-allowed"
-                              : `cursor-pointer ${isToday ? "hover:bg-indigo-50/50" : "hover:bg-slate-50"}`
+                              : `cursor-pointer ${isToday ? "hover:bg-blue-50/50" : "hover:bg-slate-50"}`
                           }`}
                           onClick={() => handleSlotClick(dayKey, startHour)}
                         >
                           {slotBookings.length === 0 && (
                             <div className="hidden group-hover:flex items-center justify-center h-full opacity-60">
-                              <span className="text-xs text-indigo-500 font-medium">+ Book</span>
+                              <span className="text-xs text-blue-600 font-medium">+ Book</span>
                             </div>
                           )}
                           {slotBookings.map((booking) => {
-                            const styles = getStatusStyles(booking.status);
+                            const color = getBookingColor(booking.id);
+                            const statusStyle = getStatusStyles(booking.status);
                             return (
-                              <div key={booking.id} className={`rounded-md px-2 py-1.5 ${styles.chip} w-full mb-1`}>
-                                <p className="text-xs font-semibold truncate leading-tight">{booking.resourceName}</p>
-                                <p className="text-xs opacity-70 leading-tight mt-0.5">
+                              <div
+                                key={booking.id}
+                                className={`rounded-lg px-2 py-1.5 ${color.bg} border ${color.border} w-full mb-1 cursor-pointer hover:shadow-md transition-all`}
+                                onMouseEnter={(e) => {
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  setHoveredBooking({
+                                    booking,
+                                    x: rect.left,
+                                    y: rect.bottom + 8,
+                                  });
+                                }}
+                                onMouseLeave={() => setHoveredBooking(null)}
+                              >
+                                <p className={`text-xs font-semibold truncate leading-tight ${color.text}`}>
+                                  {booking.resourceName}
+                                </p>
+                                <p className={`text-xs opacity-70 leading-tight mt-0.5 ${color.text}`}>
                                   {formatClockTime(booking.startTime)}-{formatClockTime(booking.endTime)}
                                 </p>
                               </div>
@@ -350,7 +370,7 @@ export function BookingCalendar({
                   : resources.map((resource) => {
                       const isPast = isPastDate(anchorKey);
                       const booking = getBookingsForSlot(resource.id, anchorKey, startHour)[0];
-                      const styles = booking ? getStatusStyles(booking.status) : null;
+                      const color = booking ? getBookingColor(booking.id) : null;
 
                       return (
                         <div
@@ -365,23 +385,34 @@ export function BookingCalendar({
                         >
                           {!booking && (
                             <div className="hidden group-hover:flex items-center justify-center h-full opacity-60">
-                              <span className="text-xs text-indigo-500 font-medium">+ Book</span>
+                              <span className="text-xs text-blue-600 font-medium">+ Book</span>
                             </div>
                           )}
-                          {booking && styles && (
-                            <div className={`rounded-md px-2 py-2 ${styles.chip} w-full h-full`}>
+                          {booking && color && (
+                            <div
+                              className={`rounded-lg px-2 py-2 ${color.bg} border ${color.border} w-full h-full cursor-pointer hover:shadow-md transition-all`}
+                              onMouseEnter={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setHoveredBooking({
+                                  booking,
+                                  x: rect.left,
+                                  y: rect.bottom + 8,
+                                });
+                              }}
+                              onMouseLeave={() => setHoveredBooking(null)}
+                            >
                               <div className="flex items-center gap-1.5 mb-1">
-                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${styles.dot}`} />
-                                <p className="text-xs font-semibold truncate leading-tight capitalize">
+                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${getStatusStyles(booking.status).dot}`} />
+                                <p className={`text-xs font-semibold truncate leading-tight capitalize ${color.text}`}>
                                   {booking.status.toLowerCase()}
                                 </p>
                               </div>
-                              <p className="text-xs font-medium truncate leading-tight">{booking.requesterDisplayName}</p>
-                              <p className="text-xs opacity-60 leading-tight mt-0.5">
+                              <p className={`text-xs font-medium truncate leading-tight ${color.text}`}>{booking.requesterDisplayName}</p>
+                              <p className={`text-xs opacity-60 leading-tight mt-0.5 ${color.text}`}>
                                 {formatClockTime(booking.startTime)} - {formatClockTime(booking.endTime)}
                               </p>
                               {booking.expectedAttendees && (
-                                <p className="text-xs opacity-60 leading-tight mt-0.5">
+                                <p className={`text-xs opacity-60 leading-tight mt-0.5 ${color.text}`}>
                                   {booking.expectedAttendees} attendees
                                 </p>
                               )}
@@ -414,6 +445,53 @@ export function BookingCalendar({
           </div>
         </div>
       </div>
+
+      {hoveredBooking && (
+        <div
+          className="fixed z-50 bg-white rounded-lg shadow-lg border border-slate-200 p-4 w-80 pointer-events-none"
+          style={{
+            left: `${hoveredBooking.x}px`,
+            top: `${hoveredBooking.y}px`,
+            transform: "translateX(-50%)",
+          }}
+        >
+          <div className="space-y-3">
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm">{hoveredBooking.booking.resourceName}</h3>
+              <p className="text-xs text-slate-500 mt-0.5">{hoveredBooking.booking.resourceCode}</p>
+            </div>
+
+            <div className="border-t border-slate-100 pt-2 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Requester:</span>
+                <span className="font-medium text-slate-900">{hoveredBooking.booking.requesterDisplayName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Date:</span>
+                <span className="font-medium text-slate-900">{hoveredBooking.booking.bookingDate}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Time:</span>
+                <span className="font-medium text-slate-900">
+                  {formatClockTime(hoveredBooking.booking.startTime)} - {formatClockTime(hoveredBooking.booking.endTime)}
+                </span>
+              </div>
+              {hoveredBooking.booking.expectedAttendees && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Attendees:</span>
+                  <span className="font-medium text-slate-900">{hoveredBooking.booking.expectedAttendees}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-slate-500">Status:</span>
+                <span className={`font-medium ${getStatusStyles(hoveredBooking.booking.status).dot}`}>
+                  {getStatusStyles(hoveredBooking.booking.status).label}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

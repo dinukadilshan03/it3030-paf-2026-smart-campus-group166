@@ -1,4 +1,5 @@
 import { clientApiFetch } from "@/lib/api/client";
+import { getFrontendApiBaseUrl } from "@/lib/config/env";
 
 export const getResources = async (search?: string) => {
   try {
@@ -12,7 +13,6 @@ export const getResources = async (search?: string) => {
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      // Avoid printing console.error in server components (dev overlay). Handle 401 quietly.
       if (res.status === 401) {
         console.warn('GET resources: authentication required');
         return [];
@@ -84,10 +84,61 @@ export const updateResource = async (id: number, data: unknown) => {
   return res.json();
 };
 
+export const uploadResourceImage = async (id: number, file: File) => {
+  const formData = new FormData();
+  formData.set("file", file);
+
+  const res = await clientApiFetch(`/api/v1/resources/${id}/image`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
 export const deleteResource = async (id: number) => {
   const res = await clientApiFetch(`/api/v1/resources/${id}`, {
     method: "DELETE",
   });
 
   if (!res.ok) throw new Error(await res.text());
+};
+
+export const createResourceCategory = async (data: unknown) => {
+  const res = await clientApiFetch("/api/v1/resource-categories", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const createLocation = async (data: unknown) => {
+  const res = await clientApiFetch("/api/v1/locations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const resolveResourceImageUrl = (imageUrl?: string | null) => {
+  if (!imageUrl) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(imageUrl) || imageUrl.startsWith("data:")) {
+    return imageUrl;
+  }
+
+  if (imageUrl.startsWith("/")) {
+    return `${getFrontendApiBaseUrl()}${imageUrl}`;
+  }
+
+  return imageUrl;
 };
