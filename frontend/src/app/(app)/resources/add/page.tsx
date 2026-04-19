@@ -140,7 +140,6 @@ export default function AddResourcePage() {
         capacity: form.capacity ? Number(form.capacity) : null,
         resourceCategoryId: Number(form.categoryId),
         locationId: Number(form.locationId),
-        imageUrl: "",
         status: form.status,
         requiresApproval: form.requiresApproval,
       };

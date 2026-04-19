@@ -35,6 +35,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class ResourceService {
 
     private static final String STORED_IMAGE_PREFIX = "resource-image:";
+    private static final String STORED_IMAGE_BUCKET_DELIMITER = "|";
     private static final long MAX_IMAGE_SIZE_BYTES = 5L * 1024L * 1024L;
     private static final Set<String> ALLOWED_IMAGE_TYPES =
             Set.of("image/jpeg", "image/png", "image/webp", "image/gif");
@@ -186,8 +187,9 @@ public class ResourceService {
 
         storageService.uploadObject(storageBucket, storagePath, content, upload.contentType());
 
-        String previousStoragePath = extractStoredImagePath(resource.getImageUrl());
-        resource.setImageUrl(STORED_IMAGE_PREFIX + storagePath);
+        StoredImageReference previousStoredImageReference =
+                extractStoredImageReference(resource.getImageUrl());
+        resource.setImageUrl(buildStoredImageReference(storageBucket, storagePath));
         resource.setUpdatedByUser(getAuthenticatedUser());
 
         Resource savedResource;
@@ -198,8 +200,9 @@ public class ResourceService {
             throw new IllegalStateException("Could not save the resource image.");
         }
 
-        if (previousStoragePath != null) {
-            tryDeleteUploadedObject(storageBucket, previousStoragePath);
+        if (previousStoredImageReference != null) {
+            tryDeleteUploadedObject(
+                    previousStoredImageReference.bucket(), previousStoredImageReference.path());
         }
 
         return resourceMapper.toResourceDetail(savedResource);
@@ -208,13 +211,13 @@ public class ResourceService {
     @Transactional(readOnly = true)
     public StoredObjectContent getImageContent(Long id) {
         Resource resource = getManagedResource(id);
-        String storagePath =
-                extractStoredImagePath(resource.getImageUrl());
-        if (storagePath == null) {
+        StoredImageReference storedImageReference = extractStoredImageReference(resource.getImageUrl());
+        if (storedImageReference == null) {
             throw new ResourceNotFoundException("Resource image not found for id: " + id);
         }
 
-        return storageService.downloadObject(normalizeRequiredBucket(), storagePath);
+        return storageService.downloadObject(
+                storedImageReference.bucket(), storedImageReference.path());
     }
 
     @Transactional(readOnly = true)
@@ -274,11 +277,11 @@ public class ResourceService {
     }
 
     private void deleteStoredImageIfPresent(Resource resource) {
-        String storagePath = extractStoredImagePath(resource.getImageUrl());
-        if (storagePath == null) {
+        StoredImageReference storedImageReference = extractStoredImageReference(resource.getImageUrl());
+        if (storedImageReference == null) {
             return;
         }
-        tryDeleteUploadedObject(normalizeRequiredBucket(), storagePath);
+        tryDeleteUploadedObject(storedImageReference.bucket(), storedImageReference.path());
     }
 
     private void tryDeleteUploadedObject(String bucket, String storagePath) {
@@ -340,14 +343,39 @@ public class ResourceService {
         return "resources/%d/%s%s".formatted(resourceId, UUID.randomUUID(), extension);
     }
 
-    private String extractStoredImagePath(String imageUrl) {
+    private String buildStoredImageReference(String bucket, String storagePath) {
+        return STORED_IMAGE_PREFIX + bucket + STORED_IMAGE_BUCKET_DELIMITER + storagePath;
+    }
+
+    private StoredImageReference extractStoredImageReference(String imageUrl) {
         if (imageUrl == null || !imageUrl.startsWith(STORED_IMAGE_PREFIX)) {
             return null;
         }
-        String storagePath = imageUrl.substring(STORED_IMAGE_PREFIX.length()).trim();
-        return storagePath.isEmpty() ? null : storagePath;
+
+        String storedReference = imageUrl.substring(STORED_IMAGE_PREFIX.length()).trim();
+        if (storedReference.isEmpty()) {
+            return null;
+        }
+
+        int delimiterIndex = storedReference.indexOf(STORED_IMAGE_BUCKET_DELIMITER);
+        if (delimiterIndex < 0) {
+            return new StoredImageReference(normalizeRequiredBucket(), storedReference);
+        }
+
+        String bucket = normalizeOptionalText(storedReference.substring(0, delimiterIndex));
+        String storagePath =
+                normalizeOptionalText(
+                        storedReference.substring(
+                                delimiterIndex + STORED_IMAGE_BUCKET_DELIMITER.length()));
+        if (bucket == null || storagePath == null) {
+            return null;
+        }
+
+        return new StoredImageReference(bucket, storagePath);
     }
 
     private record ValidatedImageUpload(
             MultipartFile file, String contentType, String originalFileName) {}
+
+    private record StoredImageReference(String bucket, String path) {}
 }
