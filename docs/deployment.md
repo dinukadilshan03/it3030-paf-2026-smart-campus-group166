@@ -8,7 +8,7 @@ This repo is split into:
 
 The quickest full deployment is:
 
-- Vercel for `frontend`
+- Railway for `frontend`
 - Railway for `backend`
 - Supabase for database and file storage
 
@@ -44,7 +44,7 @@ Create a new Railway project from this repo and configure:
 Set these environment variables in Railway:
 
 - `PORT`
-- `FRONTEND_URL=https://<your-vercel-domain>`
+- `FRONTEND_URL=https://<your-frontend-domain>`
 - `DB_CONNECTION_MODE=pooler`
 - `DB_URL_POOLER=jdbc:postgresql://...`
 - `DB_URL_DIRECT=jdbc:postgresql://...`
@@ -95,26 +95,37 @@ In Google Cloud Console, update the production redirect URI:
 
 Also add the production backend domain to authorized origins if your Google app configuration requires it.
 
-## 4. Deploy The Frontend On Vercel
+## 4. Deploy The Frontend On Railway
 
-Create a Vercel project from this repo and configure:
+Create a second Railway service from this repo and configure:
 
 - Root directory: `frontend`
-- Framework preset: Next.js
+- Build command: `npm install && npm run build`
+- Start command: `npm run start`
 
-Set this required environment variable in Vercel:
+Set these required environment variables in Railway:
 
+- `PORT`
+- `BACKEND_INTERNAL_URL=http://<your-backend-service>.railway.internal:8080`
 - `NEXT_PUBLIC_API_BASE_URL=https://<your-backend-domain>`
 
 Redeploy after saving the variable.
+
+Notes:
+
+- `BACKEND_INTERNAL_URL` is used by Next.js rewrites and server-side fetches so the frontend can talk to the backend over Railway's private network.
+- `NEXT_PUBLIC_API_BASE_URL` must stay on the backend's public HTTPS URL because browser-visible OAuth and public-origin references still need the public backend address.
+- In production, backend API requests are proxied through the frontend's `/backend/...` rewrite while frontend-owned Next app routes stay on `/api/...`.
 
 ## 5. Final Wiring
 
 Once both services are live:
 
-1. Set Railway `FRONTEND_URL` to the final Vercel URL.
-2. Set Vercel `NEXT_PUBLIC_API_BASE_URL` to the final Railway URL.
-3. Redeploy both services once after the final URLs are in place.
+1. Confirm the frontend public Railway URL is final.
+2. Set backend `FRONTEND_URL` to that exact frontend public URL.
+3. Set frontend `BACKEND_INTERNAL_URL` to the backend service's Railway internal URL.
+4. Set frontend `NEXT_PUBLIC_API_BASE_URL` to the backend's public Railway URL.
+5. Redeploy both services once after the final URLs are in place.
 
 ## 6. Smoke Test
 
@@ -122,15 +133,18 @@ Run this sequence after deployment:
 
 1. Open the frontend home page.
 2. Confirm login page loads.
-3. Test `GET /api/v1/health`.
-4. Test Google sign-in redirect.
-5. Confirm a session cookie is created after login.
-6. Test resource listing and booking flows.
-7. Test file upload paths that use Supabase storage.
-8. Test ticket creation if ticketing is enabled.
+3. Confirm Google sign-in starts from the frontend and redirects through the backend successfully.
+4. Confirm `/auth/callback` loads and the frontend can resolve `GET /api/v1/auth/me`.
+5. Confirm a session cookie is created after login and remains valid on authenticated pages.
+6. Test resource listing, filters, and resource analysis pages.
+7. Test booking list, create, review, and cancel flows.
+8. Test file upload paths that use Supabase storage.
+9. Test ticket creation if ticketing is enabled.
 
 ## 7. Notes
 
 - The backend now reads `PORT` with a fallback to `8080`, which is required for most hosted Java platforms.
+- Backend `FRONTEND_URL` must exactly match the live frontend public URL or OAuth/session redirects will break.
+- If the frontend and backend were redeployed under different Railway subdomains, update both services to the current live values before debugging code.
 - Keep local and production env values separate.
 - Do not store live secrets in `.env.example`.

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { clientApiFetch } from "@/lib/api/client";
+import { frontendRouteFetch } from "@/lib/api/client";
 
 interface Props {
   onResult?: (data: any[]) => void;
@@ -34,7 +34,7 @@ export default function AIChat({ onResult, isAdmin, onUse }: Props) {
     setLoading(true);
 
     try {
-      const res = await clientApiFetch("/api/ai/recommendations", {
+      const res = await frontendRouteFetch("/api/ai/recommendations", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

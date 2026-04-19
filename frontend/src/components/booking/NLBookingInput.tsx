@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState } from "react";
+import { frontendRouteFetch } from "@/lib/api/client";
 
 type Confidence = "high" | "medium" | "low";
 type ResourceResolution = "resolved" | "unresolved";
@@ -92,7 +93,7 @@ export default function NLBookingInput({
     setStatusType(null);
 
     try {
-      const response = await fetch("/api/v1/ai/parse-booking", {
+      const response = await frontendRouteFetch("/api/v1/ai/parse-booking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ input: trimmed }),
@@ -165,7 +166,7 @@ export default function NLBookingInput({
 
     setConfirming(true);
     try {
-      const response = await fetch("/api/v1/bookings", {
+      const response = await frontendRouteFetch("/api/v1/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
