@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, XCircle, Trash2 } from "lucide-react";
+import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import type { BookingSummaryResponse, BookingFilters } from "@/lib/bookings/types";
 import type { CurrentUser } from "@/types/auth";
 import type { Resource } from "@/lib/resources/types";
@@ -49,6 +50,7 @@ export function BookingManagementPage({
   const [resources, setResources] = useState<Resource[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showErrorModal, setShowErrorModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [activeTab, setActiveTab] = useState<TabType>("pending");
   const [actionInProgress, setActionInProgress] = useState<number | null>(null);
@@ -240,7 +242,9 @@ export function BookingManagementPage({
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Action failed");
+      const errorMsg = err instanceof Error ? err.message : "Action failed";
+      setError(errorMsg);
+      setShowErrorModal(true);
     } finally {
       setActionInProgress(null);
     }
@@ -286,9 +290,14 @@ export function BookingManagementPage({
   };
 
   return (
-    <div className="admin-bookings-page">
-      {error && <div className="status-banner error">{error}</div>}
-      {successMessage && <div className="status-banner success">{successMessage}</div>}
+    <>
+      <ErrorAlert
+        isOpen={showErrorModal}
+        message={error}
+        onClose={() => setShowErrorModal(false)}
+      />
+      <div className="admin-bookings-page">
+        {successMessage && <div className="status-banner success">{successMessage}</div>}
 
       {isAdmin && (
         <>
@@ -607,6 +616,18 @@ export function BookingManagementPage({
                             disabled={actionInProgress === booking.id}
                           >
                             <XCircle size={18} />
+                          </button>
+                        </>
+                      )}
+                      {booking.status === "PENDING" && (
+                        <>
+                          <button
+                            className="icon-button delete-icon"
+                            onClick={() => handleStudentCancelClick(booking.id)}
+                            title="Delete booking"
+                            disabled={actionInProgress === booking.id}
+                          >
+                            <Trash2 size={18} />
                           </button>
                         </>
                       )}
@@ -1306,6 +1327,7 @@ export function BookingManagementPage({
           }
         }
       `}</style>
-    </div>
+      </div>
+    </>
   );
 }
