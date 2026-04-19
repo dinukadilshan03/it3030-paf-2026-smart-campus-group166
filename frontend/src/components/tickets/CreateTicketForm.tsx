@@ -4,6 +4,11 @@ import { useState } from "react";
 
 import { TicketAttachmentDraftCard } from "@/components/tickets/TicketAttachmentDraftCard";
 import { TicketDialog } from "@/components/tickets/TicketDialog";
+import {
+  TicketPopupNotice,
+  type TicketPopupNoticeState,
+  buildTicketValidationNotice,
+} from "@/components/tickets/TicketPopupDialogs";
 import { refineTicketDescriptionClient } from "@/lib/tickets/client";
 import {
   getActiveTicketCategories,
@@ -91,21 +96,27 @@ export function CreateTicketForm({
   const [isRefiningDescription, setIsRefiningDescription] = useState(false);
   const [refineError, setRefineError] = useState<string | null>(null);
   const [refineMessage, setRefineMessage] = useState<string | null>(null);
+  const [notice, setNotice] = useState<TicketPopupNoticeState>(null);
 
   const activeCategories = getActiveTicketCategories(categories);
+  const canAddImages = currentRole === "STUDENT";
   const filteredResources = values.locationId
     ? resources.filter((resource) => resource.locationId === Number(values.locationId))
     : resources;
 
   const inputClassName =
-    "rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:bg-white";
+    "w-full min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:bg-white";
 
   return (
     <TicketDialog
       open={open}
       onClose={onClose}
       title="Report a new issue"
-      description="Create a maintenance or incident ticket against a resource or a location, then attach up to 3 evidence images."
+      description={
+        canAddImages
+          ? "Create a maintenance or incident ticket against a resource or a location, then attach up to 3 evidence images."
+          : "Create a maintenance or incident ticket against a resource or a location. Evidence images can only be added by student reporters."
+      }
     >
       <form
         className="space-y-6"
@@ -118,6 +129,12 @@ export function CreateTicketForm({
           });
           if (Object.keys(validationErrors).length > 0) {
             setErrors(validationErrors);
+            setNotice(
+              buildTicketValidationNotice(
+                "Ticket details need attention",
+                validationErrors,
+              ),
+            );
             return;
           }
 
@@ -138,11 +155,13 @@ export function CreateTicketForm({
                 preferredContactEmail: values.preferredContactEmail.trim() || undefined,
                 preferredContactPhone: values.preferredContactPhone.trim() || undefined,
               },
-              attachments: values.attachments
-                .filter((attachment) => attachment.file)
-                .map((attachment) => ({
-                  file: attachment.file as File,
-                })),
+              attachments: canAddImages
+                ? values.attachments
+                    .filter((attachment) => attachment.file)
+                    .map((attachment) => ({
+                      file: attachment.file as File,
+                    }))
+                : [],
             };
 
             await onSubmit(submission);
@@ -150,8 +169,22 @@ export function CreateTicketForm({
           } catch (error) {
             if (error instanceof TicketApiError) {
               setErrors(error.validationErrors);
+              setNotice(
+                buildTicketValidationNotice(
+                  "Ticket details need attention",
+                  error.validationErrors,
+                  error.message || "Review the highlighted ticket fields and try again.",
+                ),
+              );
             }
-            setFormError(error instanceof Error ? error.message : "Ticket creation failed.");
+            const nextFormError =
+              error instanceof Error ? error.message : "Ticket creation failed.";
+            setFormError(nextFormError);
+            setNotice({
+              tone: "error",
+              title: "Ticket could not be created",
+              message: nextFormError,
+            });
           }
         }}
       >
@@ -253,8 +286,15 @@ export function CreateTicketForm({
                 onClick={async () => {
                   const nextDescription = values.description.trim();
                   if (!nextDescription) {
-                    setRefineError("Type your issue first, then use AI to polish the description.");
+                    const nextError =
+                      "Type your issue first, then use AI to polish the description.";
+                    setRefineError(nextError);
                     setRefineMessage(null);
+                    setNotice({
+                      tone: "error",
+                      title: "Description needed",
+                      message: nextError,
+                    });
                     return;
                   }
 
@@ -277,9 +317,16 @@ export function CreateTicketForm({
                         : "A clearer description was prepared. You can still edit it before submitting.",
                     );
                   } catch (error) {
-                    setRefineError(
-                      getTicketErrorMessage(error, "Could not polish the description right now."),
+                    const nextError = getTicketErrorMessage(
+                      error,
+                      "Could not polish the description right now.",
                     );
+                    setRefineError(nextError);
+                    setNotice({
+                      tone: "error",
+                      title: "AI polish failed",
+                      message: nextError,
+                    });
                   } finally {
                     setIsRefiningDescription(false);
                   }
@@ -320,7 +367,7 @@ export function CreateTicketForm({
             </p>
           </div>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <div className="mt-5 grid gap-4 md:grid-cols-2 [&>*]:min-w-0">
             <label className="grid gap-2 text-sm font-medium text-slate-700">
               Location
               <select
@@ -441,103 +488,118 @@ export function CreateTicketForm({
           </label>
         </section>
 
-        <section className="rounded-[1.4rem] border border-slate-200 bg-slate-50/70 p-5">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-slate-900">Evidence images</p>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
-                Add up to three images that show the issue clearly. Format and file details are
-                filled in automatically.
-              </p>
-            </div>
-            <span className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700">
-              {values.attachments.length}/3 selected
-            </span>
-          </div>
-
-          {errors.attachments ? (
-            <p className="mt-3 text-xs text-rose-600">{errors.attachments}</p>
-          ) : null}
-
-          <div className="mt-5 space-y-5">
-            <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-[1.25rem] border border-dashed border-slate-300 bg-white px-5 py-8 text-center transition hover:border-teal-300 hover:bg-teal-50/40">
-              <span className="inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
-                Choose images
-              </span>
-              <span className="text-sm leading-7 text-slate-600">
-                JPG, PNG, WEBP, or GIF up to 5 MB each
-              </span>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                multiple
-                className="hidden"
-                disabled={busy || values.attachments.length >= 3}
-                onChange={async (event) => {
-                  const files = Array.from(event.target.files ?? []);
-                  event.target.value = "";
-
-                  if (files.length === 0) {
-                    return;
-                  }
-
-                  const availableSlots = Math.max(0, 3 - values.attachments.length);
-                  const nextFiles = files.slice(0, availableSlots);
-                  const nextDrafts = await Promise.all(nextFiles.map((file) => toAttachmentDraft(file)));
-
-                  setValues((current) => ({
-                    ...current,
-                    attachments: [...current.attachments, ...nextDrafts],
-                  }));
-
-                  setErrors((current) => {
-                    const nextErrors = { ...current };
-                    if (files.length > availableSlots) {
-                      nextErrors.attachments = "Only up to 3 image attachments are allowed.";
-                    } else {
-                      delete nextErrors.attachments;
-                    }
-                    return nextErrors;
-                  });
-                }}
-              />
-            </label>
-
-            {values.attachments.length === 0 ? (
-              <div className="rounded-[1.2rem] border border-dashed border-slate-300 bg-white px-4 py-5 text-sm leading-7 text-slate-600">
-                No evidence images added yet.
+        {canAddImages ? (
+          <section className="rounded-[1.4rem] border border-slate-200 bg-slate-50/70 p-5">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Evidence images</p>
+                <p className="mt-2 text-sm leading-7 text-slate-600">
+                  Add up to three images that show the issue clearly. Format and file details are
+                  filled in automatically.
+                </p>
               </div>
+              <span className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700">
+                {values.attachments.length}/3 selected
+              </span>
+            </div>
+
+            {errors.attachments ? (
+              <p className="mt-3 text-xs text-rose-600">{errors.attachments}</p>
             ) : null}
 
-            <div className="grid gap-4 xl:grid-cols-2">
-              {values.attachments.map((attachment, index) => {
-              const attachmentErrors: Record<string, string> = {};
-              Object.entries(errors).forEach(([key, message]) => {
-                const prefix = `attachments.${index}.`;
-                if (key.startsWith(prefix)) {
-                  attachmentErrors[key.slice(prefix.length)] = message;
-                }
-              });
+            <div className="mt-5 space-y-5">
+              <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-[1.25rem] border border-dashed border-slate-300 bg-white px-5 py-8 text-center transition hover:border-teal-300 hover:bg-teal-50/40">
+                <span className="inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
+                  Choose images
+                </span>
+                <span className="text-sm leading-7 text-slate-600">
+                  JPG, PNG, WEBP, or GIF up to 5 MB each
+                </span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  multiple
+                  className="hidden"
+                  disabled={busy || values.attachments.length >= 3}
+                  onChange={async (event) => {
+                    const files = Array.from(event.target.files ?? []);
+                    event.target.value = "";
 
-              return (
-                <TicketAttachmentDraftCard
-                  key={attachment.id}
-                  draft={attachment}
-                  errors={attachmentErrors}
-                  onRemove={() =>
+                    if (files.length === 0) {
+                      return;
+                    }
+
+                    const availableSlots = Math.max(0, 3 - values.attachments.length);
+                    const nextFiles = files.slice(0, availableSlots);
+                    const nextDrafts = await Promise.all(nextFiles.map((file) => toAttachmentDraft(file)));
+
                     setValues((current) => ({
                       ...current,
-                      attachments: current.attachments.filter(
-                        (currentAttachment) => currentAttachment.id !== attachment.id,
-                      ),
-                    }))
-                  }
+                      attachments: [...current.attachments, ...nextDrafts],
+                    }));
+
+                    setErrors((current) => {
+                      const nextErrors = { ...current };
+                      if (files.length > availableSlots) {
+                        nextErrors.attachments = "Only up to 3 image attachments are allowed.";
+                        setNotice({
+                          tone: "error",
+                          title: "Too many images",
+                          message: "Only up to 3 image attachments are allowed.",
+                        });
+                      } else {
+                        delete nextErrors.attachments;
+                      }
+                      return nextErrors;
+                    });
+                  }}
                 />
-              );
-              })}
+              </label>
+
+              {values.attachments.length === 0 ? (
+                <div className="rounded-[1.2rem] border border-dashed border-slate-300 bg-white px-4 py-5 text-sm leading-7 text-slate-600">
+                  No evidence images added yet.
+                </div>
+              ) : null}
+
+              <div className="grid gap-4 xl:grid-cols-2">
+                {values.attachments.map((attachment, index) => {
+                  const attachmentErrors: Record<string, string> = {};
+                  Object.entries(errors).forEach(([key, message]) => {
+                    const prefix = `attachments.${index}.`;
+                    if (key.startsWith(prefix)) {
+                      attachmentErrors[key.slice(prefix.length)] = message;
+                    }
+                  });
+
+                  return (
+                    <TicketAttachmentDraftCard
+                      key={attachment.id}
+                      draft={attachment}
+                      errors={attachmentErrors}
+                      onRemove={() =>
+                        setValues((current) => ({
+                          ...current,
+                          attachments: current.attachments.filter(
+                            (currentAttachment) => currentAttachment.id !== attachment.id,
+                          ),
+                        }))
+                      }
+                    />
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        ) : (
+          <section className="rounded-[1.4rem] border border-slate-200 bg-slate-50/70 p-5">
+            <p className="text-sm font-semibold text-slate-900">Evidence images</p>
+            <p className="mt-2 text-sm leading-7 text-slate-600">
+              Only student reporters can upload issue images. This ticket will be created without
+              image attachments.
+            </p>
+          </section>
+        )}
 
         {formError ? (
           <p className="rounded-[1.2rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -545,7 +607,7 @@ export function CreateTicketForm({
           </p>
         ) : null}
 
-        <div className="flex flex-wrap gap-3 border-t border-slate-200 pt-6">
+        <div className="flex flex-wrap gap-3 border-t border-slate-200 pt-5">
           <button
             type="submit"
             disabled={busy}
@@ -563,6 +625,12 @@ export function CreateTicketForm({
           </button>
         </div>
       </form>
+
+      <TicketPopupNotice
+        notice={notice}
+        onClose={() => setNotice(null)}
+        actionLabel="Review"
+      />
     </TicketDialog>
   );
 }

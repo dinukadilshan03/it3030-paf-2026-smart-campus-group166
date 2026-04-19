@@ -26,10 +26,34 @@ export async function POST(req: NextRequest) {
     const cookie = req.headers.get('cookie');
     if (cookie) forwardHeaders['cookie'] = cookie;
 
+    // Fetch current resource categories and locations so AI has up-to-date choices
+    const categoriesUrl = `${backendBase.replace(/\/$/, '')}/api/v1/resource-categories`;
+    const locationsUrl = `${backendBase.replace(/\/$/, '')}/api/v1/locations`;
+
+    let categories: any[] = [];
+    let locations: any[] = [];
+
+    try {
+      const [cRes, lRes] = await Promise.all([
+        fetch(categoriesUrl, { headers: forwardHeaders }),
+        fetch(locationsUrl, { headers: forwardHeaders }),
+      ]);
+
+      if (cRes && cRes.ok) categories = await cRes.json();
+      if (lRes && lRes.ok) locations = await lRes.json();
+    } catch (err) {
+      // If fetching fails, continue without blocking AI request — log for debugging
+      console.warn('Failed to fetch categories/locations for AI prompt', err);
+    }
+
+    const forwardedBody: any = { ...body };
+    if (!('availableResourceCategories' in forwardedBody)) forwardedBody.availableResourceCategories = categories;
+    if (!('availableLocations' in forwardedBody)) forwardedBody.availableLocations = locations;
+
     const resp = await fetch(target, {
       method: 'POST',
       headers: forwardHeaders,
-      body: JSON.stringify(body),
+      body: JSON.stringify(forwardedBody),
     });
 
     const text = await resp.text();

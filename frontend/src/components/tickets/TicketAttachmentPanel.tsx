@@ -4,6 +4,12 @@ import { useState } from "react";
 
 import { TicketAttachmentDraftCard } from "@/components/tickets/TicketAttachmentDraftCard";
 import {
+  TicketConfirmDialog,
+  TicketPopupNotice,
+  type TicketPopupNoticeState,
+  buildTicketValidationNotice,
+} from "@/components/tickets/TicketPopupDialogs";
+import {
   canCurrentUserManageAttachments,
   formatDateTime,
   formatFileSize,
@@ -61,6 +67,8 @@ export function TicketAttachmentPanel({
   const [draft, setDraft] = useState<TicketAttachmentDraft | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<TicketPopupNoticeState>(null);
+  const [confirmAttachmentId, setConfirmAttachmentId] = useState<number | null>(null);
 
   const canManage =
     currentUser.role != null &&
@@ -118,7 +126,7 @@ export function TicketAttachmentPanel({
         </span>
         {!canManage ? (
           <span className="rounded-full bg-slate-100 px-3 py-1 font-medium">
-            Only the reporter or an admin can change attachments
+            Only the student who raised the ticket can change images. If the images are not clear, you may add a comment describing the issue.
           </span>
         ) : null}
       </div>
@@ -131,13 +139,26 @@ export function TicketAttachmentPanel({
             setFormError(null);
 
             if (!draft) {
-              setErrors({ file: "Choose an image to upload." });
+              const validationErrors = { file: "Choose an image to upload." };
+              setErrors(validationErrors);
+              setNotice(
+                buildTicketValidationNotice(
+                  "Attachment details need attention",
+                  validationErrors,
+                ),
+              );
               return;
             }
 
             const validationErrors = validateAttachmentDraft(draft);
             if (Object.keys(validationErrors).length > 0) {
               setErrors(validationErrors);
+              setNotice(
+                buildTicketValidationNotice(
+                  "Attachment details need attention",
+                  validationErrors,
+                ),
+              );
               return;
             }
 
@@ -151,8 +172,22 @@ export function TicketAttachmentPanel({
             } catch (error) {
               if (error instanceof TicketApiError) {
                 setErrors(error.validationErrors);
+                setNotice(
+                  buildTicketValidationNotice(
+                    "Attachment details need attention",
+                    error.validationErrors,
+                    error.message || "Review the highlighted attachment fields and try again.",
+                  ),
+                );
               }
-              setFormError(error instanceof Error ? error.message : "Attachment upload failed.");
+              const nextFormError =
+                error instanceof Error ? error.message : "Attachment upload failed.";
+              setFormError(nextFormError);
+              setNotice({
+                tone: "error",
+                title: "Attachment upload failed",
+                message: nextFormError,
+              });
             }
           }}
         >
@@ -270,11 +305,8 @@ export function TicketAttachmentPanel({
                         <button
                           type="button"
                           disabled={busy}
-                          onClick={async () => {
-                            if (!window.confirm("Delete this uploaded image?")) {
-                              return;
-                            }
-                            await onDelete(attachment.id);
+                          onClick={() => {
+                            setConfirmAttachmentId(attachment.id);
                           }}
                           className="text-sm font-semibold text-rose-700 transition hover:text-rose-800 disabled:cursor-not-allowed disabled:opacity-60"
                         >
@@ -316,6 +348,46 @@ export function TicketAttachmentPanel({
           </div>
         )}
       </div>
+
+      <TicketPopupNotice
+        notice={notice}
+        onClose={() => setNotice(null)}
+        actionLabel="Review"
+      />
+      <TicketConfirmDialog
+        open={confirmAttachmentId != null}
+        title="Delete this uploaded image"
+        message="Are you sure you want to remove this image from the ticket?"
+        confirmLabel="Delete image"
+        cancelLabel="Cancel"
+        busy={busy}
+        tone="danger"
+        onClose={() => {
+          if (busy) {
+            return;
+          }
+
+          setConfirmAttachmentId(null);
+        }}
+        onConfirm={async () => {
+          if (confirmAttachmentId == null) {
+            return;
+          }
+
+          try {
+            await onDelete(confirmAttachmentId);
+            setConfirmAttachmentId(null);
+          } catch (error) {
+            const nextError =
+              error instanceof Error ? error.message : "Attachment image could not be deleted.";
+            setNotice({
+              tone: "error",
+              title: "Attachment delete failed",
+              message: nextError,
+            });
+          }
+        }}
+      />
     </section>
   );
 }

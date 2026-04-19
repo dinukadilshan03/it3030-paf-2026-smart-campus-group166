@@ -10,6 +10,8 @@ export type TicketStatus =
   | "CLOSED"
   | "REJECTED";
 
+export type TicketAgeFilter = "" | "NEW" | "OLD" | "ARCHIVED";
+
 export type CommentType = "PUBLIC_REPLY" | "INTERNAL_NOTE" | "STATUS_NOTE";
 
 export type TicketSummary = {
@@ -172,6 +174,7 @@ export type TicketFilters = {
   status?: TicketStatus | "";
   priority?: TicketPriority | "";
   ticketCategoryId?: number | "";
+  age?: TicketAgeFilter;
   search?: string;
 };
 

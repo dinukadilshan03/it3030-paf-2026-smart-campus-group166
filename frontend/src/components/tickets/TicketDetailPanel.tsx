@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 
 import {
+  TicketConfirmDialog,
+  TicketPopupNotice,
+  type TicketPopupNoticeState,
+} from "@/components/tickets/TicketPopupDialogs";
+import {
   canCurrentUserDeleteTicket,
   canCurrentUserEditTicket,
   canCurrentUserUpdateStatus,
@@ -422,6 +427,8 @@ export function TicketDetailPanel({
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [reconsiderationNote, setReconsiderationNote] = useState("");
   const [reconsiderationError, setReconsiderationError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<TicketPopupNoticeState>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNowMs(Date.now()), 30000);
@@ -469,9 +476,10 @@ export function TicketDetailPanel({
   const canRequestReconsideration =
     currentUser.id != null &&
     currentUser.role != null &&
-    currentUser.role !== "ADMIN" &&
+    currentUser.role === "STUDENT" &&
     detail.status === "REJECTED" &&
-    detail.reporterUserId === currentUser.id;
+    detail.reporterUserId === currentUser.id &&
+    detail.reconsiderationRequestCount < 1;
   const hasHeroActions = canEdit || canAssign || canUpdate || canDelete;
   const showRejectedHeroPanel = detail.status === "REJECTED";
   const latestComment = comments[0] ?? null;
@@ -690,9 +698,11 @@ export function TicketDetailPanel({
                     Rejected by admin review
                   </h3>
                   <p className="mt-2 text-sm leading-7 text-slate-600">
-                    {detail.reconsiderationRequestedAt
+                    {detail.reconsiderationRequestCount >= 1
+                      ? "This ticket has already used its one reconsideration request. Admin can review it again, but no more student re-requests are allowed."
+                      : detail.reconsiderationRequestedAt
                       ? "This ticket is rejected and already has a reconsideration request on file."
-                      : "This ticket is currently rejected. Use the details below if you need to review the reason or ask for another check."}
+                      : "This ticket is currently rejected. Review the reason below if you need to ask admin for one reconsideration check."}
                   </p>
                 </div>
 
@@ -754,7 +764,14 @@ export function TicketDetailPanel({
                     event.preventDefault();
                     const nextNote = reconsiderationNote.trim();
                     if (!nextNote) {
-                      setReconsiderationError("Explain why admin should review this rejection again.");
+                      const nextError =
+                        "Explain why admin should review this rejection again.";
+                      setReconsiderationError(nextError);
+                      setNotice({
+                        tone: "error",
+                        title: "Reconsideration note needed",
+                        message: nextError,
+                      });
                       return;
                     }
 
@@ -762,12 +779,16 @@ export function TicketDetailPanel({
                     try {
                       await onRequestReconsideration(nextNote);
                     } catch (error) {
-                      setReconsiderationError(
-                        getTicketErrorMessage(
-                          error,
-                          "Could not send the reconsideration request.",
-                        ),
+                      const nextError = getTicketErrorMessage(
+                        error,
+                        "Could not send the reconsideration request.",
                       );
+                      setReconsiderationError(nextError);
+                      setNotice({
+                        tone: "error",
+                        title: "Reconsideration request failed",
+                        message: nextError,
+                      });
                     }
                   }}
                 >
@@ -792,15 +813,26 @@ export function TicketDetailPanel({
                       disabled={busy}
                       className="inline-flex items-center justify-center rounded-full bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {detail.reconsiderationRequestedAt ? "Update reconsideration note" : "Request reconsideration"}
+                      Request reconsideration
                     </button>
-                    {detail.reconsiderationRequestedAt ? (
-                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Last sent {formatDateTime(detail.reconsiderationRequestedAt)}
-                      </span>
-                    ) : null}
                   </div>
                 </form>
+              ) : null}
+
+              {currentUser.id != null &&
+              currentUser.role != null &&
+              currentUser.role === "STUDENT" &&
+              detail.reporterUserId === currentUser.id &&
+              detail.reconsiderationRequestCount >= 1 ? (
+                <div className="mt-4 rounded-[1.15rem] border border-slate-200 bg-white/82 p-4 shadow-[0_14px_30px_rgba(15,23,42,0.04)]">
+                  <p className="text-sm font-semibold text-slate-950">
+                    Reconsideration limit reached
+                  </p>
+                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                    The student can request reconsideration only once per ticket. Admin can still
+                    review the existing request and reject it again with a fresh reason.
+                  </p>
+                </div>
               ) : null}
             </div>
           ) : null}
@@ -843,15 +875,8 @@ export function TicketDetailPanel({
                 {canDelete ? (
                   <button
                     type="button"
-                    onClick={async () => {
-                      const confirmationMessage =
-                        currentUser.role === "ADMIN"
-                          ? "Delete this open ticket from the queue?"
-                          : "Withdraw this open ticket?";
-                      if (!window.confirm(confirmationMessage)) {
-                        return;
-                      }
-                      await onDeleteTicket();
+                    onClick={() => {
+                      setDeleteConfirmOpen(true);
                     }}
                     disabled={busy}
                     className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-white px-5 py-3 text-sm font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1200,7 +1225,7 @@ export function TicketDetailPanel({
                 {detail.reconsiderationRequestCount}
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Reporter requests asking admin to review a rejection again.
+                Student requests asking admin to review a rejection again.
               </p>
             </div>
           </div>
@@ -1256,6 +1281,46 @@ export function TicketDetailPanel({
         </article>
 
       </div>
+
+      <TicketPopupNotice
+        notice={notice}
+        onClose={() => setNotice(null)}
+        actionLabel="Review"
+      />
+      <TicketConfirmDialog
+        open={deleteConfirmOpen}
+        title={currentUser.role === "ADMIN" ? "Delete this ticket" : "Withdraw this ticket"}
+        message={
+          currentUser.role === "ADMIN"
+            ? "Are you sure you want to delete this open ticket from the queue?"
+            : "Are you sure you want to withdraw this open ticket?"
+        }
+        confirmLabel={currentUser.role === "ADMIN" ? "Delete ticket" : "Withdraw ticket"}
+        cancelLabel="Cancel"
+        busy={busy}
+        tone="danger"
+        onClose={() => {
+          if (busy) {
+            return;
+          }
+
+          setDeleteConfirmOpen(false);
+        }}
+        onConfirm={async () => {
+          try {
+            await onDeleteTicket();
+            setDeleteConfirmOpen(false);
+          } catch (error) {
+            const nextError =
+              error instanceof Error ? error.message : "Could not remove the ticket.";
+            setNotice({
+              tone: "error",
+              title: "Ticket removal failed",
+              message: nextError,
+            });
+          }
+        }}
+      />
 
     </section>
   );

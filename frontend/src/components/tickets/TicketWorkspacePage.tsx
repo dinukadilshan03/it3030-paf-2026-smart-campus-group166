@@ -11,6 +11,7 @@ import { TicketDetailPanel } from "@/components/tickets/TicketDetailPanel";
 import { TicketFilters } from "@/components/tickets/TicketFilters";
 import { TicketList } from "@/components/tickets/TicketList";
 import { TicketAnalyticsPanel } from "@/components/tickets/TicketAnalyticsPanel";
+import { TicketPopupNotice } from "@/components/tickets/TicketPopupDialogs";
 import { TicketReportsPanel } from "@/components/tickets/TicketReportsPanel";
 import {
   createTicketAttachmentClient,
@@ -33,6 +34,7 @@ import {
 } from "@/lib/tickets/client";
 import {
   DEFAULT_TICKET_FILTERS,
+  filterTicketsByAge,
   getAwaitingFirstResponseCount,
   getFirstResponseTimerState,
   getInProgressTicketCount,
@@ -42,6 +44,7 @@ import {
   getSlaRiskTicketCount,
   getTicketErrorMessage,
   getUnassignedTicketCount,
+  isArchivedTicket,
   resolveSelectedTicketId,
   TicketApiError,
 } from "@/lib/tickets/shared";
@@ -74,16 +77,24 @@ type TicketWorkspacePageProps = {
 
 type FeedbackState = {
   tone: "success" | "error";
+  title?: string;
   message: string;
+  details?: string[];
 } | null;
 
-type TicketWorkspaceSection = "queue" | "detail" | "analytics" | "reports";
+type TicketWorkspaceSection =
+  | "queue"
+  | "detail"
+  | "archive"
+  | "analytics"
+  | "reports";
 type TicketQuickView = "ALL" | "OPEN" | "IN_PROGRESS" | "RESOLVED" | "FOCUS";
 type SnapshotTone = "slate" | "sky" | "amber" | "emerald" | "rose";
 
 const TICKET_WORKSPACE_SECTIONS: TicketWorkspaceSection[] = [
   "queue",
   "detail",
+  "archive",
   "analytics",
   "reports",
 ];
@@ -231,6 +242,19 @@ function getTicketsForQuickView(
   }
 }
 
+function getQueueAgeFilteredTickets(
+  tickets: TicketSummary[],
+  age: Required<TicketFilterValues>["age"],
+  nowMs: number,
+) {
+  if (age === "ARCHIVED") {
+    return tickets.filter((ticket) => isArchivedTicket(ticket));
+  }
+
+  const activeTickets = tickets.filter((ticket) => !isArchivedTicket(ticket));
+  return filterTicketsByAge(activeTickets, age, nowMs);
+}
+
 function isTicketWorkspaceSection(
   value: string,
 ): value is TicketWorkspaceSection {
@@ -307,12 +331,18 @@ export function TicketWorkspacePage({
 
   const nowMs = Date.now();
 
-  const openCount = getOpenTicketCount(tickets);
-  const inProgressCount = getInProgressTicketCount(tickets);
-  const resolvedCount = getResolvedTicketCount(tickets);
-  const unassignedCount = getUnassignedTicketCount(tickets);
-  const awaitingFirstResponseCount = getAwaitingFirstResponseCount(tickets);
-  const slaRiskCount = getSlaRiskTicketCount(tickets, nowMs);
+  const archivedTickets = tickets.filter((ticket) => isArchivedTicket(ticket));
+  const ageFilteredTickets = getQueueAgeFilteredTickets(
+    tickets,
+    filters.age,
+    nowMs,
+  );
+  const openCount = getOpenTicketCount(ageFilteredTickets);
+  const inProgressCount = getInProgressTicketCount(ageFilteredTickets);
+  const resolvedCount = getResolvedTicketCount(ageFilteredTickets);
+  const unassignedCount = getUnassignedTicketCount(ageFilteredTickets);
+  const awaitingFirstResponseCount = getAwaitingFirstResponseCount(ageFilteredTickets);
+  const slaRiskCount = getSlaRiskTicketCount(ageFilteredTickets, nowMs);
   const focusMetricLabel =
     currentRole === "ADMIN"
       ? "Unassigned"
@@ -333,7 +363,7 @@ export function TicketWorkspacePage({
         : "sky";
   const activeQuickViewLabel = getQuickViewLabel(quickView, focusMetricLabel);
   const visibleTickets = getTicketsForQuickView(
-    tickets,
+    ageFilteredTickets,
     quickView,
     currentRole,
     nowMs,
@@ -341,7 +371,9 @@ export function TicketWorkspacePage({
   const emptyStateMessage =
     tickets.length === 0
       ? "No tickets match the current role scope and server filters."
-      : "No tickets match the selected snapshot card. Choose another card or clear the quick view.";
+      : filters.age === "ARCHIVED"
+        ? "No closed tickets have been archived yet."
+        : "No active tickets match the selected queue filters or quick view. Adjust the queue filters or clear the quick view.";
   const sectionNavItems = [
     {
       id: "queue" as const,
@@ -354,6 +386,11 @@ export function TicketWorkspacePage({
       description: selectedBundle
         ? selectedBundle.detail.ticketNumber
         : "Open a ticket from the queue",
+    },
+    {
+      id: "archive" as const,
+      label: "Archive",
+      description: `${archivedTickets.length} closed`,
     },
     {
       id: "analytics" as const,
@@ -373,16 +410,25 @@ export function TicketWorkspacePage({
   ) {
     const filtersToUse = { ...nextFilters };
     const nextTickets = await listTicketsClient(filtersToUse);
-    const nextVisibleTickets = getTicketsForQuickView(
+    const nextNowMs = Date.now();
+    const nextAgeFilteredTickets = getQueueAgeFilteredTickets(
       nextTickets,
+      filtersToUse.age,
+      nextNowMs,
+    );
+    const nextVisibleTickets = getTicketsForQuickView(
+      nextAgeFilteredTickets,
       quickView,
       currentRole,
-      Date.now(),
+      nextNowMs,
     );
-    const nextSelectedTicketId = resolveSelectedTicketId(
-      nextVisibleTickets,
-      preferredTicketId,
-    );
+    const shouldPreserveSelectedTicket =
+      activeSection !== "queue" &&
+      preferredTicketId != null &&
+      nextTickets.some((ticket) => ticket.id === preferredTicketId);
+    const nextSelectedTicketId = shouldPreserveSelectedTicket
+      ? preferredTicketId
+      : resolveSelectedTicketId(nextVisibleTickets, preferredTicketId);
     const nextBundle =
       nextSelectedTicketId == null
         ? null
@@ -434,11 +480,17 @@ export function TicketWorkspacePage({
       nextQuickView === quickView && nextQuickView !== "ALL"
         ? "ALL"
         : nextQuickView;
-    const nextVisibleTickets = getTicketsForQuickView(
+    const nextNowMs = Date.now();
+    const nextAgeFilteredTickets = getQueueAgeFilteredTickets(
       tickets,
+      filters.age,
+      nextNowMs,
+    );
+    const nextVisibleTickets = getTicketsForQuickView(
+      nextAgeFilteredTickets,
       resolvedQuickView,
       currentRole,
-      Date.now(),
+      nextNowMs,
     );
     const nextSelectedTicketId = resolveSelectedTicketId(
       nextVisibleTickets,
@@ -517,13 +569,15 @@ export function TicketWorkspacePage({
               </div>
 
               <div className="flex flex-wrap gap-3 xl:justify-end">
-                <button
-                  type="button"
-                  onClick={() => setCreateDialogOpen(true)}
-                  className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-                >
-                  Report issue
-                </button>
+                {currentRole !== "ADMIN" ? (
+                  <button
+                    type="button"
+                    onClick={() => setCreateDialogOpen(true)}
+                    className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  >
+                    Report issue
+                  </button>
+                ) : null}
                 {currentRole === "ADMIN" ? (
                   <button
                     type="button"
@@ -586,18 +640,6 @@ export function TicketWorkspacePage({
           </div>
         </section>
 
-        {feedback ? (
-          <p
-            className={`rounded-[1.3rem] border px-4 py-3 text-sm ${
-              feedback.tone === "success"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                : "border-rose-200 bg-rose-50 text-rose-700"
-            }`}
-          >
-            {feedback.message}
-          </p>
-        ) : null}
-
         <div className="space-y-8">
           {activeSection === "queue" ? (
             <section className="space-y-4">
@@ -637,7 +679,7 @@ export function TicketWorkspacePage({
                   {
                     id: "ALL" as const,
                     label: "Tickets in scope",
-                    value: tickets.length,
+                    value: ageFilteredTickets.length,
                     tone: "slate" as const,
                     description:
                       "Every ticket returned by the current queue filters.",
@@ -738,8 +780,8 @@ export function TicketWorkspacePage({
                   </h2>
                   <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
                     {visibleTickets.length} shown
-                    {visibleTickets.length !== tickets.length
-                      ? ` / ${tickets.length}`
+                    {visibleTickets.length !== ageFilteredTickets.length
+                      ? ` / ${ageFilteredTickets.length}`
                       : ""}
                   </span>
                 </div>
@@ -799,9 +841,46 @@ export function TicketWorkspacePage({
                 role={currentRole}
                 currentUserId={currentUser.id}
                 tickets={visibleTickets}
-                totalTickets={tickets.length}
+                totalTickets={ageFilteredTickets.length}
                 activeViewLabel={activeQuickViewLabel}
                 emptyStateMessage={emptyStateMessage}
+                selectedTicketId={selectedTicketId}
+                busy={isListLoading}
+                onSelect={async (ticketId) => {
+                  await handleSelectTicket(ticketId);
+                }}
+              />
+            </section>
+          ) : null}
+
+          {activeSection === "archive" ? (
+            <section className="space-y-5">
+              <div className="px-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  Archived ticket section
+                </p>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+                    Review automatically archived closed tickets
+                  </h2>
+                  <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+                    {archivedTickets.length} archived
+                  </span>
+                </div>
+                <p className="mt-2 text-sm leading-7 text-slate-600">
+                  Tickets move here automatically as soon as an admin closes them.
+                  They stay out of the active queue, but you can still open any
+                  archived ticket from here for review.
+                </p>
+              </div>
+
+              <TicketList
+                role={currentRole}
+                currentUserId={currentUser.id}
+                tickets={archivedTickets}
+                totalTickets={archivedTickets.length}
+                activeViewLabel="Archived closed tickets"
+                emptyStateMessage="No closed tickets have been archived yet."
                 selectedTicketId={selectedTicketId}
                 busy={isListLoading}
                 onSelect={async (ticketId) => {
@@ -1078,22 +1157,7 @@ export function TicketWorkspacePage({
           ) : null}
 
           {activeSection === "reports" ? (
-            <section className="space-y-5">
-              <div className="px-1">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                  Reports and assistant
-                </p>
-                <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
-                    Generate downloads and guided summaries
-                  </h2>
-                </div>
-                <p className="mt-2 text-sm leading-7 text-slate-600">
-                  Build formal ticket reports, review previous downloads, and
-                  use the student assistant where it is enabled.
-                </p>
-              </div>
-
+            <section>
               <TicketReportsPanel
                 currentUser={currentUser}
                 categories={categories}
@@ -1110,7 +1174,7 @@ export function TicketWorkspacePage({
         </div>
       </section>
 
-      {createDialogOpen ? (
+      {currentRole !== "ADMIN" && createDialogOpen ? (
         <CreateTicketForm
           key="create-ticket"
           open={createDialogOpen}
@@ -1365,6 +1429,12 @@ export function TicketWorkspacePage({
           }}
         />
       ) : null}
+
+      <TicketPopupNotice
+        notice={feedback}
+        onClose={() => setFeedback(null)}
+        actionLabel={feedback?.tone === "success" ? "Close" : "Review"}
+      />
     </div>
   );
 }

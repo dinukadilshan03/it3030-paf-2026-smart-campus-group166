@@ -3,6 +3,12 @@
 import { useState } from "react";
 
 import { TicketDialog } from "@/components/tickets/TicketDialog";
+import {
+  TicketConfirmDialog,
+  TicketPopupNotice,
+  type TicketPopupNoticeState,
+  buildTicketValidationNotice,
+} from "@/components/tickets/TicketPopupDialogs";
 import { TicketApiError } from "@/lib/tickets/shared";
 import { validateAssignmentForm } from "@/lib/tickets/validation";
 import type { TicketAssignmentFormValues, TicketDetail } from "@/lib/tickets/types";
@@ -35,6 +41,12 @@ export function AssignmentDialog({
   const [values, setValues] = useState<TicketAssignmentFormValues>(getInitialValues(ticket));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<TicketPopupNoticeState>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingPayload, setPendingPayload] = useState<{
+    assignedStaffUserId: number;
+    assignmentNote?: string;
+  } | null>(null);
 
   const inputClassName =
     "rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:bg-white";
@@ -61,21 +73,40 @@ export function AssignmentDialog({
           const validationErrors = validateAssignmentForm(values);
           if (Object.keys(validationErrors).length > 0) {
             setErrors(validationErrors);
+            setNotice(
+              buildTicketValidationNotice(
+                "Assignment details need attention",
+                validationErrors,
+              ),
+            );
             return;
           }
 
           try {
             setErrors({});
-            await onSubmit({
+            setPendingPayload({
               assignedStaffUserId: Number(values.assignedStaffUserId),
               assignmentNote: values.assignmentNote.trim() || undefined,
             });
-            onClose();
+            setConfirmOpen(true);
           } catch (error) {
             if (error instanceof TicketApiError) {
               setErrors(error.validationErrors);
+              setNotice(
+                buildTicketValidationNotice(
+                  "Assignment details need attention",
+                  error.validationErrors,
+                  error.message || "Review the highlighted assignment fields and try again.",
+                ),
+              );
             }
-            setFormError(error instanceof Error ? error.message : "Assignment failed.");
+            const nextFormError = error instanceof Error ? error.message : "Assignment failed.";
+            setFormError(nextFormError);
+            setNotice({
+              tone: "error",
+              title: "Assignment failed",
+              message: nextFormError,
+            });
           }
         }}
       >
@@ -171,6 +202,65 @@ export function AssignmentDialog({
           </button>
         </div>
       </form>
+
+      <TicketPopupNotice
+        notice={notice}
+        onClose={() => setNotice(null)}
+        actionLabel="Review"
+      />
+      <TicketConfirmDialog
+        open={confirmOpen}
+        title={isRejectedTicket ? "Reopen and assign this ticket" : "Save assignment"}
+        message={
+          isRejectedTicket
+            ? "Are you sure you want to reopen this rejected ticket and assign it to a staff member?"
+            : "Are you sure you want to save this staff assignment?"
+        }
+        confirmLabel={isRejectedTicket ? "Reopen and assign" : "Save assignment"}
+        cancelLabel="Keep editing"
+        busy={busy}
+        tone="neutral"
+        onClose={() => {
+          if (busy) {
+            return;
+          }
+
+          setConfirmOpen(false);
+          setPendingPayload(null);
+        }}
+        onConfirm={async () => {
+          if (!pendingPayload) {
+            setConfirmOpen(false);
+            return;
+          }
+
+          try {
+            await onSubmit(pendingPayload);
+            setConfirmOpen(false);
+            setPendingPayload(null);
+            onClose();
+          } catch (error) {
+            if (error instanceof TicketApiError) {
+              setErrors(error.validationErrors);
+              setNotice(
+                buildTicketValidationNotice(
+                  "Assignment details need attention",
+                  error.validationErrors,
+                  error.message || "Review the highlighted assignment fields and try again.",
+                ),
+              );
+            }
+
+            const nextFormError = error instanceof Error ? error.message : "Assignment failed.";
+            setFormError(nextFormError);
+            setNotice({
+              tone: "error",
+              title: "Assignment failed",
+              message: nextFormError,
+            });
+          }
+        }}
+      />
     </TicketDialog>
   );
 }

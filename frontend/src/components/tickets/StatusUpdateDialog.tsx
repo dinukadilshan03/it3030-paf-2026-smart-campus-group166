@@ -4,6 +4,12 @@ import { useState } from "react";
 
 import { TicketDialog } from "@/components/tickets/TicketDialog";
 import {
+  TicketConfirmDialog,
+  TicketPopupNotice,
+  type TicketPopupNoticeState,
+  buildTicketValidationNotice,
+} from "@/components/tickets/TicketPopupDialogs";
+import {
   getAllowedStatusTargets,
   TicketApiError,
   toTicketTitleCase,
@@ -26,7 +32,7 @@ type StatusUpdateDialogProps = {
 };
 
 function getInitialValues(role: RoleCode, ticket: TicketDetail | null): TicketStatusFormValues {
-  const nextStatus = ticket ? getAllowedStatusTargets(role, ticket.status)[0] ?? "" : "";
+  const nextStatus = ticket ? getAllowedStatusTargets(role, ticket)[0] ?? "" : "";
   return {
     status: nextStatus,
     resolutionSummary: ticket?.resolutionSummary ?? "",
@@ -45,8 +51,15 @@ export function StatusUpdateDialog({
   const [values, setValues] = useState<TicketStatusFormValues>(getInitialValues(role, ticket));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<TicketPopupNoticeState>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingPayload, setPendingPayload] = useState<{
+    status: TicketDetail["status"];
+    resolutionSummary?: string;
+    rejectionReason?: string;
+  } | null>(null);
 
-  const availableStatuses = ticket ? getAllowedStatusTargets(role, ticket.status) : [];
+  const availableStatuses = ticket ? getAllowedStatusTargets(role, ticket) : [];
   const inputClassName =
     "rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:bg-white";
 
@@ -55,7 +68,7 @@ export function StatusUpdateDialog({
       open={open}
       onClose={onClose}
       title="Advance ticket lifecycle"
-      description="The backend enforces valid transitions. Staff move assigned tickets into progress and resolve them, while admins reject invalid requests or close resolved work."
+      description="The backend enforces valid transitions. Staff move assigned tickets into progress and resolve them, while admins reject invalid requests, review one student reconsideration request, or close resolved work."
       widthClassName="max-w-2xl"
     >
       <form
@@ -67,22 +80,42 @@ export function StatusUpdateDialog({
           const validationErrors = validateStatusForm(values);
           if (Object.keys(validationErrors).length > 0) {
             setErrors(validationErrors);
+            setNotice(
+              buildTicketValidationNotice(
+                "Status update needs attention",
+                validationErrors,
+              ),
+            );
             return;
           }
 
           try {
             setErrors({});
-            await onSubmit({
+            setPendingPayload({
               status: values.status as TicketDetail["status"],
               resolutionSummary: values.resolutionSummary.trim() || undefined,
               rejectionReason: values.rejectionReason.trim() || undefined,
             });
-            onClose();
+            setConfirmOpen(true);
           } catch (error) {
             if (error instanceof TicketApiError) {
               setErrors(error.validationErrors);
+              setNotice(
+                buildTicketValidationNotice(
+                  "Status update needs attention",
+                  error.validationErrors,
+                  error.message || "Review the highlighted status fields and try again.",
+                ),
+              );
             }
-            setFormError(error instanceof Error ? error.message : "Status update failed.");
+            const nextFormError =
+              error instanceof Error ? error.message : "Status update failed.";
+            setFormError(nextFormError);
+            setNotice({
+              tone: "error",
+              title: "Status update failed",
+              message: nextFormError,
+            });
           }
         }}
       >
@@ -191,6 +224,67 @@ export function StatusUpdateDialog({
           </button>
         </div>
       </form>
+
+      <TicketPopupNotice
+        notice={notice}
+        onClose={() => setNotice(null)}
+        actionLabel="Review"
+      />
+      <TicketConfirmDialog
+        open={confirmOpen}
+        title="Apply this status update"
+        message="Are you sure you want to apply this ticket status change?"
+        details={
+          pendingPayload
+            ? [`Next status: ${toTicketTitleCase(pendingPayload.status)}`]
+            : undefined
+        }
+        confirmLabel="Apply update"
+        cancelLabel="Keep editing"
+        busy={busy}
+        tone="neutral"
+        onClose={() => {
+          if (busy) {
+            return;
+          }
+
+          setConfirmOpen(false);
+          setPendingPayload(null);
+        }}
+        onConfirm={async () => {
+          if (!pendingPayload) {
+            setConfirmOpen(false);
+            return;
+          }
+
+          try {
+            await onSubmit(pendingPayload);
+            setConfirmOpen(false);
+            setPendingPayload(null);
+            onClose();
+          } catch (error) {
+            if (error instanceof TicketApiError) {
+              setErrors(error.validationErrors);
+              setNotice(
+                buildTicketValidationNotice(
+                  "Status update needs attention",
+                  error.validationErrors,
+                  error.message || "Review the highlighted status fields and try again.",
+                ),
+              );
+            }
+
+            const nextFormError =
+              error instanceof Error ? error.message : "Status update failed.";
+            setFormError(nextFormError);
+            setNotice({
+              tone: "error",
+              title: "Status update failed",
+              message: nextFormError,
+            });
+          }
+        }}
+      />
     </TicketDialog>
   );
 }
