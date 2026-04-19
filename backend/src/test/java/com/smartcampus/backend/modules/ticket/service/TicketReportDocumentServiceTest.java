@@ -14,8 +14,17 @@ import com.smartcampus.backend.modules.ticket.dto.TicketAssignmentResponse;
 import com.smartcampus.backend.modules.ticket.dto.TicketCommentResponse;
 import com.smartcampus.backend.modules.ticket.dto.TicketDetailResponse;
 import com.smartcampus.backend.modules.ticket.dto.TicketSummaryResponse;
+import java.awt.Color;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import javax.imageio.ImageIO;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
 import org.junit.jupiter.api.Test;
 
 class TicketReportDocumentServiceTest {
@@ -161,20 +170,23 @@ class TicketReportDocumentServiceTest {
                                 null,
                                 now.minusMinutes(12),
                                 now.minusMinutes(12)));
-        List<TicketAttachmentResponse> attachments =
+        List<TicketReportDocumentService.AttachmentEvidence> attachments =
                 List.of(
-                        new TicketAttachmentResponse(
-                                1L,
-                                10L,
-                                "Student User",
-                                "projector",
-                                "projector.jpg",
-                                "ticket-attachments",
-                                "tickets/1/projector.jpg",
-                                "image/jpeg",
-                                1024L,
-                                "IMAGE",
-                                now.minusHours(5)));
+                        new TicketReportDocumentService.AttachmentEvidence(
+                                new TicketAttachmentResponse(
+                                        1L,
+                                        10L,
+                                        "Student User",
+                                        "projector",
+                                        "projector.jpg",
+                                        "ticket-attachments",
+                                        "tickets/1/projector.jpg",
+                                        "image/png",
+                                        1024L,
+                                        "IMAGE",
+                                        now.minusHours(5)),
+                                createPngImageBytes(),
+                                "image/png"));
 
         TicketReportDocumentService.RenderedTicketReport rendered =
                 service.renderDetailReport(
@@ -183,5 +195,39 @@ class TicketReportDocumentServiceTest {
         assertEquals("application/pdf", rendered.mimeType());
         assertEquals(1, rendered.recordCount());
         assertTrue(rendered.fileData().length > 0);
+        assertTrue(countEmbeddedImages(rendered.fileData()) > 0);
+    }
+
+    private byte[] createPngImageBytes() {
+        try {
+            BufferedImage image = new BufferedImage(12, 12, BufferedImage.TYPE_INT_RGB);
+            for (int y = 0; y < image.getHeight(); y++) {
+                for (int x = 0; x < image.getWidth(); x++) {
+                    image.setRGB(x, y, (x + y) % 2 == 0 ? Color.WHITE.getRGB() : Color.GRAY.getRGB());
+                }
+            }
+
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            ImageIO.write(image, "png", outputStream);
+            return outputStream.toByteArray();
+        } catch (IOException ex) {
+            throw new IllegalStateException("Could not create test attachment image", ex);
+        }
+    }
+
+    private int countEmbeddedImages(byte[] pdfBytes) {
+        try (PDDocument document = Loader.loadPDF(pdfBytes)) {
+            int count = 0;
+            for (PDPage page : document.getPages()) {
+                for (COSName name : page.getResources().getXObjectNames()) {
+                    if (page.getResources().isImageXObject(name)) {
+                        count++;
+                    }
+                }
+            }
+            return count;
+        } catch (IOException ex) {
+            throw new IllegalStateException("Could not inspect rendered PDF", ex);
+        }
     }
 }

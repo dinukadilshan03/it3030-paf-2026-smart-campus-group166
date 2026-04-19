@@ -197,17 +197,17 @@ export function RoleDashboard({ user, definition }: RoleDashboardProps) {
                 {hero.cta ? (
                   <Link
                     href={hero.cta.href}
-                    className="inline-flex items-center justify-center rounded-full bg-stone-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-stone-800"
+                    className="inline-flex items-center justify-center rounded-full bg-stone-900 px-5 py-3 text-sm font-semibold !text-white no-underline transition hover:bg-stone-800 hover:!text-white visited:!text-white focus-visible:!text-white"
                   >
-                    {hero.cta.label}
+                    <span className="!text-white">{hero.cta.label}</span>
                   </Link>
                 ) : null}
                 {hero.secondaryCta ? (
                   <Link
                     href={hero.secondaryCta.href}
-                    className="inline-flex items-center justify-center rounded-full border border-stone-300 bg-white px-5 py-3 text-sm font-semibold text-stone-900 transition hover:bg-stone-50"
+                    className="inline-flex items-center justify-center rounded-full border border-stone-300 bg-white px-5 py-3 text-sm font-semibold !text-stone-900 no-underline transition hover:bg-stone-50 hover:!text-stone-900 visited:!text-stone-900 focus-visible:!text-stone-900"
                   >
-                    {hero.secondaryCta.label}
+                    <span className="!text-stone-900">{hero.secondaryCta.label}</span>
                   </Link>
                 ) : null}
               </div>

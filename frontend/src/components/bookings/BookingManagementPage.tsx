@@ -40,6 +40,14 @@ function getTabForStatus(status: BookingSummaryResponse["status"]): TabType {
   }
 }
 
+function canDeleteBooking(status: BookingSummaryResponse["status"]) {
+  return status === "PENDING";
+}
+
+function canCancelBooking(status: BookingSummaryResponse["status"]) {
+  return status === "APPROVED";
+}
+
 export function BookingManagementPage({
   user,
   initialHighlightedBookingId = null,
@@ -198,12 +206,15 @@ export function BookingManagementPage({
     setShowReviewDialog(true);
   };
 
-  const handleDeleteClick = (bookingId: number, status: string) => {
+  const handleDeleteClick = (
+    bookingId: number,
+    status: BookingSummaryResponse["status"]
+  ) => {
     setPendingAction({
       bookingId,
       reason: "",
       decision: "DELETE",
-      bookingStatus: status as any,
+      bookingStatus: status,
     });
     setShowReviewDialog(true);
   };
@@ -215,15 +226,16 @@ export function BookingManagementPage({
     setActionInProgress(pendingAction.bookingId);
 
     try {
-      let endpoint = "review";
-      
-      if (pendingAction.decision === "CANCEL") {
-        endpoint = "cancel";
-      } else if (pendingAction.decision === "DELETE") {
-        endpoint = "delete";
-      }
-      
       const requestBody: Record<string, unknown> = {};
+      let method: "PATCH" | "DELETE" = "PATCH";
+      let url = `/api/v1/bookings/${pendingAction.bookingId}/review`;
+
+      if (pendingAction.decision === "CANCEL") {
+        url = `/api/v1/bookings/${pendingAction.bookingId}/cancel`;
+      } else if (pendingAction.decision === "DELETE") {
+        method = "DELETE";
+        url = `/api/v1/bookings/${pendingAction.bookingId}`;
+      }
 
       // For review (approve/reject), include decision
       if (pendingAction.decision !== "CANCEL" && pendingAction.decision !== "DELETE") {
@@ -235,9 +247,8 @@ export function BookingManagementPage({
         requestBody.reason = pendingAction.reason;
       }
 
-      const url = `/api/v1/bookings/${pendingAction.bookingId}/${endpoint}`;
       const response = await fetch(url, {
-        method: "PATCH",
+        method,
         headers: {
           "Content-Type": "application/json",
         },
@@ -431,17 +442,19 @@ export function BookingManagementPage({
                       <span className={`status-badge status-${booking.status.toLowerCase()}`}>
                         {booking.status}
                       </span>
-                      {(booking.status === "PENDING" || booking.status === "APPROVED" || booking.status === "REJECTED" || booking.status === "CANCELLED") && (
+                      {(canDeleteBooking(booking.status) || canCancelBooking(booking.status)) && (
                         <>
-                          <button
-                            className="icon-button delete-icon"
-                            onClick={() => handleDeleteClick(booking.id, booking.status)}
-                            title="Delete booking"
-                            disabled={actionInProgress === booking.id}
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                          {(booking.status === "APPROVED" || booking.status === "PENDING") && (
+                          {canDeleteBooking(booking.status) && (
+                            <button
+                              className="icon-button delete-icon"
+                              onClick={() => handleDeleteClick(booking.id, booking.status)}
+                              title="Delete booking"
+                              disabled={actionInProgress === booking.id}
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
+                          {canCancelBooking(booking.status) && (
                             <button
                               className="icon-button cancel-icon"
                               onClick={() => handleStudentCancelClick(booking.id)}
@@ -624,17 +637,19 @@ export function BookingManagementPage({
                       <span className={`status-badge status-${booking.status.toLowerCase()}`}>
                         {booking.status}
                       </span>
-                      {(booking.status === "PENDING" || booking.status === "APPROVED" || booking.status === "REJECTED" || booking.status === "CANCELLED") && (
+                      {(canDeleteBooking(booking.status) || canCancelBooking(booking.status)) && (
                         <>
-                          <button
-                            className="icon-button delete-icon"
-                            onClick={() => handleDeleteClick(booking.id, booking.status)}
-                            title="Delete booking"
-                            disabled={actionInProgress === booking.id}
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                          {(booking.status === "APPROVED" || booking.status === "PENDING") && (
+                          {canDeleteBooking(booking.status) && (
+                            <button
+                              className="icon-button delete-icon"
+                              onClick={() => handleDeleteClick(booking.id, booking.status)}
+                              title="Delete booking"
+                              disabled={actionInProgress === booking.id}
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
+                          {canCancelBooking(booking.status) && (
                             <button
                               className="icon-button cancel-icon"
                               onClick={() => handleStudentCancelClick(booking.id)}

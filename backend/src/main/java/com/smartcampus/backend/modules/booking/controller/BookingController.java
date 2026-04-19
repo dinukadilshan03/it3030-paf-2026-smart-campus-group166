@@ -5,6 +5,7 @@ import com.smartcampus.backend.modules.booking.dto.BookingDetailResponse;
 import com.smartcampus.backend.modules.booking.dto.BookingSummaryResponse;
 import com.smartcampus.backend.modules.booking.dto.CancelBookingRequest;
 import com.smartcampus.backend.modules.booking.dto.CreateBookingRequest;
+import com.smartcampus.backend.modules.booking.dto.DeleteBookingRequest;
 import com.smartcampus.backend.modules.booking.dto.ReviewBookingRequest;
 import com.smartcampus.backend.modules.booking.service.BookingService;
 import jakarta.validation.Valid;
@@ -13,6 +14,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -65,5 +67,13 @@ public class BookingController {
     public BookingDetailResponse cancelBooking(
             @PathVariable Long id, @RequestBody(required = false) CancelBookingRequest request) {
         return bookingService.cancelBooking(id, request == null ? new CancelBookingRequest(null) : request);
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteBooking(
+            @PathVariable Long id, @RequestBody(required = false) DeleteBookingRequest request) {
+        bookingService.deleteBooking(id, request == null ? new DeleteBookingRequest(null) : request);
     }
 }

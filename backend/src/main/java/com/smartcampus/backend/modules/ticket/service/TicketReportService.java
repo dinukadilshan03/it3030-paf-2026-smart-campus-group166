@@ -112,8 +112,10 @@ public class TicketReportService {
             // Fetch detailed ticket data, comments, and attachments
             TicketDetailResponse detail = ticketService.getTicketById(ticket.getId());
             List<TicketCommentResponse> comments = ticketCommentService.getComments(ticket);
-            List<TicketAttachmentResponse> attachments =
+            List<TicketAttachmentResponse> attachmentMetadata =
                     ticketAttachmentService.getAttachments(ticket);
+            List<TicketReportDocumentService.AttachmentEvidence> attachments =
+                    loadRenderableAttachments(ticket, attachmentMetadata);
 
             // Render the detailed report document
             renderedReport =
@@ -377,6 +379,44 @@ public class TicketReportService {
         }
 
         return trimToLength(String.join(" | ", fragments), 500);
+    }
+
+    private List<TicketReportDocumentService.AttachmentEvidence> loadRenderableAttachments(
+            Ticket ticket, List<TicketAttachmentResponse> attachments) {
+        return attachments.stream()
+                .map(attachment -> loadRenderableAttachment(ticket, attachment))
+                .filter(attachment -> attachment != null)
+                .toList();
+    }
+
+    private TicketReportDocumentService.AttachmentEvidence loadRenderableAttachment(
+            Ticket ticket, TicketAttachmentResponse attachment) {
+        if (attachment.id() == null) {
+            return null;
+        }
+
+        try {
+            var content =
+                    ticketAttachmentService.getAttachmentContent(
+                            ticket.getId(), attachment.id(), ticket);
+            if (content == null || content.content() == null || content.content().length == 0) {
+                return null;
+            }
+
+            String contentType = normalizeOptionalText(content.contentType());
+            if (contentType == null) {
+                contentType = normalizeOptionalText(attachment.mimeType());
+            }
+
+            return new TicketReportDocumentService.AttachmentEvidence(
+                    attachment, content.content(), contentType);
+        } catch (RuntimeException ex) {
+            log.info(
+                    "Skipping attachment={} for ticket={} because the stored image is unavailable.",
+                    attachment.id(),
+                    ticket.getTicketNumber());
+            return null;
+        }
     }
 
     private TicketReportResponse toResponse(TicketReport report) {
