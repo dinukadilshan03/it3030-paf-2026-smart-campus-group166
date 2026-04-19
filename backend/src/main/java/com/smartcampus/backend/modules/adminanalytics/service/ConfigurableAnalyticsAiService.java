@@ -12,6 +12,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -22,6 +23,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
@@ -38,9 +42,13 @@ import org.springframework.stereotype.Service;
 public class ConfigurableAnalyticsAiService implements AnalyticsAiService {
 
     private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder().build();
+    private static final Pattern RETRY_AFTER_SECONDS_PATTERN =
+            Pattern.compile("try again in\\s+([0-9]+(?:\\.[0-9]+)?)s", Pattern.CASE_INSENSITIVE);
+    private static final long DEFAULT_RATE_LIMIT_COOLDOWN_MS = 10_000L;
 
     private final ObjectProvider<ChatModel> chatModelProvider;
     private final ObjectMapper objectMapper;
+    private final AtomicLong groqRateLimitCooldownUntilMs = new AtomicLong(0L);
 
     @Value("${app.analytics.ai.enabled:true}")
     private boolean aiEnabled;
@@ -81,7 +89,7 @@ public class ConfigurableAnalyticsAiService implements AnalyticsAiService {
                     normalizeItems(payload.recommendations()),
                     payload.followUpQuestions() == null ? List.of() : payload.followUpQuestions());
         } catch (Exception ex) {
-            log.warn("Failed to generate admin analytics insights with {}", providerDisplayName(), ex);
+            logFailure("generate admin analytics insights", ex);
             return unavailableInsights(classifyInsightsFailure(ex));
         }
     }
@@ -106,7 +114,7 @@ public class ConfigurableAnalyticsAiService implements AnalyticsAiService {
                     payload.referencedMetricIds() == null ? List.of() : payload.referencedMetricIds(),
                     mapRecommendedLinks(payload.recommendedLinkIds(), snapshot));
         } catch (Exception ex) {
-            log.warn("Failed to answer admin analytics question with {}", providerDisplayName(), ex);
+            logFailure("answer admin analytics question", ex);
             return unavailableAsk(classifyAskFailure(ex));
         }
     }
@@ -208,6 +216,36 @@ public class ConfigurableAnalyticsAiService implements AnalyticsAiService {
         return "AI answers are currently unavailable. Try again later or use the dashboard metrics directly.";
     }
 
+    private void logFailure(String operation, Exception ex) {
+        if (isRateLimited(ex)) {
+            log.info(
+                    "{} with {} is temporarily rate limited: {}",
+                    operation,
+                    providerDisplayName(),
+                    compactMessage(ex));
+            return;
+        }
+        log.warn("Failed to {} with {}", operation, providerDisplayName(), ex);
+    }
+
+    private boolean isRateLimited(Exception ex) {
+        Throwable rootCause = rootCause(ex);
+        String combinedMessage =
+                ((ex.getMessage() == null ? "" : ex.getMessage()) + " "
+                                + (rootCause.getMessage() == null ? "" : rootCause.getMessage()))
+                        .toLowerCase(Locale.ENGLISH);
+        return containsAny(combinedMessage, "rate limit", "429", "resource_exhausted", "quota exceeded");
+    }
+
+    private String compactMessage(Exception ex) {
+        Throwable rootCause = rootCause(ex);
+        String message = rootCause.getMessage();
+        if (message == null || message.isBlank()) {
+            message = ex.getMessage();
+        }
+        return message == null ? "No additional error detail available." : message;
+    }
+
     private Throwable rootCause(Throwable throwable) {
         Throwable current = throwable;
         while (current.getCause() != null && current.getCause() != current) {
@@ -274,6 +312,7 @@ public class ConfigurableAnalyticsAiService implements AnalyticsAiService {
             if (groqApiKey.isBlank()) {
                 throw new IllegalStateException("Groq API key is missing");
             }
+            enforceGroqCooldown();
             return runWithTimeout(() -> callGroq(prompt, groqSystemPrompt));
         }
 
@@ -320,6 +359,9 @@ public class ConfigurableAnalyticsAiService implements AnalyticsAiService {
 
         HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() >= 400) {
+            if (response.statusCode() == 429) {
+                activateGroqRateLimitCooldown(response.body());
+            }
             throw new IllegalStateException(
                     "Groq API error (" + response.statusCode() + "): " + response.body());
         }
@@ -330,6 +372,38 @@ public class ConfigurableAnalyticsAiService implements AnalyticsAiService {
             throw new IllegalStateException("Groq API returned an empty completion");
         }
         return stripCodeFences(contentNode.asText());
+    }
+
+    private void enforceGroqCooldown() {
+        long cooldownUntil = groqRateLimitCooldownUntilMs.get();
+        long now = Instant.now().toEpochMilli();
+        if (cooldownUntil > now) {
+            long retryInMs = cooldownUntil - now;
+            throw new IllegalStateException(
+                    "Groq API rate limit cooldown active. Try again in %.1fs."
+                            .formatted(retryInMs / 1000.0));
+        }
+    }
+
+    private void activateGroqRateLimitCooldown(String responseBody) {
+        long now = Instant.now().toEpochMilli();
+        long cooldownMs = parseRetryAfterMs(responseBody);
+        groqRateLimitCooldownUntilMs.updateAndGet(current -> Math.max(current, now + cooldownMs));
+    }
+
+    private long parseRetryAfterMs(String responseBody) {
+        if (responseBody != null) {
+            Matcher matcher = RETRY_AFTER_SECONDS_PATTERN.matcher(responseBody);
+            if (matcher.find()) {
+                try {
+                    double seconds = Double.parseDouble(matcher.group(1));
+                    return Math.max(1_000L, (long) Math.ceil(seconds * 1000.0));
+                } catch (NumberFormatException ignored) {
+                    // Fall back to the default cooldown below.
+                }
+            }
+        }
+        return DEFAULT_RATE_LIMIT_COOLDOWN_MS;
     }
 
     private boolean isGroqProvider() {
