@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import type { CreateBookingRequest } from "@/lib/bookings/types";
 import { createBookingClient } from "@/lib/bookings/client";
 import { getResources } from "@/lib/resources/api";
@@ -36,6 +37,8 @@ export function CreateBookingForm({
   const [isLoadingResources, setIsLoadingResources] = useState(true);
   const [resources, setResources] = useState<Resource[]>([]);
   const [resourceSearch, setResourceSearch] = useState("");
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [formData, setFormData] = useState({
     resourceId: initialResourceId || 0,
     bookingDate: initialDate || "",
@@ -173,15 +176,22 @@ export function CreateBookingForm({
 
       onSubmit?.();
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to create booking";
-      onError?.(errorMessage);
+      const errorMsg = err instanceof Error ? err.message : "Failed to create booking";
+      setErrorMessage(errorMsg);
+      setShowErrorModal(true);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="create-booking-form">
+    <>
+      <ErrorAlert
+        isOpen={showErrorModal}
+        message={errorMessage}
+        onClose={() => setShowErrorModal(false)}
+      />
+      <form onSubmit={handleSubmit} className="create-booking-form">
       <div className="form-container">
         <div className="form-section">
           <h2>Create New Booking Request</h2>
@@ -493,5 +503,6 @@ export function CreateBookingForm({
 
       `}</style>
     </form>
+    </>
   );
 }
