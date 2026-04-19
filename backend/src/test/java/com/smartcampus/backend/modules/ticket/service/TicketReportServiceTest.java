@@ -20,10 +20,13 @@ import com.smartcampus.backend.common.enums.TicketReportStatus;
 import com.smartcampus.backend.common.enums.TicketReportType;
 import com.smartcampus.backend.common.enums.TicketStatus;
 import com.smartcampus.backend.common.enums.UserStatus;
+import com.smartcampus.backend.modules.ticket.dto.TicketAttachmentResponse;
+import com.smartcampus.backend.modules.ticket.dto.TicketDetailResponse;
 import com.smartcampus.backend.modules.resource.service.LocationService;
 import com.smartcampus.backend.modules.resource.service.ResourceService;
 import com.smartcampus.backend.modules.ticket.dto.GenerateTicketReportRequest;
 import com.smartcampus.backend.modules.ticket.dto.TicketSummaryResponse;
+import com.smartcampus.backend.modules.ticket.entity.Ticket;
 import com.smartcampus.backend.modules.ticket.entity.TicketReport;
 import com.smartcampus.backend.modules.ticket.repository.TicketReportRepository;
 import com.smartcampus.backend.modules.user.repository.UserRepository;
@@ -162,6 +165,149 @@ class TicketReportServiceTest {
         assertThat(response.recordCount()).isEqualTo(2);
     }
 
+    @Test
+    void detailReportSkipsAttachmentsWhoseStoredImageIsMissing() {
+        User admin = buildUser(1L, "admin@example.com", "Admin");
+        UserRole membership = buildMembership(admin, RoleCode.ADMIN);
+        GenerateTicketReportRequest request =
+                new GenerateTicketReportRequest(
+                        42L,
+                        "TCK-20260419-DETAIL",
+                        TicketReportType.DETAIL,
+                        TicketReportFormat.PDF,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null);
+        Ticket ticket =
+                Ticket.builder()
+                        .id(42L)
+                        .ticketNumber("TCK-20260419-DETAIL")
+                        .title("Projector blue screen")
+                        .build();
+        TicketDetailResponse detail = buildDetailTicket(42L, "TCK-20260419-DETAIL");
+        TicketAttachmentResponse availableAttachment =
+                new TicketAttachmentResponse(
+                        1L,
+                        10L,
+                        "Student User",
+                        "projector evidence",
+                        "projector.png",
+                        "ticket-attachments",
+                        "tickets/42/projector.png",
+                        "image/png",
+                        1280L,
+                        "IMAGE",
+                        LocalDateTime.now().minusDays(1));
+        TicketAttachmentResponse missingAttachment =
+                new TicketAttachmentResponse(
+                        2L,
+                        10L,
+                        "Student User",
+                        "deleted evidence",
+                        "deleted.png",
+                        "ticket-attachments",
+                        "tickets/42/deleted.png",
+                        "image/png",
+                        640L,
+                        "IMAGE",
+                        LocalDateTime.now().minusHours(20));
+        TicketReportDocumentService.RenderedTicketReport renderedReport =
+                new TicketReportDocumentService.RenderedTicketReport(
+                        "ticket-detail.pdf",
+                        "application/pdf",
+                        new byte[] {1, 2, 3},
+                        1,
+                        "Detail report");
+
+        when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
+        when(ticketService.getDetailedTicketEntity(42L)).thenReturn(ticket);
+        when(ticketService.getTicketById(42L)).thenReturn(detail);
+        when(ticketCommentService.getComments(ticket)).thenReturn(List.of());
+        when(ticketAttachmentService.getAttachments(ticket))
+                .thenReturn(List.of(availableAttachment, missingAttachment));
+        when(ticketAttachmentService.getAttachmentContent(42L, 1L, ticket))
+                .thenReturn(new com.smartcampus.backend.common.service.StoredObjectContent(new byte[] {1, 2, 3}, "image/png", 3));
+        when(ticketAttachmentService.getAttachmentContent(42L, 2L, ticket))
+                .thenThrow(new IllegalStateException("Could not load the attachment image."));
+        when(ticketReportDocumentService.renderDetailReport(
+                        eq(request), eq("Admin"), anyString(), eq(detail), anyList(), anyList()))
+                .thenReturn(renderedReport);
+        when(ticketReportRepository.save(any(TicketReport.class)))
+                .thenAnswer(
+                        invocation -> {
+                            TicketReport report = invocation.getArgument(0);
+                            report.setId(99L);
+                            return report;
+                        });
+
+        ticketReportService.generateReport(request);
+
+        ArgumentCaptor<List<TicketReportDocumentService.AttachmentEvidence>> attachmentCaptor =
+                ArgumentCaptor.forClass(List.class);
+        verify(ticketReportDocumentService)
+                .renderDetailReport(
+                        eq(request),
+                        eq("Admin"),
+                        anyString(),
+                        eq(detail),
+                        anyList(),
+                        attachmentCaptor.capture());
+
+        assertThat(attachmentCaptor.getValue()).hasSize(1);
+        assertThat(attachmentCaptor.getValue().getFirst().attachment().id()).isEqualTo(1L);
+        verify(ticketAttachmentService).getAttachmentContent(42L, 1L, ticket);
+        verify(ticketAttachmentService).getAttachmentContent(42L, 2L, ticket);
+    }
+
+    @Test
+    void detailReportWrapsUnexpectedRuntimeFailures() {
+        User admin = buildUser(1L, "admin@example.com", "Admin");
+        UserRole membership = buildMembership(admin, RoleCode.ADMIN);
+        GenerateTicketReportRequest request =
+                new GenerateTicketReportRequest(
+                        42L,
+                        "TCK-20260419-DETAIL",
+                        TicketReportType.DETAIL,
+                        TicketReportFormat.PDF,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null);
+        Ticket ticket =
+                Ticket.builder()
+                        .id(42L)
+                        .ticketNumber("TCK-20260419-DETAIL")
+                        .title("Projector blue screen")
+                        .build();
+        TicketDetailResponse detail = buildDetailTicket(42L, "TCK-20260419-DETAIL");
+
+        when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
+        when(ticketService.getDetailedTicketEntity(42L)).thenReturn(ticket);
+        when(ticketService.getTicketById(42L)).thenReturn(detail);
+        when(ticketCommentService.getComments(ticket)).thenReturn(List.of());
+        when(ticketAttachmentService.getAttachments(ticket)).thenReturn(List.of());
+        when(ticketReportDocumentService.renderDetailReport(
+                        eq(request), eq("Admin"), anyString(), eq(detail), anyList(), anyList()))
+                .thenThrow(new NullPointerException("broken detail data"));
+
+        assertThatThrownBy(() -> ticketReportService.generateReport(request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Could not generate the detailed ticket report.");
+    }
+
     private User buildUser(Long id, String email, String displayName) {
         return User.builder().id(id).email(email).displayName(displayName).status(UserStatus.ACTIVE).build();
     }
@@ -216,5 +362,52 @@ class TicketReportServiceTest {
                 0,
                 0,
                 0);
+    }
+
+    private TicketDetailResponse buildDetailTicket(Long id, String ticketNumber) {
+        LocalDateTime now = LocalDateTime.now();
+        return new TicketDetailResponse(
+                id,
+                ticketNumber,
+                20L,
+                "student@example.com",
+                "Student User",
+                30L,
+                "Staff User",
+                300L,
+                "PRJ-01",
+                "Projector A",
+                "AV",
+                99L,
+                "Lab 3",
+                "Engineering",
+                "2",
+                "203",
+                "Computer lab",
+                5L,
+                "AV_EQUIPMENT",
+                "AV / Equipment",
+                "Projector blue screen",
+                "Projector shows a blue screen during class.",
+                TicketPriority.HIGH,
+                TicketStatus.OPEN,
+                "Student User",
+                "student@example.com",
+                "0771234567",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                now.minusDays(1),
+                now.minusHours(2),
+                0,
+                0,
+                0,
+                List.of());
     }
 }

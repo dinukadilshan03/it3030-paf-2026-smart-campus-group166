@@ -135,7 +135,7 @@ export function BookingList({
                   )}
                 </>
               )}
-              {(booking.status === "PENDING" || booking.status === "APPROVED") && onCancel && (
+              {booking.status === "APPROVED" && onCancel && (
                 <button
                   className="secondary-button"
                   onClick={(e) => {

@@ -49,6 +49,8 @@ export type TicketSlaTimerState = {
 };
 
 const MATCH_ALL_SEARCH_TOKEN = "%";
+const UTC_BACKEND_DATE_TIME_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/;
 
 const TICKET_SLA_TARGETS: Record<
   TicketPriority,
@@ -133,13 +135,28 @@ export function formatDateTime(value: string | null | undefined) {
   if (!value) return "Not available";
 
   try {
+    const parsedDate = parseTicketDateValue(value);
+    if (parsedDate == null) {
+      return value;
+    }
+
     return new Intl.DateTimeFormat("en-LK", {
       dateStyle: "medium",
       timeStyle: "short",
-    }).format(new Date(value));
+    }).format(new Date(parsedDate));
   } catch {
     return value;
   }
+}
+
+export function parseTicketDateValue(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const normalizedValue = normalizeTicketDateValue(value);
+  const parsed = new Date(normalizedValue).getTime();
+  return Number.isNaN(parsed) ? null : parsed;
 }
 
 export function formatFileSize(bytes: number | null | undefined) {
@@ -498,12 +515,11 @@ export function getActiveStaffOptions(users: AdminUserSummary[]) {
 }
 
 function parseDateValue(value: string | null | undefined) {
-  if (!value) {
-    return null;
-  }
+  return parseTicketDateValue(value);
+}
 
-  const parsed = new Date(value).getTime();
-  return Number.isNaN(parsed) ? null : parsed;
+function normalizeTicketDateValue(value: string) {
+  return UTC_BACKEND_DATE_TIME_PATTERN.test(value) ? `${value}Z` : value;
 }
 
 function formatDurationMs(durationMs: number) {

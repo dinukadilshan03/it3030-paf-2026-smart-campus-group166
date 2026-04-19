@@ -25,18 +25,45 @@ export function TicketDialog({
     }
 
     const { body } = document;
+    const root = document.documentElement;
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-    const previousOverflow = body.style.overflow;
-    const previousPaddingRight = body.style.paddingRight;
+    const currentLockCount = Number(body.dataset.ticketDialogLockCount ?? "0");
 
-    body.style.overflow = "hidden";
-    if (scrollbarWidth > 0) {
-      body.style.paddingRight = `${scrollbarWidth}px`;
+    if (currentLockCount === 0) {
+      body.dataset.ticketDialogPreviousOverflow = body.style.overflow;
+      body.dataset.ticketDialogPreviousPaddingRight = body.style.paddingRight;
+      root.dataset.ticketDialogPreviousOverflow = root.style.overflow;
+
+      body.style.overflow = "hidden";
+      root.style.overflow = "hidden";
+
+      if (scrollbarWidth > 0) {
+        body.style.paddingRight = `${scrollbarWidth}px`;
+      }
     }
 
+    body.dataset.ticketDialogLockCount = String(currentLockCount + 1);
+
     return () => {
-      body.style.overflow = previousOverflow;
-      body.style.paddingRight = previousPaddingRight;
+      const nextLockCount = Math.max(
+        0,
+        Number(body.dataset.ticketDialogLockCount ?? "1") - 1,
+      );
+
+      if (nextLockCount === 0) {
+        body.style.overflow = body.dataset.ticketDialogPreviousOverflow ?? "";
+        body.style.paddingRight =
+          body.dataset.ticketDialogPreviousPaddingRight ?? "";
+        root.style.overflow = root.dataset.ticketDialogPreviousOverflow ?? "";
+
+        delete body.dataset.ticketDialogLockCount;
+        delete body.dataset.ticketDialogPreviousOverflow;
+        delete body.dataset.ticketDialogPreviousPaddingRight;
+        delete root.dataset.ticketDialogPreviousOverflow;
+        return;
+      }
+
+      body.dataset.ticketDialogLockCount = String(nextLockCount);
     };
   }, [open]);
 

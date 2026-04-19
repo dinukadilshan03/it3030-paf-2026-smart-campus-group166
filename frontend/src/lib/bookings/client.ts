@@ -104,3 +104,15 @@ export async function cancelBookingClient(id: number, request?: CancelBookingReq
 
   return (await response.json()) as BookingDetailResponse;
 }
+
+export async function deleteBookingClient(id: number, request?: CancelBookingRequest) {
+  const response = await frontendRouteFetch(`/api/v1/bookings/${id}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: request ? JSON.stringify(request) : undefined,
+  });
+
+  if (!response.ok) await throwBookingApiError(response);
+}
