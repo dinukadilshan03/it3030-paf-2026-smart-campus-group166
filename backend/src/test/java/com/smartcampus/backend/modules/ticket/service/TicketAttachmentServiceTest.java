@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
@@ -144,12 +145,13 @@ class TicketAttachmentServiceTest {
 
         when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
         when(ticketAttachmentRepository.countByTicket_Id(100L)).thenReturn(0L);
-        when(supabaseStorageService.uploadObject(
+        doThrow(new IllegalStateException("bucket not found"))
+                .when(supabaseStorageService)
+                .uploadObject(
                         eq("ticket-attachments"),
                         any(String.class),
                         any(byte[].class),
-                        eq("image/jpeg")))
-                .thenThrow(new IllegalStateException("bucket not found"));
+                        eq("image/jpeg"));
 
         MultipartFile file =
                 new MockMultipartFile("file", "projector-damage.jpg", "image/jpeg", new byte[] {1, 2, 3});
