@@ -1,4 +1,5 @@
 import { clientApiFetch } from "@/lib/api/client";
+import { getFrontendApiBaseUrl } from "@/lib/config/env";
 
 export const getResources = async (search?: string) => {
   try {
@@ -83,6 +84,19 @@ export const updateResource = async (id: number, data: unknown) => {
   return res.json();
 };
 
+export const uploadResourceImage = async (id: number, file: File) => {
+  const formData = new FormData();
+  formData.set("file", file);
+
+  const res = await clientApiFetch(`/api/v1/resources/${id}/image`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
 export const deleteResource = async (id: number) => {
   const res = await clientApiFetch(`/api/v1/resources/${id}`, {
     method: "DELETE",
@@ -111,4 +125,20 @@ export const createLocation = async (data: unknown) => {
 
   if (!res.ok) throw new Error(await res.text());
   return res.json();
+};
+
+export const resolveResourceImageUrl = (imageUrl?: string | null) => {
+  if (!imageUrl) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(imageUrl) || imageUrl.startsWith("data:")) {
+    return imageUrl;
+  }
+
+  if (imageUrl.startsWith("/")) {
+    return `${getFrontendApiBaseUrl()}${imageUrl}`;
+  }
+
+  return imageUrl;
 };

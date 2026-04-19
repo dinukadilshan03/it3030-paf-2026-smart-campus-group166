@@ -1,6 +1,7 @@
 package com.smartcampus.backend.modules.resource.controller;
 
 import com.smartcampus.backend.common.enums.ResourceStatus;
+import com.smartcampus.backend.common.service.StoredObjectContent;
 import com.smartcampus.backend.modules.resource.dto.CreateResourceRequest;
 import com.smartcampus.backend.modules.resource.dto.ResourceDetailResponse;
 import com.smartcampus.backend.modules.resource.dto.ResourceSummaryResponse;
@@ -9,7 +10,10 @@ import com.smartcampus.backend.modules.resource.service.ResourceService;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/resources")
@@ -56,6 +61,25 @@ public class ResourceController {
     public ResourceDetailResponse updateResource(
             @PathVariable Long id, @Valid @RequestBody UpdateResourceRequest request) {
         return resourceService.update(id, request);
+    }
+
+    @PostMapping("/{id}/image")
+    @PreAuthorize("hasRole('ADMIN')")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ResourceDetailResponse uploadResourceImage(
+            @PathVariable Long id, @RequestParam("file") MultipartFile file) {
+        return resourceService.uploadImage(id, file);
+    }
+
+    @GetMapping("/{id}/image/content")
+    public ResponseEntity<byte[]> getResourceImageContent(@PathVariable Long id) {
+        StoredObjectContent content = resourceService.getImageContent(id);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+                .contentLength(content.contentLength())
+                .contentType(MediaType.parseMediaType(content.contentType()))
+                .body(content.content());
     }
 
     @DeleteMapping("/{id}")

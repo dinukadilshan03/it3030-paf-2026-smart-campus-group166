@@ -5,9 +5,9 @@ import {
   createResource,
   getCategories,
   getLocations,
-  getResources,
   createResourceCategory,
   createLocation,
+  uploadResourceImage,
 } from "@/lib/resources/api";
 import { useRouter } from "next/navigation";
 
@@ -29,7 +29,7 @@ export default function AddResourcePage() {
   });
 
   const [preview, setPreview] = useState("");
-  const [tempImage, setTempImage] = useState("");
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryCode, setNewCategoryCode] = useState("");
   const [newLocationName, setNewLocationName] = useState("");
@@ -120,12 +120,13 @@ export default function AddResourcePage() {
     const file = e.target.files[0];
     if (!file) return;
 
+    setSelectedImageFile(file);
+
     const reader = new FileReader();
 
     reader.onloadend = () => {
       const base64 = reader.result as string;
       setPreview(base64);
-      setTempImage(base64);
     };
 
     reader.readAsDataURL(file);
@@ -144,16 +145,10 @@ export default function AddResourcePage() {
         requiresApproval: form.requiresApproval,
       };
 
-      await createResource(payload);
+      const createdResource = await createResource(payload);
 
-      const resources = await getResources();
-      const latest = resources[resources.length - 1];
-
-      if (tempImage && latest) {
-        localStorage.setItem(
-          "resource_image_" + latest.id,
-          tempImage
-        );
+      if (selectedImageFile && createdResource?.id) {
+        await uploadResourceImage(createdResource.id, selectedImageFile);
       }
 
       alert("Added ✅");
