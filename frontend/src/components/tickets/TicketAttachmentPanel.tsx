@@ -4,6 +4,12 @@ import { useState } from "react";
 
 import { TicketAttachmentDraftCard } from "@/components/tickets/TicketAttachmentDraftCard";
 import {
+  TicketConfirmDialog,
+  TicketPopupNotice,
+  type TicketPopupNoticeState,
+  buildTicketValidationNotice,
+} from "@/components/tickets/TicketPopupDialogs";
+import {
   canCurrentUserManageAttachments,
   formatDateTime,
   formatFileSize,
@@ -25,6 +31,7 @@ type TicketAttachmentPanelProps = {
   ticket: TicketDetail;
   attachments: TicketAttachment[];
   busy?: boolean;
+  embedded?: boolean;
   onCreate: (payload: TicketAttachmentUpload) => Promise<void>;
   onDelete: (attachmentId: number) => Promise<void>;
 };
@@ -52,6 +59,7 @@ export function TicketAttachmentPanel({
   ticket,
   attachments,
   busy = false,
+  embedded = false,
   onCreate,
   onDelete,
 }: TicketAttachmentPanelProps) {
@@ -59,25 +67,44 @@ export function TicketAttachmentPanel({
   const [draft, setDraft] = useState<TicketAttachmentDraft | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<TicketPopupNoticeState>(null);
+  const [confirmAttachmentId, setConfirmAttachmentId] = useState<number | null>(null);
 
   const canManage =
     currentUser.role != null &&
     currentUser.id != null &&
     canCurrentUserManageAttachments(currentUser.role, currentUser.id, ticket);
+  const wrapperClass = embedded
+    ? "rounded-[1.25rem] border border-white/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(240,249,255,0.82))] p-5 shadow-[0_16px_34px_rgba(15,23,42,0.05)]"
+    : "rounded-[1.5rem] border border-white/70 bg-white/85 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur";
+  const titleClass = embedded
+    ? "mt-2 text-lg font-semibold tracking-tight text-slate-950"
+    : "mt-3 text-2xl font-semibold tracking-tight text-slate-950";
+  const introClass = embedded
+    ? "mt-1 max-w-2xl text-sm leading-7 text-slate-600"
+    : "mt-2 text-sm leading-7 text-slate-600";
+  const uploaderFormClass = embedded
+    ? "mt-5 space-y-4 rounded-[1.25rem] border border-slate-200 bg-slate-50/85 p-4"
+    : "mt-6 space-y-4 rounded-[1.35rem] border border-slate-200 bg-slate-50/80 p-4";
+  const emptyStateClass = embedded
+    ? "rounded-[1.15rem] border border-dashed border-slate-300 bg-slate-50/80 px-5 py-7 text-sm leading-7 text-slate-600"
+    : "rounded-[1.2rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-sm leading-7 text-slate-600";
+  const attachmentGridClass = embedded ? "grid gap-4 sm:grid-cols-2" : "grid gap-4 xl:grid-cols-2";
 
   return (
-    <section className="rounded-[1.5rem] border border-white/70 bg-white/85 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur">
+    <section className={wrapperClass}>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-            Evidence images
+            {embedded ? "Issue photos" : "Evidence images"}
           </p>
-          <h3 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-            Uploaded attachments
+          <h3 className={titleClass}>
+            {embedded ? "Uploaded images" : "Uploaded attachments"}
           </h3>
-          <p className="mt-2 text-sm leading-7 text-slate-600">
-            Attach clear images of the issue so students, staff, and admins can follow the ticket
-            without leaving the workflow.
+          <p className={introClass}>
+            {embedded
+              ? "Existing photos and new uploads for this incident, shown directly with the location details."
+              : "Attach clear images of the issue so students, staff, and admins can follow the ticket without leaving the workflow."}
           </p>
         </div>
 
@@ -99,26 +126,39 @@ export function TicketAttachmentPanel({
         </span>
         {!canManage ? (
           <span className="rounded-full bg-slate-100 px-3 py-1 font-medium">
-            Only the reporter or an admin can change attachments
+            Only the student who raised the ticket can change images. If the images are not clear, you may add a comment describing the issue.
           </span>
         ) : null}
       </div>
 
       {formOpen ? (
         <form
-          className="mt-6 space-y-4 rounded-[1.35rem] border border-slate-200 bg-slate-50/80 p-4"
+          className={uploaderFormClass}
           onSubmit={async (event) => {
             event.preventDefault();
             setFormError(null);
 
             if (!draft) {
-              setErrors({ file: "Choose an image to upload." });
+              const validationErrors = { file: "Choose an image to upload." };
+              setErrors(validationErrors);
+              setNotice(
+                buildTicketValidationNotice(
+                  "Attachment details need attention",
+                  validationErrors,
+                ),
+              );
               return;
             }
 
             const validationErrors = validateAttachmentDraft(draft);
             if (Object.keys(validationErrors).length > 0) {
               setErrors(validationErrors);
+              setNotice(
+                buildTicketValidationNotice(
+                  "Attachment details need attention",
+                  validationErrors,
+                ),
+              );
               return;
             }
 
@@ -132,8 +172,22 @@ export function TicketAttachmentPanel({
             } catch (error) {
               if (error instanceof TicketApiError) {
                 setErrors(error.validationErrors);
+                setNotice(
+                  buildTicketValidationNotice(
+                    "Attachment details need attention",
+                    error.validationErrors,
+                    error.message || "Review the highlighted attachment fields and try again.",
+                  ),
+                );
               }
-              setFormError(error instanceof Error ? error.message : "Attachment upload failed.");
+              const nextFormError =
+                error instanceof Error ? error.message : "Attachment upload failed.";
+              setFormError(nextFormError);
+              setNotice({
+                tone: "error",
+                title: "Attachment upload failed",
+                message: nextFormError,
+              });
             }
           }}
         >
@@ -215,11 +269,11 @@ export function TicketAttachmentPanel({
 
       <div className="mt-6">
         {attachments.length === 0 ? (
-          <div className="rounded-[1.2rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-sm leading-7 text-slate-600">
+          <div className={emptyStateClass}>
             No evidence images uploaded for this ticket yet.
           </div>
         ) : (
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className={attachmentGridClass}>
             {attachments.map((attachment) => {
               const contentUrl = getTicketAttachmentContentUrl(ticket.id, attachment.id);
 
@@ -251,11 +305,8 @@ export function TicketAttachmentPanel({
                         <button
                           type="button"
                           disabled={busy}
-                          onClick={async () => {
-                            if (!window.confirm("Delete this uploaded image?")) {
-                              return;
-                            }
-                            await onDelete(attachment.id);
+                          onClick={() => {
+                            setConfirmAttachmentId(attachment.id);
                           }}
                           className="text-sm font-semibold text-rose-700 transition hover:text-rose-800 disabled:cursor-not-allowed disabled:opacity-60"
                         >
@@ -297,6 +348,46 @@ export function TicketAttachmentPanel({
           </div>
         )}
       </div>
+
+      <TicketPopupNotice
+        notice={notice}
+        onClose={() => setNotice(null)}
+        actionLabel="Review"
+      />
+      <TicketConfirmDialog
+        open={confirmAttachmentId != null}
+        title="Delete this uploaded image"
+        message="Are you sure you want to remove this image from the ticket?"
+        confirmLabel="Delete image"
+        cancelLabel="Cancel"
+        busy={busy}
+        tone="danger"
+        onClose={() => {
+          if (busy) {
+            return;
+          }
+
+          setConfirmAttachmentId(null);
+        }}
+        onConfirm={async () => {
+          if (confirmAttachmentId == null) {
+            return;
+          }
+
+          try {
+            await onDelete(confirmAttachmentId);
+            setConfirmAttachmentId(null);
+          } catch (error) {
+            const nextError =
+              error instanceof Error ? error.message : "Attachment image could not be deleted.";
+            setNotice({
+              tone: "error",
+              title: "Attachment delete failed",
+              message: nextError,
+            });
+          }
+        }}
+      />
     </section>
   );
 }

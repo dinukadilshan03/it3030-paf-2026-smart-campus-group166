@@ -116,7 +116,7 @@ export function NotificationBell({ initialUnreadCount }: NotificationBellProps) 
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
-        className="relative inline-flex items-center justify-center rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
+        className="relative inline-flex items-center justify-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-50"
       >
         <span className="sr-only">Open notifications</span>
         <svg
@@ -133,20 +133,20 @@ export function NotificationBell({ initialUnreadCount }: NotificationBellProps) 
           <path d="M10 20a2 2 0 0 0 4 0" />
         </svg>
         {unreadCount > 0 ? (
-          <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+          <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-[color:#8f4b31] px-1.5 py-0.5 text-[11px] font-semibold text-white">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         ) : null}
       </button>
 
       {isOpen ? (
-        <div className="absolute right-0 z-30 mt-3 w-[22rem] rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-[0_22px_60px_rgba(15,23,42,0.16)]">
+        <div className="absolute right-0 z-30 mt-3 w-[22rem] rounded-[1.4rem] border border-stone-200 bg-[#fffdfa] p-4 shadow-[0_22px_56px_rgba(38,33,28,0.14)]">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-500">
                 Notifications
               </p>
-              <p className="mt-2 text-sm text-slate-600">
+              <p className="mt-2 text-sm text-stone-600">
                 {unreadCount === 0
                   ? "All caught up."
                   : `${unreadCount} unread notification(s).`}
@@ -156,25 +156,25 @@ export function NotificationBell({ initialUnreadCount }: NotificationBellProps) 
               type="button"
               disabled={isMutating || unreadCount === 0}
               onClick={() => void handleMarkAllAsRead()}
-              className="text-sm font-semibold text-slate-700 transition hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+              className="text-sm font-semibold text-stone-900 transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Mark all read
             </button>
           </div>
 
           {errorMessage ? (
-            <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            <p className="mt-4 rounded-2xl border border-[color:rgba(168,95,58,0.2)] bg-[rgba(168,95,58,0.08)] px-3 py-2 text-sm text-[color:#8f4b31]">
               {errorMessage}
             </p>
           ) : null}
 
           <div className="mt-4 space-y-3">
             {isLoading ? (
-              <p className="rounded-[1rem] border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+              <p className="rounded-[1rem] border border-stone-200 bg-stone-50 px-4 py-5 text-sm text-stone-600">
                 Loading recent notifications...
               </p>
             ) : notifications.length === 0 ? (
-              <p className="rounded-[1rem] border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+              <p className="rounded-[1rem] border border-dashed border-stone-300 bg-stone-50 px-4 py-5 text-sm text-stone-600">
                 No notifications yet.
               </p>
             ) : (
@@ -185,22 +185,22 @@ export function NotificationBell({ initialUnreadCount }: NotificationBellProps) 
                   onClick={() => void handleNotificationClick(notification)}
                   className={`w-full rounded-[1.1rem] border px-4 py-3 text-left transition ${
                     notification.isRead
-                      ? "border-slate-200 bg-slate-50/70 hover:bg-slate-100"
-                      : "border-teal-200 bg-teal-50/70 hover:bg-teal-100/70"
+                      ? "border-stone-200 bg-stone-50 hover:bg-stone-100"
+                      : "border-lime-300 bg-lime-50 hover:bg-lime-100"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm font-semibold text-slate-950">
+                    <p className="text-sm font-semibold text-stone-900">
                       {notification.title}
                     </p>
                     {!notification.isRead ? (
-                      <span className="mt-1 h-2.5 w-2.5 rounded-full bg-teal-600" />
+                      <span className="mt-1 h-2.5 w-2.5 rounded-full bg-[color:var(--accent)]" />
                     ) : null}
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <p className="mt-2 text-sm leading-6 text-stone-600">
                     {notification.message}
                   </p>
-                  <p className="mt-2 text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+                  <p className="mt-2 text-xs font-medium uppercase tracking-[0.18em] text-stone-500">
                     {formatNotificationDateTime(notification.createdAt)}
                   </p>
                 </button>
@@ -208,10 +208,10 @@ export function NotificationBell({ initialUnreadCount }: NotificationBellProps) 
             )}
           </div>
 
-          <div className="mt-4 border-t border-slate-200 pt-4">
+          <div className="mt-4 border-t border-stone-200 pt-4">
             <Link
               href="/notifications"
-              className="text-sm font-semibold text-slate-700 transition hover:text-slate-950"
+              className="text-sm font-semibold text-stone-900 transition hover:opacity-80"
               onClick={() => setIsOpen(false)}
             >
               View all notifications

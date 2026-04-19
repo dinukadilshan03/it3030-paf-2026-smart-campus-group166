@@ -41,11 +41,11 @@ export function SidebarNav({
             key={item.href}
             href={item.href}
             aria-current={active ? "page" : undefined}
-            style={active ? { color: "#f8fafc" } : undefined}
+            style={active ? { color: "var(--surface-strong)" } : undefined}
             className={`rounded-2xl px-4 py-3 text-sm font-medium transition ${
               active
-                ? "bg-slate-950 font-semibold shadow-[0_12px_30px_rgba(15,23,42,0.18)]"
-                : "text-slate-700 hover:bg-white hover:text-slate-950 visited:text-slate-700"
+                ? "bg-stone-900 font-semibold text-white shadow-[0_16px_34px_rgba(38,33,28,0.16)]"
+                : "text-stone-700 hover:bg-white hover:text-stone-900 visited:text-stone-700"
             }`}
           >
             {item.title}

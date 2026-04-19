@@ -1,319 +1,263 @@
 import Link from "next/link";
+import Image from "next/image";
+import {
+  Bell,
+  BookOpen,
+  CalendarRange,
+  ChartColumnIncreasing,
+  LayoutDashboard,
+  Menu,
+  ShieldCheck,
+  UserRound,
+  Users,
+} from "lucide-react";
 
 import { redirectIfAuthenticated } from "@/lib/auth/session";
+import styles from "./page.module.css";
 
-const implementedModules = [
+const features = [
   {
-    title: "Role-based dashboards",
-    description:
-      "Students, staff, and admins each land in a workspace tailored to their access and core tasks.",
+    icon: CalendarRange,
+    title: "Bookings",
+    description: "Reserve spaces and track approvals.",
   },
   {
-    title: "Resource management",
-    description:
-      "Resources, categories, locations, and availability data are already wired into the protected app.",
+    icon: LayoutDashboard,
+    title: "Dashboard",
+    description: "Role-based landing pages for every user type.",
   },
   {
-    title: "Booking workflows",
-    description:
-      "Students can request spaces while admins review, approve, reject, and cancel bookings with status tracking.",
+    icon: BookOpen,
+    title: "Resources",
+    description: "Browse and manage campus resources in one place.",
   },
   {
-    title: "Ticket operations",
-    description:
-      "Issue reporting, assignment, comments, attachments, category management, and lifecycle updates are implemented.",
+    icon: ShieldCheck,
+    title: "Support",
+    description: "Manage tickets and campus issues.",
   },
   {
-    title: "Notifications and profile",
-    description:
-      "Users can review in-app notifications and access their shared profile area from the authenticated shell.",
+    icon: Bell,
+    title: "Notifications",
+    description: "Stay on top of alerts, replies, and activity.",
   },
   {
-    title: "Admin controls and analytics",
-    description:
-      "Admins can manage users and review operational analytics, health signals, and generated insights.",
+    icon: Users,
+    title: "Users",
+    description: "Admin tools for account oversight and access.",
+  },
+  {
+    icon: ChartColumnIncreasing,
+    title: "Analytics",
+    description: "Track usage and operational trends.",
+  },
+  {
+    icon: UserRound,
+    title: "Profile",
+    description: "Manage your shared account details and settings.",
   },
 ];
 
-const accessModes = [
+const heroExperiences = [
   {
-    title: "Student sign-in",
-    description:
-      "Students authenticate with Google, then continue into the SmartCampus dashboard and feature pages permitted for their role.",
+    label: "Student experience",
+    description: "Find a space, submit a booking, and follow updates without friction.",
   },
   {
-    title: "Staff and admin sign-in",
-    description:
-      "Staff and admins use local email and password credentials created and managed through the admin workspace.",
+    label: "Staff operations",
+    description: "Handle tickets, respond faster, and stay inside one focused workspace.",
   },
   {
-    title: "Role-aware routing",
-    description:
-      "After authentication, the frontend reads the active session and routes users into the same protected app shell with the correct navigation.",
+    label: "Admin oversight",
+    description: "Monitor activity, manage resources, and keep campus operations aligned.",
   },
-];
-
-const workspacePreviews = [
-  {
-    title: "Student workspace",
-    description:
-      "Focused on finding resources, creating bookings, raising tickets, reviewing notifications, and managing personal account details.",
-  },
-  {
-    title: "Staff workspace",
-    description:
-      "Built around support operations, especially ticket handling, campus resource visibility, notifications, and profile access.",
-  },
-  {
-    title: "Admin workspace",
-    description:
-      "Acts as the operational command center for users, resources, bookings, tickets, analytics, notifications, and oversight.",
-  },
-];
-
-const workflows = [
-  "Booking requests move through pending, approval, rejection, and cancellation flows with review tracking.",
-  "Ticket management supports creation, assignment, comments, attachments, status changes, and category administration.",
-  "Resource administration covers managed spaces, locations, categories, and availability windows.",
-  "Notification flows keep users updated on booking decisions, ticket changes, and comment activity.",
 ];
 
 export default async function HomePage() {
   await redirectIfAuthenticated("/dashboard");
 
   return (
-    <main className="relative overflow-hidden px-6 py-6 md:px-8 md:py-8">
-      <div className="hero-glow hero-glow-left" />
-      <div className="hero-glow hero-glow-right" />
+    <main className={styles.page}>
+      <div className={`${styles.orb} ${styles.orbLeft}`} />
+      <div className={`${styles.orb} ${styles.orbRight}`} />
 
-      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-7xl flex-col gap-6">
-        <section className="overflow-hidden rounded-[2rem] border border-white/70 bg-white/82 shadow-[0_30px_90px_rgba(15,23,42,0.12)] backdrop-blur">
-          <div className="grid gap-10 px-6 py-8 md:px-10 md:py-10 xl:grid-cols-[1.3fr_0.85fr] xl:items-end">
-            <div className="space-y-8">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                  SmartCampus public home
-                </span>
-                <span className="inline-flex items-center rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-accent-strong">
-                  Login from here, work in the dashboard
-                </span>
+      <div className="relative z-10">
+        <section className="overflow-hidden border-b border-white/10 bg-[linear-gradient(180deg,rgba(9,11,21,0.98),rgba(10,14,30,0.94))] shadow-[0_40px_120px_rgba(4,8,20,0.42)]">
+          <div className="px-5 py-5 sm:px-8 lg:px-10">
+            <header className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 text-white">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/95 text-sm font-semibold text-slate-950">
+                  SC
+                </div>
+                <div>
+                  <p className="text-sm font-medium">SmartCampus</p>
+                  <p className="text-xs text-white/55">Campus platform</p>
+                </div>
               </div>
 
-              <div className="space-y-5">
-                <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-slate-950 md:text-6xl">
-                  One front door for campus bookings, support tickets, resources, and
-                  operational oversight.
-                </h1>
-                <p className="max-w-3xl text-base leading-8 text-slate-600 md:text-lg">
-                  SmartCampus starts with a clear public homepage, sends users to the
-                  dedicated login page, and then routes each authenticated person into the
-                  correct dashboard for their role.
-                </p>
-              </div>
+              <nav className="hidden items-center gap-8 text-sm text-white/80 md:flex">
+                <a href="#platform" className="transition hover:text-white">
+                  Platform
+                </a>
+                <a href="#capabilities" className="transition hover:text-white">
+                  Capabilities
+                </a>
+                <a href="#overview" className="transition hover:text-white">
+                  Overview
+                </a>
+              </nav>
 
-              <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="flex items-center gap-3">
                 <Link
                   href="/login"
-                  className="inline-flex items-center justify-center rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  className="hidden items-center justify-center rounded-full border border-slate-500 bg-slate-800 px-5 py-2.5 text-sm font-semibold !text-white transition hover:border-white hover:bg-white hover:!text-slate-950 sm:inline-flex"
                 >
-                  Login to SmartCampus
+                  Login
                 </Link>
-                <a
-                  href="#implemented"
-                  className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white/85 px-6 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-white"
+                <Link
+                  href="/login"
+                  className="inline-flex items-center justify-center rounded-full border border-cyan-300 bg-cyan-300 px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 hover:border-cyan-200"
                 >
-                  Explore implemented features
+                  Register
+                </Link>
+                <button
+                  type="button"
+                  aria-label="Open navigation"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/6 text-white md:hidden"
+                >
+                  <Menu className="h-5 w-5" />
+                </button>
+              </div>
+            </header>
+
+            <div className="mx-auto max-w-4xl px-2 pb-10 pt-12 text-center sm:pb-12 sm:pt-16">
+              <div className="inline-flex rounded-full border border-cyan-300/15 bg-cyan-300/8 px-4 py-2 text-[0.72rem] font-medium tracking-[0.14em] text-cyan-100/80">
+                ONE PLACE FOR BOOKINGS, SUPPORT, AND CAMPUS OPERATIONS
+              </div>
+
+              <h1 className="mt-6 text-4xl font-semibold tracking-[-0.06em] text-white sm:text-6xl lg:text-7xl">
+                A smarter front door for modern campus operations.
+              </h1>
+
+              <p className="mx-auto mt-5 max-w-2xl text-sm leading-7 text-white/70 sm:text-base">
+                Clean public entry, simple login, and a premium product experience for students,
+                staff, and admins.
+              </p>
+
+              <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                <a
+                  href="#platform"
+                  className="inline-flex min-w-[220px] items-center justify-center rounded-full border border-cyan-300/70 bg-cyan-300 px-6 py-3.5 text-sm font-semibold text-slate-950 shadow-[0_16px_36px_rgba(103,232,249,0.18)] transition hover:bg-cyan-200 hover:border-cyan-200"
+                >
+                  Explore platform
                 </a>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-[1.5rem] border border-slate-200 bg-white/70 p-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                    Public entry
-                  </p>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">
-                    Guests land here first and can learn what the app already supports
-                    before signing in.
-                  </p>
-                </div>
-                <div className="rounded-[1.5rem] border border-slate-200 bg-white/70 p-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                    Dedicated login
-                  </p>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">
-                    Authentication stays on <span className="font-semibold text-slate-900">/login</span> with
-                    Google for students and local credentials for staff or admins.
-                  </p>
-                </div>
-                <div className="rounded-[1.5rem] border border-slate-200 bg-white/70 p-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                    Protected workspace
-                  </p>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">
-                    Signed-in users are sent directly to <span className="font-semibold text-slate-900">/dashboard</span> and
-                    role checks continue to protect each feature area.
-                  </p>
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-xs uppercase tracking-[0.22em] text-white/45">
+                <span>Bookings</span>
+                <span>Resources</span>
+                <span>Support Tickets</span>
+                <span>Dashboards</span>
+                <span>Notifications</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="overview" className="relative px-0 pb-0">
+            <div className={styles.heroScene}>
+              <Image
+                src="/homepage-hero.png"
+                alt="SmartCampus campus walkway with students, digital displays, and smart kiosks."
+                fill
+                priority
+                className={styles.heroImage}
+                sizes="100vw"
+              />
+              <div className={styles.heroOverlay} />
+              <div className={styles.heroShadeLeft} />
+              <div className={styles.heroFade} />
+
+              <div className="relative min-h-[380px] px-4 py-6 sm:min-h-[440px] sm:px-8 sm:py-8 lg:min-h-[560px] lg:px-12">
+                <div className="grid gap-3 sm:max-w-sm lg:pt-8">
+                  {heroExperiences.map((experience, index) => (
+                    <div
+                      key={experience.label}
+                      className={`rounded-[1.35rem] border border-white/14 bg-[rgba(7,12,22,0.82)] p-4 text-left shadow-[0_20px_50px_rgba(2,6,18,0.34)] ${
+                        index === 1 ? "sm:translate-x-8" : ""
+                      } ${index === 2 ? "sm:translate-x-16" : ""}`}
+                    >
+                      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-cyan-100/80">
+                        {experience.label}
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-white/78">
+                        {experience.description}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
+          </div>
+        </section>
 
-            <div className="space-y-5 rounded-[1.75rem] border border-slate-200 bg-slate-950 p-6 text-slate-50 shadow-[0_16px_40px_rgba(15,23,42,0.18)] md:p-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-300">
-                Typical app flow
-              </p>
-              <ol className="space-y-4 text-sm leading-7 text-slate-300">
-                <li className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                  <span className="font-semibold text-white">1.</span> Open SmartCampus on{" "}
-                  <span className="font-semibold text-white">/</span> to understand what the
-                  platform supports.
-                </li>
-                <li className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                  <span className="font-semibold text-white">2.</span> Use the login button to
-                  continue to the dedicated authentication page.
-                </li>
-                <li className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                  <span className="font-semibold text-white">3.</span> Complete Google or local
-                  sign-in based on the user role.
-                </li>
-                <li className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                  <span className="font-semibold text-white">4.</span> Work inside the protected
-                  dashboard and follow the role-appropriate navigation.
-                </li>
-              </ol>
-              <div className="rounded-[1.5rem] border border-emerald-400/20 bg-emerald-400/10 px-5 py-4">
-                <p className="text-sm font-semibold text-white">Why this flow works better</p>
-                <p className="mt-2 text-sm leading-7 text-slate-300">
-                  It separates public product context from authentication, avoids confusion on
-                  the default route, and keeps the actual login experience in one predictable
-                  place.
+        <section className="bg-[linear-gradient(180deg,rgba(7,12,22,0.96),rgba(7,12,22,0.99))] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+          <div
+            id="platform"
+            className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-[0_16px_40px_rgba(2,8,23,0.18)] backdrop-blur-xl"
+          >
+            <div className="grid gap-8 px-6 py-6 sm:px-8 sm:py-8 lg:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)] lg:items-start lg:px-10 lg:py-10">
+              <div className="max-w-xl">
+                <p className="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-white/45">
+                  Platform surface
                 </p>
+                <h2 className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-white sm:text-4xl">
+                  Everything in the app, grouped into one clear overview.
+                </h2>
+                <p className="mt-4 max-w-lg text-sm leading-7 text-white/62 sm:text-base">
+                  The home page now reflects the actual product breadth: booking, resources,
+                  tickets, dashboards, notifications, users, analytics, and profile access.
+                </p>
+
+                <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-[1.35rem] border border-white/10 bg-black/10 p-4">
+                    <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-cyan-100/75">
+                      For students
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-white/74">
+                      Book spaces, check notifications, update profile details, and track support.
+                    </p>
+                  </div>
+                  <div className="rounded-[1.35rem] border border-white/10 bg-black/10 p-4">
+                    <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-cyan-100/75">
+                      For staff and admins
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-white/74">
+                      Manage tickets, resources, dashboards, and user oversight from one shell.
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        </section>
 
-        <section
-          id="implemented"
-          className="grid gap-6 rounded-[2rem] border border-white/70 bg-white/78 px-6 py-8 shadow-[0_24px_70px_rgba(15,23,42,0.09)] backdrop-blur md:px-10 md:py-10"
-        >
-          <div className="max-w-3xl space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-              What&apos;s implemented so far
-            </p>
-            <h2 className="text-3xl font-semibold tracking-tight text-slate-950">
-              The homepage reflects real functionality already present in the app.
-            </h2>
-            <p className="text-base leading-8 text-slate-600">
-              This is the current front door for SmartCampus, so it should explain what users
-              can already do instead of behaving like a partial sign-in screen.
-            </p>
-          </div>
+              <div id="capabilities" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {features.map((feature) => {
+                  const Icon = feature.icon;
 
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {implementedModules.map((module) => (
-              <article
-                key={module.title}
-                className="rounded-[1.5rem] border border-slate-200 bg-slate-50/85 p-5"
-              >
-                <h3 className="text-lg font-semibold text-slate-950">{module.title}</h3>
-                <p className="mt-3 text-sm leading-7 text-slate-600">{module.description}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-          <div className="rounded-[2rem] border border-white/70 bg-white/80 px-6 py-8 shadow-[0_24px_70px_rgba(15,23,42,0.09)] backdrop-blur md:px-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-              How access works
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-              One login page, two sign-in methods, one protected app shell.
-            </h2>
-            <div className="mt-6 space-y-4">
-              {accessModes.map((item) => (
-                <div
-                  key={item.title}
-                  className="rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-5"
-                >
-                  <h3 className="text-lg font-semibold text-slate-950">{item.title}</h3>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">{item.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-[2rem] border border-white/70 bg-white/80 px-6 py-8 shadow-[0_24px_70px_rgba(15,23,42,0.09)] backdrop-blur md:px-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-              Role workspaces
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-              After login, SmartCampus guides each role into the right dashboard.
-            </h2>
-            <div className="mt-6 grid gap-4">
-              {workspacePreviews.map((workspace) => (
-                <div
-                  key={workspace.title}
-                  className="rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5"
-                >
-                  <h3 className="text-lg font-semibold text-slate-950">{workspace.title}</h3>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">
-                    {workspace.description}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="grid gap-6 rounded-[2rem] border border-white/70 bg-white/82 px-6 py-8 shadow-[0_24px_70px_rgba(15,23,42,0.09)] backdrop-blur md:px-10 md:py-10 xl:grid-cols-[1.05fr_0.95fr]">
-          <div className="space-y-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-              Operational workflows
-            </p>
-            <h2 className="text-3xl font-semibold tracking-tight text-slate-950">
-              The app already supports the main campus operations this homepage should describe.
-            </h2>
-            <p className="max-w-3xl text-base leading-8 text-slate-600">
-              SmartCampus is not just a login shell. The current build already includes the
-              workflow backbone for resources, bookings, support tickets, and notifications.
-            </p>
-            <ul className="grid gap-3">
-              {workflows.map((workflow) => (
-                <li
-                  key={workflow}
-                  className="rounded-[1.25rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-7 text-slate-600"
-                >
-                  {workflow}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(160deg,rgba(15,23,42,0.98),rgba(15,118,110,0.92))] p-6 text-white shadow-[0_16px_40px_rgba(15,23,42,0.18)] md:p-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-200">
-              Ready to continue
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">
-              Start at the public home, then move into your dashboard from one clear login path.
-            </h2>
-            <p className="mt-4 text-sm leading-7 text-slate-100/90">
-              This keeps the product easier to understand for first-time visitors and easier to
-              use for returning users who just need to get back to work.
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/login"
-                className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
-              >
-                Go to login
-              </Link>
-              <a
-                href="#implemented"
-                className="inline-flex items-center justify-center rounded-full border border-white/25 bg-white/10 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
-              >
-                Review features
-              </a>
+                  return (
+                    <article
+                      key={feature.title}
+                      className="rounded-[1.5rem] border border-white/10 bg-[rgba(255,255,255,0.04)] p-5 shadow-[0_18px_42px_rgba(2,8,23,0.16)] transition hover:-translate-y-0.5 hover:bg-[rgba(255,255,255,0.06)]"
+                    >
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-950 shadow-[0_10px_24px_rgba(255,255,255,0.12)]">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <h3 className="mt-4 text-lg font-semibold tracking-[-0.03em] text-white">
+                        {feature.title}
+                      </h3>
+                      <p className="mt-2 text-sm leading-6 text-white/64">{feature.description}</p>
+                    </article>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </section>

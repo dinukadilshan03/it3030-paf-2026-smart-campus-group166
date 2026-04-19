@@ -99,27 +99,29 @@ export function TicketFilters({
           </label>
         </div>
 
-        <label className="grid gap-2 text-sm font-medium text-slate-700">
-          Category
-          <select
-            value={value.ticketCategoryId}
-            onChange={(event) =>
-              onChange({
-                ...value,
-                ticketCategoryId: event.target.value ? Number(event.target.value) : "",
-              })
-            }
-            className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:bg-white"
-          >
-            <option value="">All categories</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-                {category.isActive ? "" : " (Inactive)"}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="grid gap-2 text-sm font-medium text-slate-700">
+            Category
+            <select
+              value={value.ticketCategoryId}
+              onChange={(event) =>
+                onChange({
+                  ...value,
+                  ticketCategoryId: event.target.value ? Number(event.target.value) : "",
+                })
+              }
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:bg-white"
+            >
+              <option value="">All categories</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                  {category.isActive ? "" : " (Inactive)"}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
 
         <div className="flex flex-wrap gap-3 pt-2">
           <button

@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from "@/lib/config/env";
+import { getFrontendApiBaseUrl } from "@/lib/config/env";
 
 function withDefaultHeaders(
   inputHeaders: HeadersInit | undefined,
@@ -16,7 +16,7 @@ function withDefaultHeaders(
 }
 
 export async function clientApiFetch(path: string, init: RequestInit = {}) {
-  return fetch(`${getApiBaseUrl()}${path}`, {
+  return fetch(`${getFrontendApiBaseUrl()}${path}`, {
     ...init,
     credentials: "include",
     headers: withDefaultHeaders(init.headers, {

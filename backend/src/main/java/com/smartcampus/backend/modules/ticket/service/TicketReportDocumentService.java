@@ -33,8 +33,11 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class TicketReportDocumentService {
 
+    // Formatter for displaying timestamps inside reports
     private static final DateTimeFormatter TIMESTAMP_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT);
+
+    // Formatter for generating timestamped file names
     private static final DateTimeFormatter FILE_DATE_FORMATTER =
             DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss", Locale.ROOT);
 
@@ -43,6 +46,7 @@ public class TicketReportDocumentService {
             String generatedByDisplayName,
             String filterSummary,
             List<TicketSummaryResponse> tickets) {
+        // Render the summary report in the requested output format
         return switch (request.format()) {
             case PDF -> renderSummaryPdf(request, generatedByDisplayName, filterSummary, tickets);
             case CSV -> renderSummaryCsv(request, filterSummary, tickets);
@@ -56,6 +60,7 @@ public class TicketReportDocumentService {
             TicketDetailResponse detail,
             List<TicketCommentResponse> comments,
             List<TicketAttachmentResponse> attachments) {
+        // Render the detailed report in the requested output format
         return switch (request.format()) {
             case PDF ->
                     renderDetailPdf(
@@ -74,9 +79,13 @@ public class TicketReportDocumentService {
             String generatedByDisplayName,
             String filterSummary,
             List<TicketSummaryResponse> tickets) {
+
+        // Build a unique PDF file name using the current timestamp
         String fileName =
                 "ticket_summary_%s.pdf"
                         .formatted(LocalDateTime.now().format(FILE_DATE_FORMATTER));
+
+        // Human-readable summary of the generated report
         String summaryText =
                 "Summary report with %d ticket(s) prepared for %s."
                         .formatted(tickets.size(), generatedByDisplayName);
@@ -87,6 +96,8 @@ public class TicketReportDocumentService {
                             document,
                             "Ticket Summary Report",
                             "Campus maintenance and incident overview")) {
+
+                // Add the cover/hero section
                 writer.writeHeroCard(
                         "Smart Campus Ticketing",
                         "Ticket Summary Report",
@@ -95,6 +106,8 @@ public class TicketReportDocumentService {
                                 "Prepared for | " + generatedByDisplayName,
                                 "Prepared at | " + LocalDateTime.now().format(TIMESTAMP_FORMATTER),
                                 "Document type | Summary PDF"));
+
+                // Add summary statistics for ticket statuses
                 writer.writeStatGrid(
                         List.of(
                                 new StatItem("Tickets in scope", String.valueOf(tickets.size()), PdfTone.SLATE),
@@ -109,12 +122,23 @@ public class TicketReportDocumentService {
                                 new StatItem(
                                         "Resolved",
                                         String.valueOf(countByStatus(tickets, TicketStatus.RESOLVED)),
-                                        PdfTone.EMERALD)));
+                                        PdfTone.EMERALD),
+                                new StatItem(
+                                        "Closed",
+                                        String.valueOf(countByStatus(tickets, TicketStatus.CLOSED)),
+                                        PdfTone.SLATE),
+                                new StatItem(
+                                        "Rejected",
+                                        String.valueOf(countByStatus(tickets, TicketStatus.REJECTED)),
+                                        PdfTone.AMBER)));
+
+                // Add applied filter information
                 writer.writeParagraphCard(
                         "Reporting scope",
                         safeValue(filterSummary),
                         PdfTone.SKY);
 
+                // Add a card for each ticket in the summary report
                 for (TicketSummaryResponse ticket : tickets) {
                     writer.writeCard(
                             ticket.ticketNumber() + "  |  " + ticket.title(),
@@ -136,6 +160,7 @@ public class TicketReportDocumentService {
                 }
             }
 
+            // Convert the PDF document into bytes and return it
             return new RenderedTicketReport(
                     fileName,
                     "application/pdf",
@@ -152,12 +177,18 @@ public class TicketReportDocumentService {
             GenerateTicketReportRequest request,
             String filterSummary,
             List<TicketSummaryResponse> tickets) {
+
+        // Build a unique CSV file name
         String fileName =
                 "ticket_summary_%s.csv"
                         .formatted(LocalDateTime.now().format(FILE_DATE_FORMATTER));
+
+        // Human-readable summary of the export
         String summaryText = "CSV summary export with %d ticket(s).".formatted(tickets.size());
 
         StringBuilder csv = new StringBuilder();
+
+        // Write CSV header row
         csv.append(csvLine(
                 "Report Type",
                 "Generated At",
@@ -176,6 +207,8 @@ public class TicketReportDocumentService {
                 "Resolved At"));
 
         String generatedAt = LocalDateTime.now().format(TIMESTAMP_FORMATTER);
+
+        // Write one CSV row per ticket
         for (TicketSummaryResponse ticket : tickets) {
             csv.append(
                     csvLine(
@@ -211,9 +244,15 @@ public class TicketReportDocumentService {
             TicketDetailResponse detail,
             List<TicketCommentResponse> comments,
             List<TicketAttachmentResponse> attachments) {
+
+        // Sanitize ticket number so it is safe to use in a file name
         String safeTicketNumber =
                 detail.ticketNumber().replaceAll("[^A-Za-z0-9_-]+", "_").toLowerCase(Locale.ROOT);
+
+        // Build the PDF file name
         String fileName = "ticket_%s_detail.pdf".formatted(safeTicketNumber);
+
+        // Human-readable report summary
         String summaryText =
                 "Detailed %s report prepared for ticket %s."
                         .formatted(request.format().name(), detail.ticketNumber());
@@ -224,6 +263,8 @@ public class TicketReportDocumentService {
                             document,
                             "Ticket Detail Report",
                             "Full maintenance and incident ticket record")) {
+
+                // Add the hero section for the detailed report
                 writer.writeHeroCard(
                         "Smart Campus Ticketing",
                         "Detailed Ticket Record",
@@ -232,13 +273,19 @@ public class TicketReportDocumentService {
                                 "Prepared for | " + generatedByDisplayName,
                                 "Prepared at | " + LocalDateTime.now().format(TIMESTAMP_FORMATTER),
                                 "Current status | " + toTitleCase(detail.status().name())));
+
+                // Add quick stats for the selected ticket
                 writer.writeStatGrid(
                         List.of(
                                 new StatItem("Status", toTitleCase(detail.status().name()), toneForStatus(detail.status())),
                                 new StatItem("Priority", toTitleCase(detail.priority().name()), toneForPriority(detail.priority())),
                                 new StatItem("Comments", String.valueOf(comments.size()), PdfTone.SKY),
                                 new StatItem("Attachments", String.valueOf(attachments.size()), PdfTone.EMERALD)));
+
+                // Add filter/scope summary
                 writer.writeParagraphCard("Reporting scope", safeValue(filterSummary), PdfTone.SKY);
+
+                // Add ticket profile information
                 writer.writeCard(
                         "Ticket profile",
                         List.of(
@@ -254,10 +301,14 @@ public class TicketReportDocumentService {
                                 "Resource | " + safeValue(detail.resourceName()),
                                 "Location | " + resolveDetailScope(detail)),
                         PdfTone.SLATE);
+
+                // Add the issue description
                 writer.writeParagraphCard(
                         "Issue narrative",
                         safeValue(detail.description()),
                         PdfTone.SLATE);
+
+                // Add reporter contact and access information
                 writer.writeCard(
                         "Reporter contact and access details",
                         List.of(
@@ -267,6 +318,8 @@ public class TicketReportDocumentService {
                                 "Resource category | " + safeValue(detail.resourceCategoryName()),
                                 "Location description | " + safeValue(detail.locationDescription())),
                         PdfTone.SKY);
+
+                // Add lifecycle dates
                 writer.writeCard(
                         "Lifecycle timeline",
                         List.of(
@@ -277,6 +330,8 @@ public class TicketReportDocumentService {
                                 "Rejected | " + formatDateTime(detail.rejectedAt()),
                                 "Closed | " + formatDateTime(detail.closedAt())),
                         PdfTone.AMBER);
+
+                // Add resolution outcome details
                 writer.writeCard(
                         "Resolution outcome",
                         List.of(
@@ -284,6 +339,7 @@ public class TicketReportDocumentService {
                                 "Rejection Reason | " + safeValue(detail.rejectionReason())),
                         toneForStatus(detail.status()));
 
+                // Add assignment history or a placeholder if there is none
                 if (detail.assignmentHistory().isEmpty()) {
                     writer.writeParagraphCard(
                             "Assignment history",
@@ -303,6 +359,7 @@ public class TicketReportDocumentService {
                     }
                 }
 
+                // Add ticket comments or a placeholder if none exist
                 if (comments.isEmpty()) {
                     writer.writeParagraphCard(
                             "Comments and notes",
@@ -323,6 +380,7 @@ public class TicketReportDocumentService {
                     }
                 }
 
+                // Add attachment list or a placeholder if there are none
                 if (attachments.isEmpty()) {
                     writer.writeParagraphCard(
                             "Attachments and evidence",
@@ -346,6 +404,7 @@ public class TicketReportDocumentService {
                 }
             }
 
+            // Convert the PDF to bytes and return it
             return new RenderedTicketReport(
                     fileName,
                     "application/pdf",
@@ -364,14 +423,22 @@ public class TicketReportDocumentService {
             TicketDetailResponse detail,
             List<TicketCommentResponse> comments,
             List<TicketAttachmentResponse> attachments) {
+
+        // Sanitize ticket number for file naming
         String safeTicketNumber =
                 detail.ticketNumber().replaceAll("[^A-Za-z0-9_-]+", "_").toLowerCase(Locale.ROOT);
+
+        // Build CSV file name
         String fileName = "ticket_%s_detail.csv".formatted(safeTicketNumber);
+
+        // Human-readable summary of the export
         String summaryText =
                 "Detailed CSV export prepared for ticket %s."
                         .formatted(detail.ticketNumber());
 
         StringBuilder csv = new StringBuilder();
+
+        // Write CSV header row
         csv.append(
                 csvLine(
                         "Report Type",
@@ -400,6 +467,7 @@ public class TicketReportDocumentService {
                         "Comments",
                         "Attachments"));
 
+        // Write one detailed CSV row
         csv.append(
                 csvLine(
                         request.reportType().name(),
@@ -437,12 +505,14 @@ public class TicketReportDocumentService {
     }
 
     private byte[] saveDocument(PDDocument document) throws IOException {
+        // Save PDF document content into a byte array
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         document.save(outputStream);
         return outputStream.toByteArray();
     }
 
     private String resolveSummaryScope(TicketSummaryResponse ticket) {
+        // Combine resource and location into one summary string
         if (ticket.resourceName() != null && ticket.locationName() != null) {
             return ticket.resourceName() + " / " + ticket.locationName();
         }
@@ -456,6 +526,7 @@ public class TicketReportDocumentService {
     }
 
     private String resolveDetailScope(TicketDetailResponse detail) {
+        // Build a formatted location string from available location parts
         List<String> parts = new ArrayList<>();
         if (detail.locationName() != null) {
             parts.add(detail.locationName());
@@ -476,6 +547,7 @@ public class TicketReportDocumentService {
     }
 
     private String joinComments(List<TicketCommentResponse> comments) {
+        // Join all comments into a single CSV-safe string
         if (comments.isEmpty()) {
             return "";
         }
@@ -492,6 +564,7 @@ public class TicketReportDocumentService {
     }
 
     private String joinAttachments(List<TicketAttachmentResponse> attachments) {
+        // Join attachment file names into a single CSV-safe string
         if (attachments.isEmpty()) {
             return "";
         }
@@ -502,6 +575,7 @@ public class TicketReportDocumentService {
     }
 
     private String csvLine(String... values) {
+        // Convert an array of values into one CSV line
         return String.join(
                         ",",
                         java.util.Arrays.stream(values)
@@ -511,16 +585,19 @@ public class TicketReportDocumentService {
     }
 
     private String csvEscape(String value) {
+        // Escape double quotes and wrap every field in quotes
         String safe = value == null ? "" : value;
         String escaped = safe.replace("\"", "\"\"");
         return "\"" + escaped + "\"";
     }
 
     private String formatDateTime(LocalDateTime value) {
+        // Format LocalDateTime or return empty string when null
         return value == null ? "" : value.format(TIMESTAMP_FORMATTER);
     }
 
     private String formatFileSize(Long bytes) {
+        // Format raw byte size into B, KB, or MB
         if (bytes == null || bytes < 0) {
             return "Unknown size";
         }
@@ -534,10 +611,12 @@ public class TicketReportDocumentService {
     }
 
     private String safeValue(String value) {
+        // Replace null or blank text with a placeholder
         return value == null || value.isBlank() ? "Not provided" : value;
     }
 
     private String toTitleCase(String value) {
+        // Convert enum-like uppercase text into readable title case
         String normalized = value.toLowerCase(Locale.ROOT).replace('_', ' ');
         String[] segments = normalized.split("\\s+");
         StringBuilder result = new StringBuilder();
@@ -556,9 +635,11 @@ public class TicketReportDocumentService {
         return result.isEmpty() ? normalized : result.toString();
     }
 
+    // Holds the generated report file and related metadata
     public record RenderedTicketReport(
             String fileName, String mimeType, byte[] fileData, int recordCount, String summaryText) {}
 
+    // Predefined color themes used in PDF sections
     private enum PdfTone {
         SLATE(new Color(27, 43, 65), new Color(244, 247, 250), new Color(92, 108, 126)),
         AMBER(new Color(186, 110, 24), new Color(255, 248, 238), new Color(145, 86, 18)),
@@ -588,9 +669,11 @@ public class TicketReportDocumentService {
         }
     }
 
+    // Small DTO used to render statistic tiles in the PDF
     record StatItem(String label, String value, PdfTone tone) {}
 
     private PdfTone toneForStatus(TicketStatus status) {
+        // Choose a PDF color tone based on ticket status
         return switch (status) {
             case OPEN -> PdfTone.AMBER;
             case IN_PROGRESS -> PdfTone.SKY;
@@ -600,6 +683,7 @@ public class TicketReportDocumentService {
     }
 
     private PdfTone toneForPriority(TicketPriority priority) {
+        // Choose a PDF color tone based on ticket priority
         return switch (priority) {
             case LOW -> PdfTone.SKY;
             case MEDIUM -> PdfTone.AMBER;
@@ -608,11 +692,13 @@ public class TicketReportDocumentService {
     }
 
     private long countByStatus(List<TicketSummaryResponse> tickets, TicketStatus status) {
+        // Count how many tickets match the given status
         return tickets.stream().filter(ticket -> ticket.status() == status).count();
     }
 
     private static final class PdfWriter implements AutoCloseable {
 
+        // Layout constants for PDF rendering
         private static final float MARGIN = 42f;
         private static final float HEADER_HEIGHT = 64f;
         private static final float BOTTOM_MARGIN = 42f;
@@ -622,6 +708,8 @@ public class TicketReportDocumentService {
         private static final float TITLE_FONT_SIZE = 22f;
         private static final float SECTION_FONT_SIZE = 13f;
         private static final float LINE_GAP = 14f;
+
+        // Color palette for the PDF
         private static final Color HEADER_COLOR = new Color(20, 32, 47);
         private static final Color HEADER_MUTED = new Color(196, 207, 218);
         private static final Color BORDER_COLOR = new Color(216, 223, 230);
@@ -630,15 +718,22 @@ public class TicketReportDocumentService {
         private static final Color PAGE_BACKGROUND = new Color(250, 251, 252);
         private static final Color FOOTER_COLOR = new Color(119, 132, 146);
 
+        // PDF document and current writing state
         private final PDDocument document;
         private final String title;
         private final String subtitle;
+
+        // Fonts used throughout the PDF
         private final PDType1Font headingFont =
                 new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
         private final PDType1Font bodyFont =
                 new PDType1Font(Standard14Fonts.FontName.HELVETICA);
+
+        // Timestamp shown in the document footer
         private final String generatedTimestamp =
                 LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.ROOT));
+
+        // Current page/stream/cursor state
         private PDPage page;
         private PDPageContentStream stream;
         private float cursorY;
@@ -648,29 +743,37 @@ public class TicketReportDocumentService {
             this.document = document;
             this.title = title;
             this.subtitle = subtitle;
+
+            // Start the first page immediately
             startNewPage();
         }
 
         private void ensureSpace(float blockHeight) throws IOException {
+            // Start a new page if the current block will not fit
             if (cursorY - blockHeight <= BOTTOM_MARGIN + 12f) {
                 startNewPage();
             }
         }
 
         private void startNewPage() throws IOException {
+            // Close previous content stream before creating a new page
             closeCurrentStream();
+
             page = new PDPage(PDRectangle.LETTER);
             document.addPage(page);
             stream = new PDPageContentStream(document, page);
             pageNumber++;
 
+            // Paint page background
             stream.setNonStrokingColor(PAGE_BACKGROUND);
             stream.addRect(0, 0, page.getMediaBox().getWidth(), page.getMediaBox().getHeight());
             stream.fill();
 
+            // Draw standard header and footer
             drawHeader();
             drawFooter();
 
+            // Reset cursor position below the header
             cursorY = page.getMediaBox().getHeight() - HEADER_HEIGHT - CONTENT_TOP_SPACING;
         }
 
@@ -678,10 +781,12 @@ public class TicketReportDocumentService {
             float pageWidth = page.getMediaBox().getWidth();
             float headerY = page.getMediaBox().getHeight() - HEADER_HEIGHT;
 
+            // Draw header background bar
             stream.setNonStrokingColor(HEADER_COLOR);
             stream.addRect(0, headerY, pageWidth, HEADER_HEIGHT);
             stream.fill();
 
+            // Left side branding
             stream.setNonStrokingColor(Color.WHITE);
             stream.beginText();
             stream.setFont(headingFont, 10f);
@@ -696,6 +801,7 @@ public class TicketReportDocumentService {
             stream.showText("Maintenance and Incident Reporting");
             stream.endText();
 
+            // Right side title and subtitle
             stream.setNonStrokingColor(Color.WHITE);
             stream.beginText();
             stream.setFont(headingFont, 14f);
@@ -715,12 +821,14 @@ public class TicketReportDocumentService {
             float pageWidth = page.getMediaBox().getWidth();
             float footerY = BOTTOM_MARGIN - 8f;
 
+            // Draw separator line above footer
             stream.setStrokingColor(BORDER_COLOR);
             stream.setLineWidth(0.5f);
             stream.moveTo(MARGIN, footerY + 16f);
             stream.lineTo(pageWidth - MARGIN, footerY + 16f);
             stream.stroke();
 
+            // Footer left: generation timestamp
             stream.setNonStrokingColor(FOOTER_COLOR);
             stream.beginText();
             stream.setFont(bodyFont, 9f);
@@ -728,6 +836,7 @@ public class TicketReportDocumentService {
             stream.showText("Generated " + generatedTimestamp + "  |  Smart Campus Ticketing");
             stream.endText();
 
+            // Footer right: page number
             stream.beginText();
             stream.setFont(bodyFont, 9f);
             stream.newLineAtOffset(pageWidth - MARGIN - 52f, footerY);
@@ -738,6 +847,8 @@ public class TicketReportDocumentService {
         private void writeHeroCard(
                 String eyebrow, String titleText, String description, List<String> metadata)
                 throws IOException {
+
+            // Calculate hero card dimensions based on wrapped text
             float cardWidth = page.getMediaBox().getWidth() - 2 * MARGIN;
             List<String> titleLines = wrapText(titleText, headingFont, TITLE_FONT_SIZE, cardWidth - 36f);
             List<String> descriptionLines =
@@ -758,6 +869,7 @@ public class TicketReportDocumentService {
             float cardX = MARGIN;
             float cardY = cursorY - cardHeight;
 
+            // Draw card background and border
             stream.setNonStrokingColor(Color.WHITE);
             stream.addRect(cardX, cardY, cardWidth, cardHeight);
             stream.fill();
@@ -766,12 +878,15 @@ public class TicketReportDocumentService {
             stream.addRect(cardX, cardY, cardWidth, cardHeight);
             stream.stroke();
 
+            // Draw accent bar
             stream.setNonStrokingColor(HEADER_COLOR);
             stream.addRect(cardX, cardY + cardHeight - 12f, cardWidth, 12f);
             stream.fill();
 
             float textX = cardX + 18f;
             float textY = cardY + cardHeight - 28f;
+
+            // Write hero card text blocks
             drawTextBlock(List.of(eyebrow.toUpperCase(Locale.ROOT)), headingFont, 8.5f, textX, textY, 11f, PdfTone.SKY.textColor());
             textY -= 18f;
             drawTextBlock(titleLines, headingFont, TITLE_FONT_SIZE, textX, textY, 24f, TEXT_COLOR);
@@ -784,6 +899,7 @@ public class TicketReportDocumentService {
         }
 
         private void writeStatGrid(List<StatItem> stats) throws IOException {
+            // Calculate each stat card width based on total number of stats
             int statCount = Math.max(stats.size(), 1);
             float pageWidth = page.getMediaBox().getWidth();
             float statWidth = (pageWidth - 2 * MARGIN - ((statCount - 1) * 10f)) / statCount;
@@ -792,6 +908,7 @@ public class TicketReportDocumentService {
 
             ensureSpace(statHeight + 10f);
 
+            // Draw each stat block
             for (int i = 0; i < stats.size(); i++) {
                 StatItem stat = stats.get(i);
                 float statX = MARGIN + i * (statWidth + 10);
@@ -827,6 +944,7 @@ public class TicketReportDocumentService {
         }
 
         private void writeCard(String title, List<String> items, PdfTone tone) throws IOException {
+            // Calculate layout values for the card
             float pageWidth = page.getMediaBox().getWidth();
             float cardWidth = pageWidth - 2 * MARGIN;
             float cardX = MARGIN;
@@ -835,9 +953,11 @@ public class TicketReportDocumentService {
             float bodyY = 0f;
             float totalHeight = 26f;
 
+            // Wrap the card title
             List<List<String>> titleLines = List.of(wrapText(title, headingFont, SECTION_FONT_SIZE, cardWidth - 30f));
             totalHeight += titleLines.getFirst().size() * 17f + 12f;
 
+            // Calculate row layouts for all items
             List<RowLayout> layouts = new ArrayList<>();
             for (String item : items) {
                 String key = item;
@@ -867,6 +987,8 @@ public class TicketReportDocumentService {
             ensureSpace(totalHeight + 10f);
 
             float cardY = cursorY - totalHeight;
+
+            // Draw card background and border
             stream.setNonStrokingColor(tone.surfaceColor());
             stream.addRect(cardX, cardY, cardWidth, totalHeight);
             stream.fill();
@@ -875,6 +997,7 @@ public class TicketReportDocumentService {
             stream.addRect(cardX, cardY, cardWidth, totalHeight);
             stream.stroke();
 
+            // Draw top accent bar
             stream.setNonStrokingColor(tone.accentColor());
             stream.addRect(cardX, cardY + totalHeight - 7f, cardWidth, 7f);
             stream.fill();
@@ -883,10 +1006,13 @@ public class TicketReportDocumentService {
             float textY = cardY + totalHeight - 22f;
             drawTextBlock(titleLines.getFirst(), headingFont, SECTION_FONT_SIZE, textX, textY, 17f, TEXT_COLOR);
 
+            // Write rows inside the card
             bodyY = textY - titleLines.getFirst().size() * 17f - 10f;
             for (int i = 0; i < layouts.size(); i++) {
                 RowLayout layout = layouts.get(i);
                 float rowTop = bodyY;
+
+                // Draw separator lines between rows
                 if (i > 0) {
                     stream.setStrokingColor(new Color(233, 237, 241));
                     stream.setLineWidth(0.5f);
@@ -895,6 +1021,7 @@ public class TicketReportDocumentService {
                     stream.stroke();
                 }
 
+                // Draw either key/value pair or full-width value
                 if (layout.split()) {
                     drawTextBlock(layout.keyLines(), headingFont, LABEL_FONT_SIZE, textX, rowTop - 3f, 11f, tone.textColor());
                     drawTextBlock(
@@ -916,6 +1043,7 @@ public class TicketReportDocumentService {
         }
 
         private void writeParagraphCard(String title, String body, PdfTone tone) throws IOException {
+            // Calculate paragraph card size using wrapped title and body text
             float cardWidth = page.getMediaBox().getWidth() - 2 * MARGIN;
             List<String> titleLines = wrapText(title, headingFont, SECTION_FONT_SIZE, cardWidth - 30f);
             List<String> bodyLines = wrapText(body, bodyFont, BODY_FONT_SIZE, cardWidth - 30f);
@@ -926,6 +1054,7 @@ public class TicketReportDocumentService {
             float cardX = MARGIN;
             float cardY = cursorY - cardHeight;
 
+            // Draw card background and border
             stream.setNonStrokingColor(tone.surfaceColor());
             stream.addRect(cardX, cardY, cardWidth, cardHeight);
             stream.fill();
@@ -934,12 +1063,15 @@ public class TicketReportDocumentService {
             stream.addRect(cardX, cardY, cardWidth, cardHeight);
             stream.stroke();
 
+            // Draw accent bar
             stream.setNonStrokingColor(tone.accentColor());
             stream.addRect(cardX, cardY + cardHeight - 7f, cardWidth, 7f);
             stream.fill();
 
             float textX = cardX + 15f;
             float textY = cardY + cardHeight - 22f;
+
+            // Draw title and paragraph content
             drawTextBlock(titleLines, headingFont, SECTION_FONT_SIZE, textX, textY, 17f, TEXT_COLOR);
             drawTextBlock(
                     bodyLines,
@@ -962,6 +1094,8 @@ public class TicketReportDocumentService {
                 float lineHeight,
                 Color color)
                 throws IOException {
+
+            // Draw each wrapped line at the given position and style
             stream.setNonStrokingColor(color);
             float textY = startY;
             for (String line : lines) {
@@ -976,6 +1110,8 @@ public class TicketReportDocumentService {
 
         private List<String> wrapText(String text, PDFont font, float fontSize, float maxWidth)
                 throws IOException {
+
+            // Normalize text and split it into lines that fit inside maxWidth
             String normalized = text == null || text.isBlank() ? " " : text.replace('\n', ' ');
             List<String> lines = new ArrayList<>();
             StringBuilder currentLine = new StringBuilder();
@@ -1001,16 +1137,19 @@ public class TicketReportDocumentService {
 
         @Override
         public void close() throws IOException {
+            // Ensure the current content stream is closed
             closeCurrentStream();
         }
 
         private void closeCurrentStream() throws IOException {
+            // Close the active PDF content stream if present
             if (stream != null) {
                 stream.close();
                 stream = null;
             }
         }
 
+        // Layout holder for rows inside key/value cards
         private record RowLayout(
                 boolean split, List<String> keyLines, List<String> valueLines, float height) {}
     }
