@@ -25,5 +25,11 @@ export function getFrontendApiBaseUrl() {
 }
 
 export function getBackendOAuthUrl() {
-  return `${getApiBaseUrl()}/oauth2/authorization/google`;
+  const backendOrigin = getApiBaseUrl();
+
+  if (isLocalBackendUrl(backendOrigin)) {
+    return `${backendOrigin}/oauth2/authorization/google`;
+  }
+
+  return "/oauth2/authorization/google";
 }
