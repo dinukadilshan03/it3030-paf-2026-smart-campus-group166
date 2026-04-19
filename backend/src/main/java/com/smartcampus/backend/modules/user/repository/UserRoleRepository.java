@@ -1,5 +1,6 @@
 package com.smartcampus.backend.modules.user.repository;
 
+import com.smartcampus.backend.common.entity.User;
 import com.smartcampus.backend.common.entity.UserRole;
 import com.smartcampus.backend.common.enums.RoleCode;
 import com.smartcampus.backend.common.enums.UserStatus;
@@ -54,5 +55,17 @@ public interface UserRoleRepository extends JpaRepository<UserRole, Long> {
               and ur.user.status = :status
             """)
     long countActiveUsersByRoleAndStatus(
+            @Param("roleCode") RoleCode roleCode, @Param("status") UserStatus status);
+
+    @Query(
+            """
+            select u
+            from UserRole ur
+            join ur.user u
+            where ur.isActive = true
+              and ur.role.code = :roleCode
+              and u.status = :status
+            """)
+    List<User> findActiveUsersByRoleAndStatus(
             @Param("roleCode") RoleCode roleCode, @Param("status") UserStatus status);
 }

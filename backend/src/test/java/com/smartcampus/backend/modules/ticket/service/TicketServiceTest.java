@@ -112,6 +112,7 @@ class TicketServiceTest {
         assertThat(response.priority()).isEqualTo(TicketPriority.MEDIUM);
         assertThat(response.status()).isEqualTo(TicketStatus.OPEN);
         assertThat(response.locationId()).isEqualTo(20L);
+        verify(notificationService).notifyTicketCreated(any(Ticket.class));
     }
 
     @Test
@@ -456,6 +457,7 @@ class TicketServiceTest {
         assertThat(response.reconsiderationRequestCount()).isEqualTo(1);
         verify(ticketCommentService)
                 .createSystemStatusNote(ticket, "Student requested reconsideration review", reporter);
+        verify(notificationService).notifyTicketReconsiderationRequested(ticket);
     }
 
     @Test
@@ -573,6 +575,7 @@ class TicketServiceTest {
                         ticket,
                         "Rejected ticket reopened for reconsideration and assigned to Staff Reopen",
                         admin);
+        verify(notificationService).notifyTicketAssigned(ticket, admin, null);
     }
 
     private User buildUser(Long id, String email, String displayName) {

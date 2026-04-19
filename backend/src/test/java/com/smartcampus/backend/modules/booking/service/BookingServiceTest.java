@@ -133,6 +133,7 @@ class BookingServiceTest {
         verify(bookingRepository).save(bookingCaptor.capture());
         assertThat(bookingCaptor.getValue().getStatus()).isEqualTo(BookingStatus.PENDING);
         assertThat(bookingCaptor.getValue().getRequesterUser()).isEqualTo(student);
+        verify(notificationService).notifyBookingCreated(bookingCaptor.getValue());
         assertThat(created.status()).isEqualTo(BookingStatus.PENDING);
     }
 
@@ -197,6 +198,7 @@ class BookingServiceTest {
         BookingDetailResponse created = bookingService.create(request);
 
         assertThat(created.status()).isEqualTo(BookingStatus.APPROVED);
+        verify(notificationService).notifyBookingCreated(any(Booking.class));
     }
 
     @Test
@@ -381,6 +383,7 @@ class BookingServiceTest {
 
         assertThat(cancelled.status()).isEqualTo(BookingStatus.CANCELLED);
         assertThat(booking.getCancelledByUser()).isEqualTo(requester);
+        verify(notificationService).notifyBookingCancelled(booking, requester);
     }
 
     @Test
@@ -429,7 +432,7 @@ class BookingServiceTest {
     }
 
     @Test
-    void autoApprovedCreateDoesNotCreateNotification() {
+    void autoApprovedCreateTriggersBookingNotificationFlow() {
         User admin = buildUser(13L, "admin3@example.com", "Admin Three");
         UserRole membership = buildMembership(admin, RoleCode.ADMIN);
         Resource resource = buildResource(18L, false, ResourceStatus.ACTIVE);
@@ -488,6 +491,7 @@ class BookingServiceTest {
 
         bookingService.create(request);
 
+        verify(notificationService).notifyBookingCreated(any(Booking.class));
         verify(notificationService, never()).notifyBookingReviewed(any());
     }
 

@@ -108,7 +108,9 @@ public class BookingService {
                         .status(initialStatus)
                         .build();
 
-        return bookingMapper.toDetail(bookingRepository.save(booking));
+        Booking savedBooking = bookingRepository.save(booking);
+        notificationService.notifyBookingCreated(savedBooking);
+        return bookingMapper.toDetail(savedBooking);
     }
 
     @Transactional
@@ -176,7 +178,9 @@ public class BookingService {
         booking.setCancellationReason(
                 request == null ? null : normalizeOptionalText(request.reason()));
 
-        return bookingMapper.toDetail(bookingRepository.save(booking));
+        Booking savedBooking = bookingRepository.save(booking);
+        notificationService.notifyBookingCancelled(savedBooking, membership.getUser());
+        return bookingMapper.toDetail(savedBooking);
     }
 
     private Booking getManagedBooking(Long id) {
