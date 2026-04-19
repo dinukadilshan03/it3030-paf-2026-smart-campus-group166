@@ -266,6 +266,48 @@ class TicketReportServiceTest {
         verify(ticketAttachmentService).getAttachmentContent(42L, 2L, ticket);
     }
 
+    @Test
+    void detailReportWrapsUnexpectedRuntimeFailures() {
+        User admin = buildUser(1L, "admin@example.com", "Admin");
+        UserRole membership = buildMembership(admin, RoleCode.ADMIN);
+        GenerateTicketReportRequest request =
+                new GenerateTicketReportRequest(
+                        42L,
+                        "TCK-20260419-DETAIL",
+                        TicketReportType.DETAIL,
+                        TicketReportFormat.PDF,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null);
+        Ticket ticket =
+                Ticket.builder()
+                        .id(42L)
+                        .ticketNumber("TCK-20260419-DETAIL")
+                        .title("Projector blue screen")
+                        .build();
+        TicketDetailResponse detail = buildDetailTicket(42L, "TCK-20260419-DETAIL");
+
+        when(ticketAccessService.getRequiredCurrentMembership()).thenReturn(membership);
+        when(ticketService.getDetailedTicketEntity(42L)).thenReturn(ticket);
+        when(ticketService.getTicketById(42L)).thenReturn(detail);
+        when(ticketCommentService.getComments(ticket)).thenReturn(List.of());
+        when(ticketAttachmentService.getAttachments(ticket)).thenReturn(List.of());
+        when(ticketReportDocumentService.renderDetailReport(
+                        eq(request), eq("Admin"), anyString(), eq(detail), anyList(), anyList()))
+                .thenThrow(new NullPointerException("broken detail data"));
+
+        assertThatThrownBy(() -> ticketReportService.generateReport(request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Could not generate the detailed ticket report.");
+    }
+
     private User buildUser(Long id, String email, String displayName) {
         return User.builder().id(id).email(email).displayName(displayName).status(UserStatus.ACTIVE).build();
     }
