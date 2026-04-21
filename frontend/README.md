@@ -1,36 +1,89 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SmartCampus Frontend
 
-## Getting Started
+This is the production frontend for SmartCampus. It is a `Next.js 16` App Router application that serves the public landing page, authentication flows, and the protected campus operations workspace.
 
-First, run the development server:
+Live app: [https://triumphant-warmth-production-14f0.up.railway.app/](https://triumphant-warmth-production-14f0.up.railway.app/)
+
+## Stack
+
+- `Next.js 16`
+- `React 19`
+- `TypeScript`
+- `Tailwind CSS 4`
+
+## Scripts
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run build
+npm run start
+npm run lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Local example:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+```
 
-## Learn More
+Production variables:
 
-To learn more about Next.js, take a look at the following resources:
+- `BACKEND_INTERNAL_URL` for Railway internal-network rewrites
+- `NEXT_PUBLIC_API_BASE_URL` for browser-visible backend references
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Routing Layout
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `src/app/(public)` contains login, OAuth callback, and password-change flows
+- `src/app/(app)` contains the authenticated workspace
+- `src/app/api` contains frontend-owned API routes and server actions where used
 
-## Deploy on Vercel
+Primary workspace routes:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `/dashboard`
+- `/resources`
+- `/bookings`
+- `/tickets`
+- `/notifications`
+- `/users`
+- `/profile`
+- `/analytics`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Backend Integration
+
+The frontend talks to the Spring Boot backend through:
+
+- direct public API calls using `NEXT_PUBLIC_API_BASE_URL`
+- Railway rewrite proxying for `/backend/*`, `/oauth2/*`, `/login/oauth2/*`, and `/error`
+
+See [next.config.ts](/C:/Users/dinuka/Documents/SmartCampus/frontend/next.config.ts).
+
+## Frontend Structure
+
+- `src/components` for feature UI
+- `src/lib` for API clients, feature logic, auth helpers, and config
+- `src/types` for shared frontend types
+- `public` for static assets
+
+Feature areas currently represented in the codebase:
+
+- auth
+- dashboard
+- resources
+- bookings
+- tickets
+- notifications
+- profile
+- users
+- admin analytics
+
+## Development Notes
+
+- The frontend is role-aware and expects backend session state from `/api/v1/auth/me`.
+- Students authenticate through Google OAuth.
+- Staff and admins authenticate through local email/password.
+- Do not connect the frontend directly to Supabase; the backend is the single source of truth for data access and validation.
+
+Repo-level documentation lives in [README.md](/C:/Users/dinuka/Documents/SmartCampus/README.md).

@@ -1,87 +1,49 @@
 # Resources Cheat Sheet
 
-**Scope**
+Quick reference for the active resources module.
 
-- Frontend UI and client API for managing campus resources: listing, filtering, adding, editing, AI-assisted help, and analysis.
+## Frontend Entry Points
 
-**Key frontend components**
+- [frontend/src/app/(app)/resources/page.tsx](/C:/Users/dinuka/Documents/SmartCampus/frontend/src/app/(app)/resources/page.tsx)
+- [frontend/src/app/(app)/resources/add/page.tsx](/C:/Users/dinuka/Documents/SmartCampus/frontend/src/app/(app)/resources/add/page.tsx)
+- [frontend/src/app/(app)/resources/analysis/page.tsx](/C:/Users/dinuka/Documents/SmartCampus/frontend/src/app/(app)/resources/analysis/page.tsx)
+- [frontend/src/app/(app)/resources/AIChat.tsx](/C:/Users/dinuka/Documents/SmartCampus/frontend/src/app/(app)/resources/AIChat.tsx)
 
-- `ResourceList` — displays resource lists and cards: [frontend/src/components/resources/ResourceList.tsx](frontend/src/components/resources/ResourceList.tsx)
-- `ResourceFilters` — filter controls (type, availability, location): [frontend/src/components/resources/ResourceFilters.tsx](frontend/src/components/resources/ResourceFilters.tsx)
+## Frontend Support Code
 
-**Pages / flows**
+- [frontend/src/components/resources](/C:/Users/dinuka/Documents/SmartCampus/frontend/src/components/resources)
+- [frontend/src/lib/resources/api.ts](/C:/Users/dinuka/Documents/SmartCampus/frontend/src/lib/resources/api.ts)
+- [frontend/src/lib/resources/types.ts](/C:/Users/dinuka/Documents/SmartCampus/frontend/src/lib/resources/types.ts)
 
-- List page: [frontend/src/app/(app)/resources/page.tsx](frontend/src/app/(app)/resources/page.tsx)
-- Add resource: [frontend/src/app/(app)/resources/add/page.tsx](frontend/src/app/(app)/resources/add/page.tsx)
-- Edit resource: [frontend/src/app/(app)/resources/edit/[id]/page.tsx](frontend/src/app/(app)/resources/edit/[id]/page.tsx)
-- AI assistant / chat: [frontend/src/app/(app)/resources/AIChat.tsx](frontend/src/app/(app)/resources/AIChat.tsx)
-- Analysis / metrics: [frontend/src/app/(app)/resources/analysis/page.tsx](frontend/src/app/(app)/resources/analysis/page.tsx)
+## Backend Endpoints
 
-**Client API & types**
+- `GET /api/v1/resources`
+- `GET /api/v1/resources/{id}`
+- `POST /api/v1/resources`
+- `PATCH /api/v1/resources/{id}`
+- `DELETE /api/v1/resources/{id}`
+- `GET /api/v1/resources/{resourceId}/availability`
+- `PUT /api/v1/resources/{resourceId}/availability`
+- `GET /api/v1/resource-categories`
+- `GET /api/v1/locations`
 
-- `api.ts`: client calls (fetch/list/create/update): [frontend/src/lib/resources/api.ts](frontend/src/lib/resources/api.ts)
-- `types.ts`: resource data shapes (e.g., `Resource`, `Availability`): [frontend/src/lib/resources/types.ts](frontend/src/lib/resources/types.ts)
+## Common Filters
 
-**Common functions / symbols**
+- `categoryId`
+- `locationId`
+- `status`
+- `minCapacity`
+- `search`
 
-- `getResources` / `fetchResources` — list retrieval (see `api.ts`)
-- `createResource` / `updateResource` — mutations (see `api.ts`)
-- `ResourceList` / `ResourceFilters` — UI wiring
+## Practical Notes
 
-**Where to add fields / validation**
+- admins own resource/category/location mutations
+- authenticated users can browse resources
+- keep resource types in sync with backend DTOs before changing UI contracts
+- availability updates are full replacement operations
+- verify AI-related changes against both the UI flow and backend/provider configuration
 
-- Update the add form at [frontend/src/app/(app)/resources/add/page.tsx](frontend/src/app/(app)/resources/add/page.tsx) and mirror changes in the edit page.
-- Update types in [frontend/src/lib/resources/types.ts](frontend/src/lib/resources/types.ts) and adjust `api.ts` accordingly.
+## Related Docs
 
-**Integration notes**
-
-- When changing a backend contract, first update `types.ts` and `api.ts` to reflect the new shape, then align backend endpoints.
-- Check `AIChat.tsx` prompts and rate limits before modifying AI behavior.
-
-**Run / inspect**
-
-- Frontend: see `frontend/package.json` for dev scripts. Typical dev command:
-
-```bash
-cd frontend
-pnpm install
-pnpm dev
-```
-
-- Backend config: [backend/src/main/resources/application.properties](backend/src/main/resources/application.properties)
-
-**Quick TODOs**
-
-- Add form validation and error handling on add/edit pages.
-- Add unit tests for `api.ts` (mock fetch) if missing.
-- Verify AI assistant UX and prompt wording in `AIChat.tsx`.
-
----
-
-If you want this note placed somewhere else (frontend folder, repo root, or as a `README`), tell me and I'll move it.
-
-**Backend endpoints (summary)**
-
-- See detailed endpoints copy: [frontend/resources-backend-endpoints.md](frontend/resources-backend-endpoints.md)
-
-- Resources
-	- GET `/api/v1/resources` — list resources (query: `categoryId`, `locationId`, `status`, `minCapacity`, `search`)
-	- GET `/api/v1/resources/{id}` — resource details
-	- POST `/api/v1/resources` — create resource (ADMIN)
-	- PATCH `/api/v1/resources/{id}` — update resource (ADMIN)
-	- DELETE `/api/v1/resources/{id}` — delete resource (ADMIN)
-
-- Availability
-	- GET `/api/v1/resources/{resourceId}/availability` — get availability windows
-	- PUT `/api/v1/resources/{resourceId}/availability` — replace availability (ADMIN)
-
-- Categories
-	- GET `/api/v1/resource-categories` — list categories
-	- GET `/api/v1/resource-categories/{id}` — category details
-	- POST/PATCH/DELETE `/api/v1/resource-categories` (and `/{id}`) — mutating ops (ADMIN)
-
-- Locations
-	- GET `/api/v1/locations` — list locations
-	- GET `/api/v1/locations/{id}` — location details
-	- POST/PATCH/DELETE `/api/v1/locations` (and `/{id}`) — mutating ops (ADMIN)
-
+- [docs/resource-component-handoff.md](/C:/Users/dinuka/Documents/SmartCampus/docs/resource-component-handoff.md)
+- [frontend/resources-backend-endpoints.md](/C:/Users/dinuka/Documents/SmartCampus/frontend/resources-backend-endpoints.md)

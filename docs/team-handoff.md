@@ -1,213 +1,82 @@
-# Team Handoff
+# Project Orientation
 
-## Purpose
+This document is the quick orientation guide for the current SmartCampus codebase.
 
-This is the main handoff note for the current SmartCampus state. It gives the team one place to see:
+## Current State
 
-- what foundation is already implemented
-- which modules are ready for frontend work
-- what auth and role behavior already exists
-- which detailed handoff docs to use next
+SmartCampus is no longer a scaffold or partial handoff. The active web app is implemented in:
 
-## Current Project State
+- [frontend](/C:/Users/dinuka/Documents/SmartCampus/frontend)
+- [backend](/C:/Users/dinuka/Documents/SmartCampus/backend)
 
-The project already has the core backend foundation and the frontend app shell in place.
+Live deployment:
 
-### Active project roots
+- [https://triumphant-warmth-production-14f0.up.railway.app/](https://triumphant-warmth-production-14f0.up.railway.app/)
 
-- backend work happens in [backend](C:/Users/dinuka/Documents/SmartCampus/backend)
-- frontend work happens in [frontend](C:/Users/dinuka/Documents/SmartCampus/frontend)
+Legacy directories remain in the repo for reference only:
 
-### Backend setup source of truth
+- `legacy-frontend`
+- `legacy-backend`
 
-- the active backend is Supabase-only
-- local Postgres is not part of the supported setup
-- backend environment setup should start from [backend/.env.example](C:/Users/dinuka/Documents/SmartCampus/backend/.env.example)
-- if `DB_CONNECTION_MODE=pooler` times out, switch to `direct` and retry with the direct Supabase JDBC URL
+## Where To Start
 
-### Backend already implemented
+If you are new to the repo, read in this order:
 
-- auth and session foundation
-- user management workflow
-- resource workflow
-- booking workflow
-- ticket workflow
+1. [README.md](/C:/Users/dinuka/Documents/SmartCampus/README.md)
+2. [docs/tech-stack.md](/C:/Users/dinuka/Documents/SmartCampus/docs/tech-stack.md)
+3. [docs/deployment.md](/C:/Users/dinuka/Documents/SmartCampus/docs/deployment.md)
+4. [docs/workflows.md](/C:/Users/dinuka/Documents/SmartCampus/docs/workflows.md)
+5. relevant module reference docs in `docs/`
 
-### Frontend already implemented
+## Active Product Areas
 
-- login flow and protected shell
-- role-based dashboards and navigation
-- shared route protection
-- admin user-management page
-- placeholder routes for resources, bookings, tickets, notifications, and profile
-
-## Auth Model
-
-The auth model is now split by role:
-
-- `STUDENT`
-  - Google OAuth only
-- `STAFF`
-  - local email/password only
-- `ADMIN`
-  - local email/password only
-
-What is already done:
-
-- session-based backend auth
-- `GET /api/v1/auth/me`
-- `POST /api/v1/auth/logout`
-- `POST /api/v1/auth/login`
-- `POST /api/v1/auth/change-password`
-- role-aware frontend shell
-- forced password-change support for temporary local credentials
-
-## Frontend Role Shell
-
-The app shell and dashboards are already built.
-
-### Student navigation
-
+- authentication and password-change flows
 - dashboard
 - resources
 - bookings
 - tickets
-- profile
-
-### Staff navigation
-
-- dashboard
-- resources
-- tickets
-- profile
-
-### Admin navigation
-
-- dashboard
-- resources
-- bookings
-- tickets
-- users
 - notifications
+- users
 - profile
+- analytics
 
-The dashboards are scaffolded and role-aware. The `/users` page is no longer a placeholder.
+## Repo Responsibilities
 
-## Completed Module
+### Frontend
 
-### Admin users module
+Use [frontend](/C:/Users/dinuka/Documents/SmartCampus/frontend) for:
 
-The `/users` route is already implemented as a real admin workspace.
+- public pages
+- app routes
+- UI components
+- frontend API clients
+- route-level role-aware experiences
 
-Implemented:
+### Backend
 
-- browse/filter/search users
-- view user detail
-- edit profile fields
-- change role
-- change status
-- create staff/admin users
-- create/reset/delete local credentials
-- show credential/login state
+Use [backend](/C:/Users/dinuka/Documents/SmartCampus/backend) for:
 
-If teammates need a pattern for how to build an admin workflow page, they should use `/users` as the reference implementation.
+- REST API controllers
+- business logic
+- security
+- database access
+- Flyway migrations
+- storage integration
 
-Main frontend page:
+## Important Constraints
 
-- [frontend/src/app/(app)/users/page.tsx](C:/Users/dinuka/Documents/SmartCampus/frontend/src/app/(app)/users/page.tsx)
-
-Main frontend feature area:
-
-- [frontend/src/components/users](C:/Users/dinuka/Documents/SmartCampus/frontend/src/components/users)
-- [frontend/src/lib/users](C:/Users/dinuka/Documents/SmartCampus/frontend/src/lib/users)
-
-## Workflow Handoff Docs
-
-Use these detailed docs for the remaining frontend feature work:
-
-### Resources
-
-- [docs/resource-component-handoff.md](C:/Users/dinuka/Documents/SmartCampus/docs/resource-component-handoff.md)
-
-### Bookings
-
-- [docs/booking-component-handoff.md](C:/Users/dinuka/Documents/SmartCampus/docs/booking-component-handoff.md)
-
-### Tickets
-
-- [docs/ticket-component-handoff.md](C:/Users/dinuka/Documents/SmartCampus/docs/ticket-component-handoff.md)
-
-## Recommended Team Split
-
-### You
-
-Suggested ownership:
-
-- auth polish
-- dashboards
-- admin/user management
-- project-wide coordination
-- notifications later
-
-### Resources teammate
-
-Suggested ownership:
-
-- resource list/browse UI
-- category manager
-- location manager
-- availability editor
-
-### Bookings teammate
-
-Suggested ownership:
-
-- booking request form
-- booking list/detail
-- admin review flow
-
-### Tickets teammate
-
-Suggested ownership:
-
-- ticket list/detail
-- ticket creation
-- comments
-- assignment/status workflow
-- category manager
-
-## What Is Still Not Done
-
-These areas still need implementation:
-
-- real frontend for resources
-- real frontend for bookings
-- real frontend for tickets
-- notifications workflow
-- real storage upload flow for attachments
-- full profile module polish
-
-## Important Notes For The Team
-
-- do not rebuild auth or route protection
-- use the existing backend APIs and frontend shell
-- backend already enforces most business rules
-- frontend should focus on:
-  - list/detail views
-  - filters
-  - forms
-  - dialogs
-  - role-aware actions
-  - clean display of backend validation errors
+- the backend is the source of truth for validation and permissions
+- the frontend should not connect directly to Supabase
+- production deployment is Railway plus Supabase
+- student auth is Google OAuth only
+- staff/admin auth is local credentials only
 
 ## Reference Docs
 
-Main API contract:
-
-- [docs/api/endpoints.md](C:/Users/dinuka/Documents/SmartCampus/docs/api/endpoints.md)
-
-If someone needs to understand the overall app flow before building, start with:
-
-- this file
-- the relevant component handoff doc
-- the `/users` frontend implementation as a reference pattern
+- [docs/api/endpoints.md](/C:/Users/dinuka/Documents/SmartCampus/docs/api/endpoints.md)
+- [docs/entity.md](/C:/Users/dinuka/Documents/SmartCampus/docs/entity.md)
+- [docs/database/schema.md](/C:/Users/dinuka/Documents/SmartCampus/docs/database/schema.md)
+- [docs/database/relationships.md](/C:/Users/dinuka/Documents/SmartCampus/docs/database/relationships.md)
+- [docs/resource-component-handoff.md](/C:/Users/dinuka/Documents/SmartCampus/docs/resource-component-handoff.md)
+- [docs/booking-component-handoff.md](/C:/Users/dinuka/Documents/SmartCampus/docs/booking-component-handoff.md)
+- [docs/ticket-component-handoff.md](/C:/Users/dinuka/Documents/SmartCampus/docs/ticket-component-handoff.md)
