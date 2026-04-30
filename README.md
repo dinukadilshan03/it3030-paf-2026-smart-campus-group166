@@ -20,34 +20,6 @@ SmartCampus is a complete campus operations platform that streamlines resource m
 
 ---
 
-## 📸 Screenshots
-
-> Place your screenshots in the `images/` folder and update the paths below.
-
-### Landing Page
-![Landing Page](images/homepage.png)
-
-### Dashboard
-> _Add screenshot: `images/dashboard.png`_
-<!-- ![Dashboard](images/dashboard.png) -->
-
-### Resource Directory
-![Resource - Computer Lab](images/computer_lab.jpg)
-
-### Bookings
-> _Add screenshot: `images/bookings.png`_
-<!-- ![Bookings](images/bookings.png) -->
-
-### Ticketing
-> _Add screenshot: `images/tickets.png`_
-<!-- ![Tickets](images/tickets.png) -->
-
-### Analytics (Admin)
-> _Add screenshot: `images/analytics.png`_
-<!-- ![Analytics](images/analytics.png) -->
-
----
-
 ## 📋 Table of Contents
 
 - [Overview](#-overview)
